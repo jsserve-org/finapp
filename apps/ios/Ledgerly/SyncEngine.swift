@@ -19,20 +19,43 @@ struct SyncEngine {
         //    come back in the same change feed.
         let pending = try context.fetch(FetchDescriptor<PendingMutation>(sortBy: [SortDescriptor(\.createdAt)]))
         let pendingAccounts = try context.fetch(FetchDescriptor<PendingAccountMutation>(sortBy: [SortDescriptor(\.createdAt)]))
+        let pendingTransactions = try context.fetch(FetchDescriptor<PendingTransactionCreate>(sortBy: [SortDescriptor(\.createdAt)]))
+        let pendingRecurring = try context.fetch(FetchDescriptor<PendingRecurringMutation>(sortBy: [SortDescriptor(\.createdAt)]))
         let accountOperations: [SyncOperation] = try pendingAccounts.compactMap { mutation in
             guard let account = try fetchOne(CachedAccount.self, id: mutation.entityId, context: context) else { return nil }
             let dto = AccountDTO(id: account.id, name: account.name, institution: account.institution, kind: account.kind, balance: Money(amountMinor: account.amountMinor, currency: account.currency), updatedAt: account.updatedAt)
             return SyncOperation(mutationId: mutation.mutationId, entity: "account", action: "upsert", entityId: account.id, value: .init(account: dto), baseVersion: 0)
         }
+        let transactionOperations: [SyncOperation] = try pendingTransactions.compactMap { mutation in
+            guard let transaction = try fetchOne(CachedTransaction.self, id: mutation.entityId, context: context) else { return nil }
+            let dto = TransactionDTO(id: transaction.id, accountId: transaction.accountId, description: transaction.title, amount: Money(amountMinor: transaction.amountMinor, currency: transaction.currency), bookedAt: transaction.bookedAt, pending: transaction.pending, category: transaction.category, updatedAt: transaction.updatedAt)
+            return SyncOperation(mutationId: mutation.mutationId, action: "upsert", entityId: transaction.id, value: .init(transaction: dto), baseVersion: 0)
+        }
+        let recurringOperations: [SyncOperation] = try pendingRecurring.compactMap { mutation in
+            if mutation.action == "delete" {
+                return SyncOperation(mutationId: mutation.mutationId, entity: "recurringPayment", action: "delete", entityId: mutation.entityId, value: nil, baseVersion: 0)
+            }
+            guard let payment = try fetchOne(RecurringPayment.self, id: mutation.entityId, context: context) else { return nil }
+            let dto = RecurringPaymentDTO(id: payment.id, name: payment.name, amountMinor: payment.amountMinor, currency: payment.currency, frequency: payment.frequency, nextDate: payment.nextDate, accountId: payment.accountId, category: payment.category, isActive: payment.isActive)
+            return SyncOperation(mutationId: mutation.mutationId, entity: "recurringPayment", action: "upsert", entityId: payment.id, value: .init(recurringPayment: dto), baseVersion: 0)
+        }
         var accepted = 0
-        if !pending.isEmpty || !pendingAccounts.isEmpty {
-            let result = try await api.sync(cursor: cursor, operations: accountOperations + pending.map(\.operation))
+        if !pending.isEmpty || !pendingAccounts.isEmpty || !pendingTransactions.isEmpty || !pendingRecurring.isEmpty {
+            let result = try await api.sync(cursor: cursor, operations: accountOperations + transactionOperations + recurringOperations + pending.map(\.operation))
             let acceptedIds = Set(result.acceptedMutationIds)
             for mutation in pending where acceptedIds.contains(mutation.mutationId) {
                 context.delete(mutation)
                 accepted += 1
             }
             for mutation in pendingAccounts where acceptedIds.contains(mutation.mutationId) {
+                context.delete(mutation)
+                accepted += 1
+            }
+            for mutation in pendingTransactions where acceptedIds.contains(mutation.mutationId) {
+                context.delete(mutation)
+                accepted += 1
+            }
+            for mutation in pendingRecurring where acceptedIds.contains(mutation.mutationId) {
                 context.delete(mutation)
                 accepted += 1
             }
@@ -63,6 +86,9 @@ struct SyncEngine {
                 if change.entity == "transaction" {
                     try fetchOne(CachedTransaction.self, id: entityID, context: context).map(context.delete)
                 }
+                if change.entity == "recurringPayment" {
+                    try fetchOne(RecurringPayment.self, id: entityID, context: context).map(context.delete)
+                }
                 continue
             }
             guard let value = change.value else { continue }
@@ -82,6 +108,20 @@ struct SyncEngine {
                     item.apply(dto, version: change.sequence)
                 } else {
                     context.insert(CachedTransaction(dto: dto, initialVersion: change.sequence))
+                }
+            case "recurringPayment":
+                let dto = try decoder.decode(RecurringPaymentDTO.self, from: data)
+                if let item = try fetchOne(RecurringPayment.self, id: entityID, context: context) {
+                    item.name = dto.name
+                    item.amountMinor = dto.amountMinor
+                    item.currency = dto.currency
+                    item.frequency = dto.frequency
+                    item.nextDate = dto.nextDate
+                    item.accountId = dto.accountId
+                    item.category = dto.category
+                    item.isActive = dto.isActive
+                } else {
+                    context.insert(RecurringPayment(id: dto.id, name: dto.name, amountMinor: dto.amountMinor, currency: dto.currency, frequency: dto.frequency, nextDate: dto.nextDate, accountId: dto.accountId, category: dto.category, isActive: dto.isActive))
                 }
             default:
                 continue

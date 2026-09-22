@@ -10,7 +10,7 @@ struct LedgerlyApp: App {
             if session.canUseApp { RootTabView().environment(session) }
             else { LoginView().environment(session) }
         }
-            .modelContainer(for: [CachedAccount.self, CachedTransaction.self, SyncSetting.self, PendingMutation.self, PendingAccountMutation.self, RecurringPayment.self])
+            .modelContainer(for: [CachedAccount.self, CachedTransaction.self, SyncSetting.self, PendingMutation.self, PendingAccountMutation.self, PendingTransactionCreate.self, PendingRecurringMutation.self, RecurringPayment.self])
     }
 }
 
@@ -201,7 +201,7 @@ struct NewRecurringPaymentView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Payment") {
+                Section("Bill") {
                     TextField("Name", text: $name)
                         .font(.body)
                     TextField("Amount", text: $amount)
@@ -215,7 +215,7 @@ struct NewRecurringPaymentView: View {
                     TextField("Category", text: $category)
                         .font(.body)
                 }
-                Section("Schedule") {
+                Section("Repeats") {
                     Picker("Repeats", selection: $frequency) {
                         ForEach(frequencies, id: \.0) { Text($0.1).tag($0.0) }
                     }
@@ -230,12 +230,12 @@ struct NewRecurringPaymentView: View {
                     }
                 }
                 Section {
-                    Text("Ledgerly will track this schedule. It will not move money or charge the account.")
+                    Text("This bill repeats automatically in Ledgerly. It does not move money or charge the account.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
             }
-            .navigationTitle("New recurring payment")
+            .navigationTitle("Add recurring bill")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
@@ -250,7 +250,7 @@ struct NewRecurringPaymentView: View {
     }
 
     private func save() {
-        context.insert(RecurringPayment(
+        let bill = RecurringPayment(
             name: name.trimmingCharacters(in: .whitespaces),
             amountMinor: parsedAmount,
             currency: currency,
@@ -258,7 +258,9 @@ struct NewRecurringPaymentView: View {
             nextDate: nextDate,
             accountId: accountId.isEmpty ? nil : accountId,
             category: category.trimmingCharacters(in: .whitespaces).isEmpty ? "Bills" : category.trimmingCharacters(in: .whitespaces)
-        ))
+        )
+        context.insert(bill)
+        context.insert(PendingRecurringMutation(entityId: bill.id, action: "upsert"))
         try? context.save()
         dismiss()
     }
