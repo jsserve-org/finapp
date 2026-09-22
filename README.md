@@ -2,6 +2,8 @@
 
 An offline-first finance app with native SwiftUI iOS, React Native Android, a Bun authentication/bank gateway, and a self-hosted Convex sync layer.
 
+Both apps can be used without a server account. Users can continue locally, create manual accounts immediately, and enable self-hosted sync later from Settings. Local account data is stored in SwiftData on iOS and SQLite on Android.
+
 ## Services
 
 ```text
@@ -30,7 +32,7 @@ docker compose up --build -d api
 curl http://localhost:3000/health/ready
 ```
 
-The login screens let users set both endpoints. Emulator defaults are `http://10.0.2.2:3000` and `http://10.0.2.2:3210`; the iOS Simulator uses `localhost`. Registration can be disabled with `ALLOW_REGISTRATION=false` after creating users.
+The login screens let users set both endpoints. Emulator defaults are `http://10.0.2.2:3000` and `http://10.0.2.2:3210`; the iOS Simulator uses `localhost`. Administrators can set `ALLOW_REGISTRATION=false` and restart the API after creating users. The API then rejects registration with HTTP 403 and `/v1/config` tells both apps to hide the registration option.
 
 ## Opening ports
 

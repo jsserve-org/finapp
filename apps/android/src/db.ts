@@ -28,3 +28,8 @@ export function applySync(result: SyncResponse) {
 export const cachedAccounts = () => readCache<Account>("account");
 export const cachedTransactions = () => readCache<Transaction>("transaction");
 export const cursor = () => database.getFirstSync<{ value: string }>("SELECT value FROM settings WHERE key = 'cursor'")?.value;
+export function createLocalAccount(input: { name: string; institution: string; kind: Account["kind"]; amountMinor: number; currency: string }) {
+  const account: Account = { id: `local-${Date.now()}-${Math.random().toString(36).slice(2)}`, name: input.name, institution: input.institution || "Manual", kind: input.kind, balance: { amountMinor: input.amountMinor, currency: input.currency.toUpperCase() }, updatedAt: new Date().toISOString() };
+  database.runSync("INSERT INTO cache(kind, id, value) VALUES ('account', ?, ?)", account.id, JSON.stringify(account));
+  return account;
+}

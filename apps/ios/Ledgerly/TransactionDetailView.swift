@@ -22,7 +22,7 @@ struct TransactionDetailView: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(colors: [Color(red: 0.02, green: 0.12, blue: 0.09), Color(red: 0.03, green: 0.22, blue: 0.16)], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
+            LedgerlyBackground()
             ScrollView {
                 if let transaction {
                     LazyVStack(alignment: .leading, spacing: 16) {
@@ -34,7 +34,7 @@ struct TransactionDetailView: View {
                                 Text(transaction.title).font(.title.bold()).foregroundStyle(.white)
                                 Text(transaction.category ?? "Uncategorized").foregroundStyle(.secondary)
                             }
-                            Text(money(transaction.amountMinor, transaction.currency)).font(.system(size: 36, weight: .bold, design: .rounded)).foregroundStyle(transaction.amountMinor > 0 ? .mint : .white)
+                            Text(money(transaction.amountMinor, transaction.currency)).font(.system(size: 36, weight: .bold, design: .rounded)).foregroundStyle(transaction.amountMinor > 0 ? .blue : .white)
                             HStack(spacing: 12) {
                                 if transaction.pending { Label("Pending", systemImage: "clock").font(.caption).foregroundStyle(.orange) }
                                 if let date = transaction.bookedDate {
@@ -45,7 +45,7 @@ struct TransactionDetailView: View {
                         }.frame(maxWidth: .infinity, alignment: .leading).padding(24).ledgerlyGlass(cornerRadius: 28)
 
                         if savedFlash {
-                            Label("Saved offline · will sync automatically", systemImage: "tray.and.arrow.up").font(.caption).foregroundStyle(.mint)
+                            Label("Saved on this device", systemImage: "checkmark.circle").font(.caption).foregroundStyle(.blue)
                         }
 
                         if isEditing {
@@ -53,7 +53,7 @@ struct TransactionDetailView: View {
                                 save(transaction)
                             } label: {
                                 Label("Save", systemImage: "checkmark").frame(maxWidth: .infinity)
-                            }.buttonStyle(.borderedProminent).tint(.mint)
+                            }.buttonStyle(.borderedProminent).tint(.blue)
                             Button("Cancel", role: .cancel) { isEditing = false }.frame(maxWidth: .infinity)
                         } else {
                             Button {
@@ -62,7 +62,7 @@ struct TransactionDetailView: View {
                                 isEditing = true
                             } label: {
                                 Label("Edit", systemImage: "pencil").frame(maxWidth: .infinity)
-                            }.buttonStyle(.borderedProminent).tint(.mint)
+                            }.buttonStyle(.borderedProminent).tint(.blue)
                             Button("Delete", role: .destructive) { showDeleteConfirm = true }.frame(maxWidth: .infinity)
                         }
                     }.padding(20)

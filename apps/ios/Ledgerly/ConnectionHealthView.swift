@@ -8,7 +8,7 @@ struct ConnectionHealthView: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(colors: [Color(red: 0.02, green: 0.12, blue: 0.09), Color(red: 0.03, green: 0.22, blue: 0.16)], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
+            LedgerlyBackground()
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 16) {
                     if let errorText {
@@ -34,7 +34,7 @@ struct ConnectionHealthView: View {
                         }.frame(maxWidth: .infinity, alignment: .leading).padding(18).ledgerlyGlass(cornerRadius: 20)
                     }
                     if statuses.isEmpty && !isLoading && errorText == nil {
-                        ContentUnavailableView("No connections", systemImage: "antenna.radiowaves.left.and.right", description: Text("Run the demo automation to create one."))
+                        ContentUnavailableView("No connections", systemImage: "antenna.radiowaves.left.and.right", description: Text("Connect a bank when you are ready."))
                     }
                 }.padding(20)
             }
@@ -56,7 +56,7 @@ struct ConnectionHealthView: View {
                 if isRunningDemo { ProgressView().frame(maxWidth: .infinity) }
                 else { Label("Run demo import", systemImage: "sparkles").frame(maxWidth: .infinity) }
             }
-            .buttonStyle(.borderedProminent).tint(.mint).padding()
+            .buttonStyle(.borderedProminent).tint(.blue).padding()
         }
     }
 

@@ -13,6 +13,7 @@ struct AuthResponse: Codable {
     let user: User
     let context: Context
 }
+struct ServerConfig: Codable { let registrationEnabled: Bool; let convexUrl: String }
 
 struct ConnectionStatus: Codable, Equatable {
     let connectionId: String
@@ -59,6 +60,10 @@ actor APIClient {
         let request = makeRequest(path: register ? "/v1/auth/register" : "/v1/auth/login", method: "POST", body: body)
         let data = try await send(request)
         return register ? nil : try decoder.decode(AuthResponse.self, from: data)
+    }
+
+    func serverConfig() async throws -> ServerConfig {
+        try decoder.decode(ServerConfig.self, from: await send(makeRequest(path: "/v1/config")))
     }
 
     func logout() async throws {
