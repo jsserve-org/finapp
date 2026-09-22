@@ -15,6 +15,13 @@ struct AuthResponse: Codable {
 }
 struct ServerConfig: Codable { let registrationEnabled: Bool; let convexUrl: String }
 
+struct RemoteAccount: Codable, Identifiable {
+    let id, name, institution, kind: String
+    let balance: Money
+}
+
+struct CreatedBill: Codable { let id: String; let created: Bool }
+
 struct ConnectionStatus: Codable, Equatable {
     let connectionId: String
     let state: String
@@ -104,6 +111,15 @@ actor APIClient {
         let body = try JSONEncoder().encode(SyncRequestBody(cursor: cursor, operations: operations))
         let request = makeRequest(path: "/v1/sync", method: "POST", body: body)
         return try decoder.decode(SyncResponse.self, from: await send(request))
+    }
+
+    func accounts() async throws -> [RemoteAccount] {
+        try decoder.decode([RemoteAccount].self, from: await send(makeRequest(path: "/v1/accounts")))
+    }
+
+    func createBill(_ bill: ShortcutBillRequest) async throws -> CreatedBill {
+        let body = try JSONEncoder().encode(bill)
+        return try decoder.decode(CreatedBill.self, from: await send(makeRequest(path: "/v1/bills", method: "POST", body: body)))
     }
 
     // MARK: - Health & connections

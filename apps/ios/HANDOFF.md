@@ -11,7 +11,10 @@ The iOS client is a native SwiftUI/SwiftData app in `apps/ios/Ledgerly`. The bac
 - Keychain-backed bearer token (`KeychainStore`) with build-config fallback.
 - Users choose the API and Convex URLs at login. The opaque session token is stored in Keychain; use HTTPS on a physical device.
 - Stock SwiftUI navigation, forms, lists, toolbars, and tab bar. iOS 26 supplies its native Liquid Glass treatment automatically, while earlier supported versions retain their system appearance.
-- Unit test target `LedgerlyTests` (11 tests): DTO decoding against the API's JSON shape, `JSONValue` ordering, cache upsert/merge/delete, cursor persistence, outbox operation encoding.
+- App Intents for creating one-time and recurring bills through Apple Shortcuts; both use the authenticated bill API and server-backed account picker.
+- Account deletion cascades to linked transactions and recurring bills locally and through the sync server.
+- An AppIcon asset catalog plus an iOS 18-safe SF Symbol catalog for visible icons throughout the supported OS range.
+- Unit test target `LedgerlyTests` (13 tests): DTO decoding against the API's JSON shape, `JSONValue` ordering, cache upsert/merge/delete, cursor persistence, outbox operation encoding, and backup restoration.
 - XcodeGen specification in `project.yml`.
 
 ## Build & test

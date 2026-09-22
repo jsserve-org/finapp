@@ -15,6 +15,11 @@ describe("health", () => {
     expect(response.status).toBe(401);
   });
 
+  it("protects bill creation and account lookup", async () => {
+    expect((await app.request("/v1/accounts")).status).toBe(401);
+    expect((await app.request("/v1/bills", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })).status).toBe(401);
+  });
+
   it("publishes registration policy without authentication", async () => {
     const response = await app.request("/v1/config");
     expect(response.status).toBe(200);

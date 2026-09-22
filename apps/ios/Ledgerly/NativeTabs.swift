@@ -36,13 +36,13 @@ struct NativeAccountsView: View {
                                     Text("\(account.institution) · \(account.displayKind)").font(.subheadline).foregroundStyle(.secondary)
                                 }
                             } icon: {
-                                Image(systemName: accountSymbol(account)).foregroundStyle(.blue)
+                                Image(systemName: accountSymbol(account)).ledgerlyIcon()
                             }
                             .badge(Text(money(account.amountMinor, account.currency)))
                         }
                     }
                     if accounts.isEmpty {
-                        ContentUnavailableView("No accounts", systemImage: "building.columns", description: Text("Create an account on this device. Sync is optional."))
+                        ContentUnavailableView("No accounts", systemImage: AppIcon.account, description: Text("Create an account on this device. Sync is optional."))
                     }
                 }
             }
@@ -58,7 +58,7 @@ struct NativeAccountsView: View {
         case "savings": "banknote.fill"
         case "credit": "creditcard.trianglebadge.exclamationmark"
         case "investment": "chart.line.uptrend.xyaxis"
-        default: "wallet.bifold.fill"
+        default: AppIcon.cash
         }
     }
 }
@@ -113,7 +113,7 @@ struct NativeActivityView: View {
                         .controlSize(.large)
 
                         Button { showingNewRecurringPayment = true } label: {
-                            Label("Add recurring bill", systemImage: "repeat.circle")
+                            Label("Add recurring bill", systemImage: AppIcon.recurring)
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.bordered)
@@ -142,7 +142,7 @@ struct NativeActivityView: View {
                         NavigationLink { TransactionDetailView(transactionID: transaction.id) } label: { transactionRow(transaction) }
                     }
                     if transactions.isEmpty {
-                        ContentUnavailableView("No activity", systemImage: "list.bullet.rectangle", description: Text("Transactions you add or sync will appear here."))
+                        ContentUnavailableView("No activity", systemImage: AppIcon.activity, description: Text("Transactions you add or sync will appear here."))
                     }
                 }
             }
@@ -161,7 +161,7 @@ struct NativeActivityView: View {
                     Text(payment.name).font(.headline)
                     Text("\(payment.frequencyLabel) · next due \(payment.nextDate.formatted(date: .abbreviated, time: .omitted))").font(.subheadline).foregroundStyle(.secondary)
                 }
-            } icon: { Image(systemName: "repeat").foregroundStyle(.blue) }
+            } icon: { Image(systemName: AppIcon.recurring).ledgerlyIcon() }
         }
     }
 

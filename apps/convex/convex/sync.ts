@@ -8,6 +8,24 @@ export const exchange = mutation({ args: { tokenHash: v.string(), cursor: v.stri
   for (const operation of args.operations.slice(0, 100)) {
     const prior = await ctx.db.query("mutations").withIndex("by_user_mutation", (q) => q.eq("userId", session.userId).eq("mutationId", operation.mutationId)).unique();
     if (prior) { acceptedMutationIds.push(operation.mutationId); continue; }
+    if (operation.entity === "account" && operation.action === "delete") {
+      const account = await ctx.db.query("accounts").withIndex("by_user_external", (q) => q.eq("userId", session.userId).eq("externalId", operation.entityId)).unique();
+      if (account) await ctx.db.delete(account._id);
+      const transactions = await ctx.db.query("transactions").withIndex("by_user", (q) => q.eq("userId", session.userId)).collect();
+      for (const transaction of transactions.filter((item) => !item.deleted && item.value?.accountId === operation.entityId)) {
+        await ctx.db.patch(transaction._id, { deleted: true, version: transaction.version + 1 });
+        await addChange(ctx, session.userId, "transaction", transaction.externalId, "delete", null);
+      }
+      const recurringPayments = await ctx.db.query("recurringPayments").withIndex("by_user", (q) => q.eq("userId", session.userId)).collect();
+      for (const payment of recurringPayments.filter((item) => !item.deleted && item.value?.accountId === operation.entityId)) {
+        await ctx.db.patch(payment._id, { deleted: true, version: payment.version + 1 });
+        await addChange(ctx, session.userId, "recurringPayment", payment.externalId, "delete", null);
+      }
+      await addChange(ctx, session.userId, "account", operation.entityId, "delete", null);
+      await ctx.db.insert("mutations", { userId: session.userId, mutationId: operation.mutationId });
+      acceptedMutationIds.push(operation.mutationId);
+      continue;
+    }
     if (operation.entity === "account" && operation.action === "upsert") {
       const account = await ctx.db.query("accounts").withIndex("by_user_external", (q) => q.eq("userId", session.userId).eq("externalId", operation.entityId)).unique();
       if (account) await ctx.db.patch(account._id, { value: operation.value, version: account.version + 1 });
