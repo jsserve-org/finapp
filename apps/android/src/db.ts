@@ -12,7 +12,7 @@ export function initializeDatabase() {
   `);
 }
 
-export function readCache<T>(kind: "account" | "transaction"): T[] {
+export function readCache<T>(kind: "account" | "transaction" | "recurring"): T[] {
   return database.getAllSync<{ value: string }>("SELECT value FROM cache WHERE kind = ?", kind).map((row) => JSON.parse(row.value) as T);
 }
 
@@ -29,6 +29,23 @@ export function applySync(result: SyncResponse) {
 export const cachedAccounts = () => readCache<Account>("account");
 export const cachedTransactions = () => readCache<Transaction>("transaction");
 export const cursor = () => database.getFirstSync<{ value: string }>("SELECT value FROM settings WHERE key = 'cursor'")?.value;
+export type RecurringPayment = {
+  id: string;
+  name: string;
+  amountMinor: number;
+  currency: string;
+  frequency: "weekly" | "everyTwoWeeks" | "monthly" | "yearly";
+  nextDate: string;
+  accountId?: string;
+  category: string;
+  isActive: boolean;
+};
+export const cachedRecurringPayments = () => readCache<RecurringPayment>("recurring");
+export function createRecurringPayment(input: Omit<RecurringPayment, "id" | "isActive">) {
+  const payment: RecurringPayment = { ...input, id: `recurring-${Date.now()}-${Math.random().toString(36).slice(2)}`, isActive: true };
+  database.runSync("INSERT INTO cache(kind, id, value) VALUES ('recurring', ?, ?)", payment.id, JSON.stringify(payment));
+  return payment;
+}
 export function createLocalAccount(input: { name: string; institution: string; kind: Account["kind"]; amountMinor: number; currency: string }) {
   const account: Account = { id: `local-${Date.now()}-${Math.random().toString(36).slice(2)}`, name: input.name, institution: input.institution || "Manual", kind: input.kind, balance: { amountMinor: input.amountMinor, currency: input.currency.toUpperCase() }, updatedAt: new Date().toISOString() };
   database.runSync("INSERT INTO cache(kind, id, value) VALUES ('account', ?, ?)", account.id, JSON.stringify(account));

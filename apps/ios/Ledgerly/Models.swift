@@ -212,6 +212,39 @@ enum JSONValue: Codable, Equatable {
     }
 }
 
+@Model final class RecurringPayment {
+    @Attribute(.unique) var id: String
+    var name: String
+    var amountMinor: Int
+    var currency: String
+    var frequency: String
+    var nextDate: Date
+    var accountId: String?
+    var category: String
+    var isActive: Bool
+
+    init(name: String, amountMinor: Int, currency: String, frequency: String, nextDate: Date, accountId: String?, category: String) {
+        id = UUID().uuidString.lowercased()
+        self.name = name
+        self.amountMinor = amountMinor
+        self.currency = currency
+        self.frequency = frequency
+        self.nextDate = nextDate
+        self.accountId = accountId
+        self.category = category
+        isActive = true
+    }
+
+    var frequencyLabel: String {
+        switch frequency {
+        case "weekly": "Weekly"
+        case "everyTwoWeeks": "Every 2 weeks"
+        case "yearly": "Yearly"
+        default: "Monthly"
+        }
+    }
+}
+
 /// Local mutation queue for edits made while offline. Entries are flushed
 /// through `POST /v1/sync` operations and dropped once accepted.
 @Model final class PendingMutation {

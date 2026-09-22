@@ -33,7 +33,7 @@ struct AccountDetailView: View {
                                 HStack {
                                     VStack(alignment: .leading) {
                                         Text(transaction.title).fontWeight(.semibold)
-                                        Text(transaction.category ?? "Uncategorized").font(.caption).foregroundStyle(.secondary)
+                                        Text(transaction.category ?? "Uncategorized").font(.subheadline).foregroundStyle(.secondary)
                                     }
                                     Spacer()
                                     Text(money(transaction.amountMinor, transaction.currency))

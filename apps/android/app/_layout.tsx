@@ -20,11 +20,11 @@ function AuthenticatedTabs() {
     sceneStyle: { backgroundColor: "#0B0C0F" },
     tabBarActiveTintColor: "#9CB7FF",
     tabBarInactiveTintColor: "#777E89",
-    tabBarLabelStyle: { fontSize: 11, fontWeight: "600", marginTop: 2 },
+    tabBarLabelStyle: { fontSize: 14, fontWeight: "600", marginTop: 2 },
     tabBarStyle: {
       backgroundColor: "#12141A",
       borderTopColor: "#292D36",
-      height: 70,
+      height: 78,
       paddingTop: 8,
       paddingBottom: 8,
     },

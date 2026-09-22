@@ -36,16 +36,16 @@ struct TransactionDetailView: View {
                             }
                             Text(money(transaction.amountMinor, transaction.currency)).font(.system(size: 36, weight: .bold, design: .rounded)).foregroundStyle(transaction.amountMinor > 0 ? .blue : .white)
                             HStack(spacing: 12) {
-                                if transaction.pending { Label("Pending", systemImage: "clock").font(.caption).foregroundStyle(.orange) }
+                                if transaction.pending { Label("Pending", systemImage: "clock").font(.subheadline).foregroundStyle(.orange) }
                                 if let date = transaction.bookedDate {
-                                    Text(date.formatted(date: .abbreviated, time: .omitted)).font(.caption).foregroundStyle(.secondary)
+                                    Text(date.formatted(date: .abbreviated, time: .omitted)).font(.subheadline).foregroundStyle(.secondary)
                                 }
-                                Text("v\(transaction.version)").font(.caption2).foregroundStyle(.tertiary)
+                                Text("v\(transaction.version)").font(.footnote).foregroundStyle(.tertiary)
                             }
                         }.frame(maxWidth: .infinity, alignment: .leading).padding(24).ledgerlyGlass(cornerRadius: 28)
 
                         if savedFlash {
-                            Label("Saved on this device", systemImage: "checkmark.circle").font(.caption).foregroundStyle(.blue)
+                            Label("Saved on this device", systemImage: "checkmark.circle").font(.subheadline).foregroundStyle(.blue)
                         }
 
                         if isEditing {

@@ -30,7 +30,7 @@ struct SettingsView: View {
             }.scrollContentBackground(.hidden)
         }
         .navigationTitle("Settings")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayMode(.large)
         .preferredColorScheme(.dark)
     }
 

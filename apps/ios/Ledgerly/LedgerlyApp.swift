@@ -10,7 +10,7 @@ struct LedgerlyApp: App {
             if session.canUseApp { RootTabView().environment(session) }
             else { LoginView().environment(session) }
         }
-            .modelContainer(for: [CachedAccount.self, CachedTransaction.self, SyncSetting.self, PendingMutation.self, PendingAccountMutation.self])
+            .modelContainer(for: [CachedAccount.self, CachedTransaction.self, SyncSetting.self, PendingMutation.self, PendingAccountMutation.self, RecurringPayment.self])
     }
 }
 
@@ -109,30 +109,78 @@ private struct LoginView: View {
 }
 
 private struct RootTabView: View {
+    @State private var selection: RootTab = .overview
+
     var body: some View {
-        TabView {
-            Tab("Overview", systemImage: "rectangle.grid.2x2.fill") {
+        TabView(selection: $selection) {
+            Tab("Overview", systemImage: "rectangle.grid.2x2.fill", value: RootTab.overview) {
                 DashboardView()
             }
 
-            Tab("Accounts", systemImage: "building.columns.fill") {
+            Tab("Accounts", systemImage: "building.columns.fill", value: RootTab.accounts) {
                 AccountsTabView()
             }
 
-            Tab("Insights", systemImage: "chart.bar.xaxis") {
+            Tab("Insights", systemImage: "chart.bar.xaxis", value: RootTab.insights) {
                 InsightsTabView()
             }
 
-            Tab("Activity", systemImage: "list.bullet.rectangle.portrait.fill") {
+            Tab("Activity", systemImage: "list.bullet.rectangle.portrait.fill", value: RootTab.activity) {
                 ActivityTabView()
             }
 
-            Tab("Settings", systemImage: "person.crop.circle.fill") {
+            Tab("Settings", systemImage: "person.crop.circle.fill", value: RootTab.settings) {
                 NavigationStack { SettingsView() }
             }
         }
+        .toolbar(.hidden, for: .tabBar)
+        .safeAreaInset(edge: .bottom, spacing: 0) { LedgerlyTabBar(selection: $selection) }
         .tint(Color(red: 0.48, green: 0.66, blue: 1.0))
         .preferredColorScheme(.dark)
+    }
+}
+
+private enum RootTab: String, CaseIterable, Identifiable {
+    case overview, accounts, insights, activity, settings
+    var id: Self { self }
+    var title: String { rawValue.capitalized }
+    var symbol: String {
+        switch self {
+        case .overview: "rectangle.grid.2x2.fill"
+        case .accounts: "building.columns.fill"
+        case .insights: "chart.bar.fill"
+        case .activity: "list.bullet.rectangle.portrait.fill"
+        case .settings: "person.crop.circle.fill"
+        }
+    }
+}
+
+private struct LedgerlyTabBar: View {
+    @Binding var selection: RootTab
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(RootTab.allCases) { tab in
+                Button { selection = tab } label: {
+                    VStack(spacing: 4) {
+                        Image(systemName: tab.symbol).font(.system(size: 21, weight: .semibold))
+                        Text(tab.title).font(.system(size: 14, weight: selection == tab ? .bold : .semibold))
+                    }
+                    .foregroundStyle(selection == tab ? Color(red: 0.62, green: 0.72, blue: 1.0) : .secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 9)
+                    .background(selection == tab ? Color.white.opacity(0.09) : .clear, in: .rect(cornerRadius: 16))
+                    .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(tab.title)
+                .accessibilityAddTraits(selection == tab ? .isSelected : [])
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.top, 6)
+        .background(.ultraThinMaterial)
+        .overlay(alignment: .top) { Divider().opacity(0.35) }
     }
 }
 
@@ -150,9 +198,8 @@ private struct AccountsTabView: View {
 
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 14) {
-                        Text("ALL ACCOUNTS")
-                            .font(.caption.bold())
-                            .tracking(2)
+                        Text("Your accounts")
+                            .font(.title3.bold())
                             .foregroundStyle(.blue)
 
                         Text(money(total, accounts.first?.currency ?? "USD"))
@@ -177,7 +224,7 @@ private struct AccountsTabView: View {
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text(account.name).font(.headline)
                                         Text("\(account.institution) · \(account.displayKind)")
-                                            .font(.caption)
+                                            .font(.subheadline)
                                             .foregroundStyle(.secondary)
                                     }
 
@@ -207,7 +254,7 @@ private struct AccountsTabView: View {
                 }
             }
             .navigationTitle("Accounts")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(.large)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button { showingNewAccount = true } label: { Image(systemName: "plus") } } }
             .sheet(isPresented: $showingNewAccount) { NewAccountView() }
         }
@@ -243,9 +290,8 @@ private struct InsightsTabView: View {
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
-                        Text("YOUR MONEY AT A GLANCE")
-                            .font(.caption.bold())
-                            .tracking(2)
+                        Text("Your money at a glance")
+                            .font(.title3.bold())
                             .foregroundStyle(.blue)
 
                         insightCard("Net worth", value: totalBalance, symbol: "sum", tint: .blue)
@@ -271,14 +317,14 @@ private struct InsightsTabView: View {
                 }
             }
             .navigationTitle("Insights")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(.large)
         }
     }
 
     private func insightCard(_ title: String, value: Int, symbol: String, tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Image(systemName: symbol).foregroundStyle(tint)
-            Text(title).font(.caption).foregroundStyle(.secondary)
+            Text(title).font(.subheadline).foregroundStyle(.secondary)
             Text(money(value, accounts.first?.currency ?? "USD"))
                 .font(.title3.bold())
                 .minimumScaleFactor(0.72)
@@ -291,7 +337,10 @@ private struct InsightsTabView: View {
 }
 
 private struct ActivityTabView: View {
+    @Environment(\.modelContext) private var context
     @Query(sort: \CachedTransaction.bookedAt, order: .reverse) private var transactions: [CachedTransaction]
+    @Query(sort: \RecurringPayment.nextDate) private var recurringPayments: [RecurringPayment]
+    @State private var showingNewRecurringPayment = false
 
     var body: some View {
         NavigationStack {
@@ -299,7 +348,52 @@ private struct ActivityTabView: View {
                 LedgerlyBackground()
 
                 ScrollView {
-                    LazyVStack(spacing: 4) {
+                    LazyVStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("Recurring payments").font(.title2.bold())
+                            Spacer()
+                            Button { showingNewRecurringPayment = true } label: {
+                                Label("Add", systemImage: "plus")
+                            }
+                            .font(.body.weight(.semibold))
+                        }
+                        .padding(.top, 10)
+
+                        if recurringPayments.isEmpty {
+                            Button { showingNewRecurringPayment = true } label: {
+                                HStack(spacing: 14) {
+                                    Image(systemName: "calendar.badge.plus")
+                                        .font(.title2)
+                                        .foregroundStyle(.blue)
+                                        .frame(width: 48, height: 48)
+                                        .background(.blue.opacity(0.12), in: .rect(cornerRadius: 15))
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("Plan your regular bills").font(.headline)
+                                        Text("Add rent, subscriptions, or any repeating payment.")
+                                            .font(.subheadline)
+                                            .foregroundStyle(.secondary)
+                                            .multilineTextAlignment(.leading)
+                                    }
+                                    Spacer(minLength: 4)
+                                    Image(systemName: "chevron.right").foregroundStyle(.tertiary)
+                                }
+                                .padding(16)
+                                .ledgerlyGlass(cornerRadius: 20)
+                            }
+                            .buttonStyle(.plain)
+                        } else {
+                            ForEach(recurringPayments) { payment in
+                                recurringRow(payment)
+                                    .contextMenu {
+                                        Button("Delete", systemImage: "trash", role: .destructive) { context.delete(payment); try? context.save() }
+                                    }
+                            }
+                        }
+
+                        Text("Transactions")
+                            .font(.title2.bold())
+                            .padding(.top, 18)
+
                         ForEach(transactions) { transaction in
                             NavigationLink {
                                 TransactionDetailView(transactionID: transaction.id)
@@ -314,7 +408,7 @@ private struct ActivityTabView: View {
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text(transaction.title).fontWeight(.semibold)
                                         Text(transaction.category ?? "Uncategorized")
-                                            .font(.caption)
+                                            .font(.subheadline)
                                             .foregroundStyle(.secondary)
                                     }
 
@@ -323,7 +417,7 @@ private struct ActivityTabView: View {
                                         Text(money(transaction.amountMinor, transaction.currency))
                                             .foregroundStyle(transaction.amountMinor > 0 ? .blue : .primary)
                                         if transaction.pending {
-                                            Text("Pending").font(.caption2).foregroundStyle(.orange)
+                                            Text("Pending").font(.footnote).foregroundStyle(.orange)
                                         }
                                     }
                                 }
@@ -340,7 +434,7 @@ private struct ActivityTabView: View {
                             ContentUnavailableView(
                                 "No activity yet",
                                 systemImage: "list.bullet.rectangle",
-                                description: Text("Transactions will appear here after you sync.")
+                                description: Text("Transactions you add or sync will appear here.")
                             )
                             .foregroundStyle(.white.opacity(0.8))
                             .padding(.top, 80)
@@ -351,8 +445,29 @@ private struct ActivityTabView: View {
                 }
             }
             .navigationTitle("Activity")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(.large)
+            .sheet(isPresented: $showingNewRecurringPayment) { NewRecurringPaymentView() }
         }
+    }
+
+    private func recurringRow(_ payment: RecurringPayment) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: "repeat")
+                .font(.headline)
+                .foregroundStyle(.blue)
+                .frame(width: 46, height: 46)
+                .background(.blue.opacity(0.12), in: .rect(cornerRadius: 15))
+            VStack(alignment: .leading, spacing: 5) {
+                Text(payment.name).font(.headline)
+                Text("\(payment.frequencyLabel) · next \(payment.nextDate.formatted(date: .abbreviated, time: .omitted))")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 8)
+            Text(money(-payment.amountMinor, payment.currency)).font(.body.weight(.semibold))
+        }
+        .padding(16)
+        .ledgerlyGlass(cornerRadius: 20)
     }
 }
 
@@ -384,7 +499,7 @@ struct NewAccountView: View {
                     TextField("0.00", text: $balance).keyboardType(.decimalPad)
                     TextField("Currency", text: $currency).textInputAutocapitalization(.characters)
                 }
-                Section { Text("This account is saved locally. You can enable sync later in Settings.").font(.caption).foregroundStyle(.secondary) }
+                Section { Text("This account is saved locally. You can enable sync later in Settings.").font(.subheadline).foregroundStyle(.secondary) }
             }
             .navigationTitle("New account").navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -400,6 +515,84 @@ struct NewAccountView: View {
         let account = CachedAccount(name: name.trimmingCharacters(in: .whitespaces), institution: institution.trimmingCharacters(in: .whitespaces).isEmpty ? "Manual" : institution.trimmingCharacters(in: .whitespaces), kind: kind, amountMinor: minor, currency: currency.uppercased())
         context.insert(account)
         context.insert(PendingAccountMutation(entityId: account.id))
+        try? context.save()
+        dismiss()
+    }
+}
+
+private struct NewRecurringPaymentView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var context
+    @Query(sort: \CachedAccount.name) private var accounts: [CachedAccount]
+    @State private var name = ""
+    @State private var amount = ""
+    @State private var currency = "USD"
+    @State private var frequency = "monthly"
+    @State private var nextDate = Date()
+    @State private var accountId = ""
+    @State private var category = "Bills"
+    private let frequencies = [("weekly", "Weekly"), ("everyTwoWeeks", "Every 2 weeks"), ("monthly", "Monthly"), ("yearly", "Yearly")]
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Payment") {
+                    TextField("Name", text: $name)
+                        .font(.body)
+                    TextField("Amount", text: $amount)
+                        .font(.body)
+                        .keyboardType(.decimalPad)
+                    TextField("Currency", text: $currency)
+                        .font(.body)
+                        .textInputAutocapitalization(.characters)
+                    TextField("Category", text: $category)
+                        .font(.body)
+                }
+                Section("Schedule") {
+                    Picker("Repeats", selection: $frequency) {
+                        ForEach(frequencies, id: \.0) { Text($0.1).tag($0.0) }
+                    }
+                    DatePicker("Next payment", selection: $nextDate, displayedComponents: .date)
+                }
+                if !accounts.isEmpty {
+                    Section("Account") {
+                        Picker("Pay from", selection: $accountId) {
+                            Text("Not selected").tag("")
+                            ForEach(accounts) { Text($0.name).tag($0.id) }
+                        }
+                    }
+                }
+                Section {
+                    Text("Ledgerly will track this schedule. It will not move money or charge the account.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle("New recurring payment")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) { Button("Save") { save() }.disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || parsedAmount <= 0) }
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    private var parsedAmount: Int {
+        let decimal = Decimal(string: amount.replacingOccurrences(of: ",", with: ".")) ?? 0
+        return NSDecimalNumber(decimal: decimal * 100).intValue
+    }
+
+    private func save() {
+        context.insert(RecurringPayment(
+            name: name.trimmingCharacters(in: .whitespaces),
+            amountMinor: parsedAmount,
+            currency: currency.uppercased(),
+            frequency: frequency,
+            nextDate: nextDate,
+            accountId: accountId.isEmpty ? nil : accountId,
+            category: category.trimmingCharacters(in: .whitespaces).isEmpty ? "Bills" : category.trimmingCharacters(in: .whitespaces)
+        ))
         try? context.save()
         dismiss()
     }
