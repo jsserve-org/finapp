@@ -20,6 +20,16 @@ struct TransactionDTO: Codable, Equatable, Identifiable {
     let updatedAt: String
 }
 
+struct RecurringPaymentDTO: Codable, Equatable, Identifiable {
+    let id, name: String
+    let amountMinor: Int
+    let currency, frequency: String
+    let nextDate: Date
+    let accountId: String?
+    let category: String
+    let isActive: Bool
+}
+
 struct SyncChange: Codable {
     let sequence: Int
     let entity: String
@@ -34,8 +44,8 @@ struct SyncResponse: Codable {
     let acceptedMutationIds: [String]
 }
 
-/// Mirrors the zod contract in `apps/api/src/routes/sync.ts`: only
-/// transaction upserts/deletes with a base version are accepted.
+/// Mutation payload exchanged with the sync API for accounts, transactions,
+/// and recurring bills.
 struct SyncOperation: Encodable {
     let mutationId: String
     let entity: String
@@ -48,14 +58,18 @@ struct SyncOperation: Encodable {
         var description: String?
         var category: String?
         var account: AccountDTO?
+        var transaction: TransactionDTO?
+        var recurringPayment: RecurringPaymentDTO?
 
-        init(description: String? = nil, category: String? = nil, account: AccountDTO? = nil) {
-            self.description = description; self.category = category; self.account = account
+        init(description: String? = nil, category: String? = nil, account: AccountDTO? = nil, transaction: TransactionDTO? = nil, recurringPayment: RecurringPaymentDTO? = nil) {
+            self.description = description; self.category = category; self.account = account; self.transaction = transaction; self.recurringPayment = recurringPayment
         }
 
         enum CodingKeys: String, CodingKey { case description; case category }
         func encode(to encoder: Encoder) throws {
             if let account { try account.encode(to: encoder); return }
+            if let transaction { try transaction.encode(to: encoder); return }
+            if let recurringPayment { try recurringPayment.encode(to: encoder); return }
             var container = encoder.container(keyedBy: CodingKeys.self)
             if let description, !description.isEmpty { try container.encode(description, forKey: .description) }
             if let category { try container.encode(category, forKey: .category) }
@@ -72,6 +86,32 @@ struct SyncOperation: Encodable {
     var entityId: String
     var createdAt: Date
     init(entityId: String) { mutationId = UUID().uuidString.lowercased(); self.entityId = entityId; createdAt = Date() }
+}
+
+@Model final class PendingTransactionCreate {
+    @Attribute(.unique) var mutationId: String
+    var entityId: String
+    var createdAt: Date
+
+    init(entityId: String) {
+        mutationId = UUID().uuidString.lowercased()
+        self.entityId = entityId
+        createdAt = Date()
+    }
+}
+
+@Model final class PendingRecurringMutation {
+    @Attribute(.unique) var mutationId: String
+    var entityId: String
+    var action: String
+    var createdAt: Date
+
+    init(entityId: String, action: String) {
+        mutationId = UUID().uuidString.lowercased()
+        self.entityId = entityId
+        self.action = action
+        createdAt = Date()
+    }
 }
 
 /// Opaque JSON payload attached to a sync change.

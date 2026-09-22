@@ -16,7 +16,10 @@ struct DashboardView: View {
             .sorted { $0.currency < $1.currency }
     }
     private var pendingCount: Int {
-        ((try? context.fetchCount(FetchDescriptor<PendingMutation>())) ?? 0) + ((try? context.fetchCount(FetchDescriptor<PendingAccountMutation>())) ?? 0)
+        ((try? context.fetchCount(FetchDescriptor<PendingMutation>())) ?? 0)
+            + ((try? context.fetchCount(FetchDescriptor<PendingAccountMutation>())) ?? 0)
+            + ((try? context.fetchCount(FetchDescriptor<PendingTransactionCreate>())) ?? 0)
+            + ((try? context.fetchCount(FetchDescriptor<PendingRecurringMutation>())) ?? 0)
     }
 
     var body: some View {

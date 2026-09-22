@@ -17,7 +17,30 @@ export const exchange = mutation({ args: { tokenHash: v.string(), cursor: v.stri
       acceptedMutationIds.push(operation.mutationId);
       continue;
     }
+    if (operation.entity === "recurringPayment") {
+      const payment = await ctx.db.query("recurringPayments").withIndex("by_user_external", (q) => q.eq("userId", session.userId).eq("externalId", operation.entityId)).unique();
+      if (operation.action === "delete") {
+        if (payment) await ctx.db.patch(payment._id, { deleted: true, version: payment.version + 1 });
+        await addChange(ctx, session.userId, "recurringPayment", operation.entityId, "delete", null);
+      } else if (operation.value?.id === operation.entityId) {
+        if (payment) await ctx.db.patch(payment._id, { value: operation.value, deleted: false, version: payment.version + 1 });
+        else await ctx.db.insert("recurringPayments", { userId: session.userId, externalId: operation.entityId, value: operation.value, version: 1, deleted: false });
+        await addChange(ctx, session.userId, "recurringPayment", operation.entityId, "upsert", operation.value);
+      } else {
+        continue;
+      }
+      await ctx.db.insert("mutations", { userId: session.userId, mutationId: operation.mutationId });
+      acceptedMutationIds.push(operation.mutationId);
+      continue;
+    }
     const transaction = await ctx.db.query("transactions").withIndex("by_user_external", (q) => q.eq("userId", session.userId).eq("externalId", operation.entityId)).unique();
+    if (!transaction && operation.entity === "transaction" && operation.action === "upsert" && operation.value?.id === operation.entityId && operation.value?.accountId && operation.value?.amount) {
+      await ctx.db.insert("transactions", { userId: session.userId, externalId: operation.entityId, value: operation.value, version: 1, deleted: false });
+      await addChange(ctx, session.userId, "transaction", operation.entityId, "upsert", operation.value);
+      await ctx.db.insert("mutations", { userId: session.userId, mutationId: operation.mutationId });
+      acceptedMutationIds.push(operation.mutationId);
+      continue;
+    }
     if (!transaction || transaction.version !== operation.baseVersion) continue;
     const deleted = operation.action === "delete";
     const value = deleted ? null : { ...transaction.value, ...operation.value, updatedAt: new Date(args.now).toISOString() };

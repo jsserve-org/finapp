@@ -42,9 +42,15 @@ enum DemoData {
 
         let nextMonth = calendar.date(byAdding: .month, value: 1, to: now) ?? now
         let nextWeek = calendar.date(byAdding: .day, value: 7, to: now) ?? now
-        context.insert(RecurringPayment(name: "Rent", amountMinor: 18_000_00, currency: "TWD", frequency: "monthly", nextDate: nextMonth, accountId: checking.id, category: "Housing"))
-        context.insert(RecurringPayment(name: "Chunghwa Telecom", amountMinor: 699_00, currency: "TWD", frequency: "monthly", nextDate: nextWeek, accountId: checking.id, category: "Bills"))
-        context.insert(RecurringPayment(name: "iCloud+", amountMinor: 90_00, currency: "TWD", frequency: "monthly", nextDate: nextWeek, accountId: checking.id, category: "Subscriptions"))
+        let recurring = [
+            RecurringPayment(name: "Rent", amountMinor: 18_000_00, currency: "TWD", frequency: "monthly", nextDate: nextMonth, accountId: checking.id, category: "Housing"),
+            RecurringPayment(name: "Chunghwa Telecom", amountMinor: 699_00, currency: "TWD", frequency: "monthly", nextDate: nextWeek, accountId: checking.id, category: "Bills"),
+            RecurringPayment(name: "iCloud+", amountMinor: 90_00, currency: "TWD", frequency: "monthly", nextDate: nextWeek, accountId: checking.id, category: "Subscriptions")
+        ]
+        recurring.forEach {
+            context.insert($0)
+            context.insert(PendingRecurringMutation(entityId: $0.id, action: "upsert"))
+        }
 
         try context.save()
         return true

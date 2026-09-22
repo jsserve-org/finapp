@@ -97,26 +97,47 @@ struct NativeActivityView: View {
     @Environment(\.modelContext) private var context
     @Query(sort: \CachedTransaction.bookedAt, order: .reverse) private var transactions: [CachedTransaction]
     @Query(sort: \RecurringPayment.nextDate) private var recurringPayments: [RecurringPayment]
+    @State private var showingNewBill = false
     @State private var showingNewRecurringPayment = false
 
     var body: some View {
         NavigationStack {
             List {
                 Section {
+                    VStack(spacing: 12) {
+                        Button { showingNewBill = true } label: {
+                            Label("Add one-time bill", systemImage: "plus.circle.fill")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+
+                        Button { showingNewRecurringPayment = true } label: {
+                            Label("Add recurring bill", systemImage: "repeat.circle")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.large)
+                    }
+                    .padding(.vertical, 8)
+                    .listRowBackground(Color.clear)
+                } footer: {
+                    Text("One-time bills use a payment date. Recurring bills repeat on a schedule.")
+                }
+
+                Section {
                     ForEach(recurringPayments) { payment in recurringRow(payment) }
                         .onDelete(perform: deleteRecurringPayments)
                     if recurringPayments.isEmpty {
-                        Button { showingNewRecurringPayment = true } label: {
-                            Label("Add rent, subscriptions, or regular bills", systemImage: "calendar.badge.plus")
-                        }
+                        Text("No recurring bills yet.").foregroundStyle(.secondary)
                     }
                 } header: {
-                    Text("Recurring payments")
+                    Text("Recurring bills")
                 } footer: {
-                    Text("Ledgerly tracks schedules only. It never moves money or charges an account.")
+                    Text("These repeat on the frequency and next due date you choose.")
                 }
 
-                Section("Transactions") {
+                Section("Bills & transactions") {
                     ForEach(transactions) { transaction in
                         NavigationLink { TransactionDetailView(transactionID: transaction.id) } label: { transactionRow(transaction) }
                     }
@@ -126,7 +147,7 @@ struct NativeActivityView: View {
                 }
             }
             .navigationTitle("Activity")
-            .toolbar { Button("Add recurring payment", systemImage: "plus") { showingNewRecurringPayment = true } }
+            .sheet(isPresented: $showingNewBill) { NewBillView() }
             .sheet(isPresented: $showingNewRecurringPayment) { NewRecurringPaymentView() }
         }
     }
@@ -138,7 +159,7 @@ struct NativeActivityView: View {
             Label {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(payment.name).font(.headline)
-                    Text("\(payment.frequencyLabel) · \(payment.nextDate.formatted(date: .abbreviated, time: .omitted))").font(.subheadline).foregroundStyle(.secondary)
+                    Text("\(payment.frequencyLabel) · next due \(payment.nextDate.formatted(date: .abbreviated, time: .omitted))").font(.subheadline).foregroundStyle(.secondary)
                 }
             } icon: { Image(systemName: "repeat").foregroundStyle(.blue) }
         }
@@ -156,7 +177,11 @@ struct NativeActivityView: View {
     }
 
     private func deleteRecurringPayments(at offsets: IndexSet) {
-        for index in offsets { context.delete(recurringPayments[index]) }
+        for index in offsets {
+            let payment = recurringPayments[index]
+            context.insert(PendingRecurringMutation(entityId: payment.id, action: "delete"))
+            context.delete(payment)
+        }
         try? context.save()
     }
 }
