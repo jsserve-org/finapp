@@ -6,6 +6,14 @@ enum APIError: Error, Equatable {
     case offline
 }
 
+struct AuthResponse: Codable {
+    struct User: Codable { let username: String }
+    struct Context: Codable { let apiUrl, convexUrl, syncSessionId, expiresAt: String }
+    let token: String
+    let user: User
+    let context: Context
+}
+
 struct ConnectionStatus: Codable, Equatable {
     let connectionId: String
     let state: String
@@ -19,29 +27,42 @@ struct ConnectionStatus: Codable, Equatable {
 actor APIClient {
     static let shared = APIClient()
 
-    private let baseURL: URL
+    private let configuredBaseURL: URL?
     private let session: URLSession
     private let decoder = JSONDecoder()
 
     init(baseURL: URL = AppConfig.baseURL, session: URLSession = .shared) {
-        self.baseURL = baseURL
+        self.configuredBaseURL = baseURL == AppConfig.baseURL ? nil : baseURL
         self.session = session
     }
 
     private func token() -> String {
-        KeychainStore().token() ?? AppConfig.apiToken
+        KeychainStore().token() ?? ""
     }
 
     private func makeRequest(path: String, method: String = "GET", body: Data? = nil) -> URLRequest {
-        var request = URLRequest(url: baseURL.appending(path: path))
+        var request = URLRequest(url: (configuredBaseURL ?? AppConfig.baseURL).appending(path: path))
         request.httpMethod = method
-        request.setValue("Bearer \(token())", forHTTPHeaderField: "Authorization")
+        let bearer = token()
+        if !bearer.isEmpty { request.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization") }
         if let body {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.httpBody = body
         }
         request.timeoutInterval = 15
         return request
+    }
+
+    func authenticate(username: String, password: String, convexURL: URL, register: Bool = false) async throws -> AuthResponse? {
+        struct Body: Encodable { let username, password, convexUrl: String }
+        let body = try JSONEncoder().encode(Body(username: username, password: password, convexUrl: convexURL.absoluteString))
+        let request = makeRequest(path: register ? "/v1/auth/register" : "/v1/auth/login", method: "POST", body: body)
+        let data = try await send(request)
+        return register ? nil : try decoder.decode(AuthResponse.self, from: data)
+    }
+
+    func logout() async throws {
+        _ = try await send(makeRequest(path: "/v1/auth/logout", method: "POST"))
     }
 
     private func send(_ request: URLRequest) async throws -> Data {

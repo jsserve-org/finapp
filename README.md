@@ -1,50 +1,69 @@
 # Ledgerly
 
-An offline-first personal finance foundation with a Bun/TypeScript API, native SwiftUI iPhone app, and React Native Android app.
+An offline-first finance app with native SwiftUI iOS, React Native Android, a Bun authentication/bank gateway, and a self-hosted Convex sync layer.
 
-## Architecture
+## Services
 
 ```text
-iPhone (SwiftData) ─┐                       ┌─ bank provider adapter
-                    ├─ HTTPS sync API ─ Postgres ─ automation worker
-Android (SQLite) ───┘                       └─ health/self-check events
+iOS / Android ─┬─ HTTPS :3000  Bun API (login and bank integrations)
+               └─ WSS   :3210  Convex (realtime sync)
+                                  └─ persistent convex-data volume
+Admin only ────── HTTPS :6791  Convex dashboard
 ```
 
-- `apps/api`: Bun + Hono + Drizzle/Postgres. Account and transaction reads, cursor-based sync, automation runs, readiness checks.
-- `apps/ios`: SwiftUI/SwiftData shell targeting iOS 26. It uses system materials and availability-gated Liquid Glass APIs.
-- `apps/android`: Expo/React Native Android shell with local SQLite storage.
-- `packages/contracts`: shared TypeScript API types for the backend and Android client.
+Postgres and Drizzle have been removed. Convex now owns users, opaque sessions, accounts, transactions, sync changes, mutation deduplication, and automation status. Passwords are processed by the Bun gateway with Argon2id; Convex stores only the resulting salted hash. Mobile devices store only an opaque session token in Keychain/SecureStore, together with the server-issued API URL, Convex URL, sync-session ID, and local sync cursor.
 
-The API has `demo` bank automation for development. Real bank access belongs behind the same adapter via a regulated Open Banking provider; do not collect online-banking passwords in either app. Provider tokens should be envelope-encrypted by a cloud KMS before storage.
-
-## Run the backend in Docker
-
-The API, migration job, automation worker, and PostgreSQL all run in containers. Bun does not need to be installed on the host.
+## First-time Docker setup
 
 ```sh
 cp .env.example .env
-docker compose up --build -d
-docker compose ps
+# Replace both placeholder secrets in .env first.
+docker compose up -d convex dashboard
+docker compose exec convex ./generate_admin_key.sh
 ```
 
-Compose runs the database migration once before starting `api` and `worker`. The API is published at `http://localhost:3000`; PostgreSQL remains private to the Docker network.
-
-Useful commands:
+Copy the generated key into `CONVEX_SELF_HOSTED_ADMIN_KEY` in `.env`, then deploy the checked-in schema and functions:
 
 ```sh
-docker compose logs -f api worker
-docker compose down
+docker compose --profile tools run --rm convex-deploy
+docker compose up --build -d api
+curl http://localhost:3000/health/ready
 ```
 
-For cloud deployments, build the same `Dockerfile` and run separate API, worker, and one-shot migration services. Set `API_DATABASE_URL` to the managed PostgreSQL connection string and use the platform's secret manager for `API_TOKEN` and provider credentials.
+The login screens let users set both endpoints. Emulator defaults are `http://10.0.2.2:3000` and `http://10.0.2.2:3210`; the iOS Simulator uses `localhost`. Registration can be disabled with `ALLOW_REGISTRATION=false` after creating users.
 
-Check `http://localhost:3000/health/live` and use `Authorization: Bearer local-development-token` for `/v1/*` routes. Seed deterministic demo data with:
+## Opening ports
+
+For a private LAN test, replace `localhost` in the three `PUBLIC_*` values with the server's LAN IP, then allow only trusted LAN clients:
 
 ```sh
-curl -X POST http://localhost:3000/v1/automations/demo/run \
-  -H 'Authorization: Bearer local-development-token'
+# Ubuntu UFW example; replace 192.168.1.0/24 with your actual subnet.
+sudo ufw allow from 192.168.1.0/24 to any port 3000 proto tcp
+sudo ufw allow from 192.168.1.0/24 to any port 3210 proto tcp
 ```
 
-## Important production work
+Do not expose ports 3000, 3210, 3211, or 6791 directly to the public internet. Put the API and Convex backend behind a TLS reverse proxy and expose only TCP 443. Route distinct public hostnames, for example:
 
-This repository is a secure architectural baseline, not a production banking integration. Before shipping: add OIDC/passkeys and per-user authorization, KMS-backed token encryption, a real provider consent flow, background job leases/retries, audit export/retention, observability, rate limiting, database backups, privacy/legal review, and App Store/Play policies. Never log provider credentials or raw access tokens.
+- `https://api.finance.example` → `api:3000`
+- `https://sync.finance.example` → `convex:3210` (WebSocket upgrades required)
+- `https://actions.finance.example` → `convex:3211`, only if HTTP actions are added
+- Keep the dashboard (`6791`) private behind VPN/SSH tunneling and authentication.
+
+Set `PUBLIC_API_URL` and `PUBLIC_CONVEX_URL` to those HTTPS URLs. Mobile login rejects a Convex endpoint that does not match the API's configured public deployment. Configure DNS, a valid certificate, rate limiting, backups for `convex-data`, and pinned Convex image versions before production.
+
+## Authentication behavior
+
+Registration and login passwords are sent only to the chosen API endpoint. Production therefore requires HTTPS. The server performs Argon2id hashing and never stores the plaintext password or password-derived value in a session. Successful login creates a random 256-bit opaque token; Convex stores only its SHA-256 digest. Sessions expire after 30 days and can be revoked at logout.
+
+Client-side-only hashing is deliberately not used because that hash becomes a replayable password equivalent. If proof-based password authentication is needed later, implement OPAQUE or WebAuthn/passkeys rather than inventing a custom challenge protocol.
+
+## Development and verification
+
+```sh
+bun install
+bun typecheck
+bun test
+docker compose logs -f api convex
+```
+
+The demo automation remains available after login at `POST /v1/automations/demo/run`. Real bank access belongs behind a regulated Open Banking provider and requires encrypted provider tokens, audit logs, rate limiting, and privacy review.

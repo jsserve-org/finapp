@@ -4,6 +4,7 @@ WORKDIR /app
 COPY package.json bun.lock ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/android/package.json apps/android/package.json
+COPY apps/convex/package.json apps/convex/package.json
 COPY packages/contracts/package.json packages/contracts/package.json
 RUN bun install --frozen-lockfile
 
@@ -13,8 +14,10 @@ ENV NODE_ENV=production
 
 COPY --from=dependencies --chown=bun:bun /app/node_modules ./node_modules
 COPY --from=dependencies --chown=bun:bun /app/apps/api/node_modules ./apps/api/node_modules
+COPY --from=dependencies --chown=bun:bun /app/apps/convex/node_modules ./apps/convex/node_modules
 COPY --chown=bun:bun package.json bun.lock ./
 COPY --chown=bun:bun apps/api ./apps/api
+COPY --chown=bun:bun apps/convex ./apps/convex
 COPY --chown=bun:bun packages/contracts ./packages/contracts
 
 USER bun

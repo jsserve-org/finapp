@@ -1,10 +1,20 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Tabs } from "expo-router";
+import { Redirect, Stack, Tabs, useSegments } from "expo-router";
 import { useEffect } from "react";
 import { initializeDatabase } from "../src/db";
+import { SessionProvider, useSession } from "../src/session";
 
 export default function RootLayout() {
   useEffect(initializeDatabase, []);
+  return <SessionProvider><AuthenticatedTabs /></SessionProvider>;
+}
+
+function AuthenticatedTabs() {
+  const { token, loading } = useSession();
+  const segments = useSegments();
+  if (loading) return null;
+  if (!token) return segments[0] === "login" ? <Stack screenOptions={{ headerShown: false }}><Stack.Screen name="login" /></Stack> : <Redirect href="/login" />;
+  if (segments[0] === "login") return <Redirect href="/" />;
   return <Tabs screenOptions={{
     headerShown: false,
     sceneStyle: { backgroundColor: "#071712" },
@@ -19,6 +29,7 @@ export default function RootLayout() {
       paddingBottom: 8,
     },
   }}>
+    <Tabs.Screen name="login" options={{ href: null }} />
     <Tabs.Screen name="index" options={{
       title: "Overview",
       tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? "grid" : "grid-outline"} color={color} size={size} />,

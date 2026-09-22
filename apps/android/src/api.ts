@@ -1,10 +1,20 @@
 import type { SyncResponse } from "@ledgerly/contracts";
 import { applySync, cursor } from "./db";
+import * as SecureStore from "expo-secure-store";
+import { endpoint, type AuthResponse } from "./session";
 
-const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? "http://10.0.2.2:3000";
-const token = process.env.EXPO_PUBLIC_API_TOKEN ?? "local-development-token";
+const defaultApiUrl = process.env.EXPO_PUBLIC_API_URL ?? "http://10.0.2.2:3000";
+
+export async function authenticate(apiUrl: string, convexUrl: string, username: string, password: string, register = false): Promise<AuthResponse | null> {
+  const response = await fetch(`${apiUrl.replace(/\/$/, "")}/v1/auth/${register ? "register" : "login"}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, password, convexUrl }) });
+  if (!response.ok) throw new Error(response.status === 401 ? "Invalid username or password" : `Server rejected the request (${response.status})`);
+  return register ? null : response.json() as Promise<AuthResponse>;
+}
 
 export async function syncNow(): Promise<SyncResponse> {
+  const apiUrl = await endpoint("api-url", defaultApiUrl);
+  const token = await SecureStore.getItemAsync("session-token");
+  if (!token) throw new Error("Not logged in");
   const response = await fetch(`${apiUrl}/v1/sync`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
