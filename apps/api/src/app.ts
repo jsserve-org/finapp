@@ -27,6 +27,20 @@ const credentials = z.object({
   convexUrl: z.string().url(),
 });
 
+const currency = z.enum(["TWD", "USD", "JPY", "PHP", "EUR", "GBP", "CNY", "HKD", "SGD", "KRW", "AUD", "CAD", "THB", "MYR", "VND", "INR", "IDR"]);
+const bill = z.discriminatedUnion("type", [
+  z.object({
+    id: z.string().uuid().optional(), type: z.literal("oneTime"), name: z.string().trim().min(1).max(120),
+    amountMinor: z.number().int().positive(), currency, date: z.string().datetime(),
+    accountId: z.string().min(1), category: z.string().trim().min(1).max(80).default("Bills"),
+  }),
+  z.object({
+    id: z.string().uuid().optional(), type: z.literal("recurring"), name: z.string().trim().min(1).max(120),
+    amountMinor: z.number().int().positive(), currency, frequency: z.enum(["weekly", "everyTwoWeeks", "monthly", "yearly"]),
+    nextDate: z.string().datetime(), accountId: z.string().min(1).optional(), category: z.string().trim().min(1).max(80).default("Bills"),
+  }),
+]);
+
 function requireDeployment(requested: string) {
   if (normalizedURL(requested) !== normalizedURL(config.PUBLIC_CONVEX_URL)) {
     throw new HTTPException(400, { message: "The Convex URL does not belong to this API server" });
@@ -88,6 +102,24 @@ app.post("/v1/auth/logout", async (c) => {
 app.post("/v1/sync", async (c) => {
   const body = await c.req.json().catch(() => ({ operations: [] }));
   return c.json(await convexMutation("sync:exchange", { tokenHash: await sha256(c.get("sessionToken")), cursor: body.cursor ?? "0", operations: body.operations ?? [], now: Date.now() }));
+});
+
+app.get("/v1/accounts", async (c) => c.json(await convexQuery("bills:listAccounts", { tokenHash: await sha256(c.get("sessionToken")), now: Date.now() })));
+
+app.post("/v1/bills", zValidator("json", bill), async (c) => {
+  const input = c.req.valid("json");
+  const id = input.id ?? crypto.randomUUID();
+  const dateFields = input.type === "oneTime"
+    ? { ...input, id }
+    : { ...input, id, nextDate: (new Date(input.nextDate).getTime() - Date.UTC(2001, 0, 1)) / 1000 };
+  try {
+    return c.json(await convexMutation("bills:create", { tokenHash: await sha256(c.get("sessionToken")), now: Date.now(), bill: dateFields }), 201);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (message.includes("ACCOUNT_NOT_FOUND")) throw new HTTPException(404, { message: "Account not found" });
+    if (message.includes("CURRENCY_MISMATCH")) throw new HTTPException(409, { message: "Bill currency must match the account currency" });
+    throw error;
+  }
 });
 
 app.get("/v1/automations/status", async (c) => c.json(await convexQuery("automation:statuses", { tokenHash: await sha256(c.get("sessionToken")), now: Date.now() })));

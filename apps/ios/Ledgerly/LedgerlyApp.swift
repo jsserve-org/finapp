@@ -114,23 +114,23 @@ private struct LoginView: View {
 private struct RootTabView: View {
     var body: some View {
         TabView {
-            Tab("Overview", systemImage: "rectangle.grid.2x2.fill") {
+            Tab("Overview", systemImage: AppIcon.overview) {
                 DashboardView()
             }
 
-            Tab("Accounts", systemImage: "building.columns.fill") {
+            Tab("Accounts", systemImage: AppIcon.accounts) {
                 NativeAccountsView()
             }
 
-            Tab("Insights", systemImage: "chart.bar.xaxis") {
+            Tab("Insights", systemImage: AppIcon.insights) {
                 NativeInsightsView()
             }
 
-            Tab("Activity", systemImage: "list.bullet.rectangle.portrait.fill") {
+            Tab("Activity", systemImage: AppIcon.activity) {
                 NativeActivityView()
             }
 
-            Tab("Settings", systemImage: "gearshape.fill") {
+            Tab("Settings", systemImage: AppIcon.settings) {
                 NavigationStack { SettingsView() }
             }
         }

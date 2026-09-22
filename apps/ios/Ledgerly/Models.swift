@@ -84,8 +84,14 @@ struct SyncOperation: Encodable {
 @Model final class PendingAccountMutation {
     @Attribute(.unique) var mutationId: String
     var entityId: String
+    var action: String = "upsert"
     var createdAt: Date
-    init(entityId: String) { mutationId = UUID().uuidString.lowercased(); self.entityId = entityId; createdAt = Date() }
+    init(entityId: String, action: String = "upsert") {
+        mutationId = UUID().uuidString.lowercased()
+        self.entityId = entityId
+        self.action = action
+        createdAt = Date()
+    }
 }
 
 @Model final class PendingTransactionCreate {

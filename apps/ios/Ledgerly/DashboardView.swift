@@ -76,7 +76,7 @@ struct DashboardView: View {
                 }
             }
             HStack(spacing: 8) {
-                Image(systemName: session.localOnly ? "iphone" : (sync.isOffline ? "wifi.slash" : "checkmark.icloud"))
+                Image(systemName: session.localOnly ? "iphone" : (sync.isOffline ? "wifi.slash" : AppIcon.synced))
                 Text(session.localOnly ? "Saved on this iPhone" : (sync.isOffline ? "Offline" : "Up to date"))
                 if sync.isSyncing { ProgressView().controlSize(.small) }
                 if let syncedAt = sync.lastSyncedAt {
@@ -97,7 +97,7 @@ struct DashboardView: View {
 
     private var emptyState: some View {
         VStack(spacing: 14) {
-            Image(systemName: "wallet.bifold").font(.system(size: 34)).foregroundStyle(.secondary)
+            Image(systemName: AppIcon.cash).ledgerlyIcon().font(.system(size: 34))
             Text("Start with an account").font(.headline)
             Text("Add a bank, card, cash, or savings account. It stays on this device until you enable sync.")
                 .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
@@ -121,7 +121,7 @@ struct DashboardView: View {
 
     private func transactionRow(_ item: CachedTransaction) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: "arrow.up.arrow.down").foregroundStyle(.secondary).frame(width: 32)
+            Image(systemName: AppIcon.transaction).ledgerlyIcon().frame(width: 32)
             VStack(alignment: .leading, spacing: 3) {
                 Text(item.title).fontWeight(.semibold)
                 Text(item.category ?? "Uncategorized").font(.subheadline).foregroundStyle(.secondary)
