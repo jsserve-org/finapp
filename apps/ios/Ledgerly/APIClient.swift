@@ -1,62 +1,86 @@
 import Foundation
-import Observation
-import SwiftData
 
-actor APIClient {
-    static let shared = APIClient()
-    private let baseURL = URL(string: "http://localhost:3000")!
-    private let decoder = JSONDecoder()
-
-    func sync(cursor: String?) async throws -> SyncResponse {
-        var request = URLRequest(url: baseURL.appending(path: "/v1/sync"))
-        request.httpMethod = "POST"
-        request.setValue("Bearer local-development-token", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        var body: [String: Any] = ["operations": []]
-        if let cursor { body["cursor"] = cursor }
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { throw URLError(.badServerResponse) }
-        return try decoder.decode(SyncResponse.self, from: data)
-    }
+enum APIError: Error, Equatable {
+    case invalidResponse
+    case http(Int)
+    case offline
 }
 
-@MainActor
-@Observable final class SyncController {
-    var isSyncing = false
-    var isOffline = false
+struct ConnectionStatus: Codable, Equatable {
+    let connectionId: String
+    let state: String
+    let lastSuccessAt: String?
+    let lastError: String?
+    let nextCheckAt: String
+}
 
-    func refresh(context: ModelContext) async {
-        guard !isSyncing else { return }
-        isSyncing = true
-        defer { isSyncing = false }
+/// Actor wrapping all calls to the Docker Compose API. Endpoint shapes match
+/// `apps/api/src/app.ts` and `apps/api/src/routes/sync.ts`.
+actor APIClient {
+    static let shared = APIClient()
+
+    private let baseURL: URL
+    private let session: URLSession
+    private let decoder = JSONDecoder()
+
+    init(baseURL: URL = AppConfig.baseURL, session: URLSession = .shared) {
+        self.baseURL = baseURL
+        self.session = session
+    }
+
+    private func token() -> String {
+        KeychainStore().token() ?? AppConfig.apiToken
+    }
+
+    private func makeRequest(path: String, method: String = "GET", body: Data? = nil) -> URLRequest {
+        var request = URLRequest(url: baseURL.appending(path: path))
+        request.httpMethod = method
+        request.setValue("Bearer \(token())", forHTTPHeaderField: "Authorization")
+        if let body {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = body
+        }
+        request.timeoutInterval = 15
+        return request
+    }
+
+    private func send(_ request: URLRequest) async throws -> Data {
         do {
-            let settings = try context.fetch(FetchDescriptor<SyncSetting>())
-            let result = try await APIClient.shared.sync(cursor: settings.first(where: { $0.key == "cursor" })?.value)
-            let encoder = JSONEncoder(), decoder = JSONDecoder()
-            for change in result.changes {
-                let entityID = change.entityId
-                if change.action == "delete" {
-                    if change.entity == "account", let item = try context.fetch(FetchDescriptor<CachedAccount>(predicate: #Predicate { $0.id == entityID })).first { context.delete(item) }
-                    if change.entity == "transaction", let item = try context.fetch(FetchDescriptor<CachedTransaction>(predicate: #Predicate { $0.id == entityID })).first { context.delete(item) }
-                } else if let value = change.value {
-                    let data = try encoder.encode(value)
-                    if change.entity == "account" {
-                        let dto = try decoder.decode(AccountDTO.self, from: data)
-                        if let item = try context.fetch(FetchDescriptor<CachedAccount>(predicate: #Predicate { $0.id == entityID })).first {
-                            item.name = dto.name; item.institution = dto.institution; item.kind = dto.kind; item.amountMinor = dto.balance.amountMinor; item.currency = dto.balance.currency; item.updatedAt = dto.updatedAt
-                        } else { context.insert(CachedAccount(dto: dto)) }
-                    }
-                    if change.entity == "transaction" {
-                        let dto = try decoder.decode(TransactionDTO.self, from: data)
-                        if let item = try context.fetch(FetchDescriptor<CachedTransaction>(predicate: #Predicate { $0.id == entityID })).first {
-                            item.accountId = dto.accountId; item.title = dto.description; item.amountMinor = dto.amount.amountMinor; item.currency = dto.amount.currency; item.bookedAt = dto.bookedAt; item.pending = dto.pending; item.category = dto.category; item.updatedAt = dto.updatedAt
-                        } else { context.insert(CachedTransaction(dto: dto)) }
-                    }
-                }
-            }
-            if let setting = settings.first(where: { $0.key == "cursor" }) { setting.value = result.cursor } else { context.insert(SyncSetting(key: "cursor", value: result.cursor)) }
-            try context.save(); isOffline = false
-        } catch { isOffline = true }
+            let (data, response) = try await session.data(for: request)
+            guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+            guard (200..<300).contains(http.statusCode) else { throw APIError.http(http.statusCode) }
+            return data
+        } catch let error as APIError {
+            throw error
+        } catch {
+            throw APIError.offline
+        }
+    }
+
+    // MARK: - Sync
+
+    private struct SyncRequestBody: Encodable {
+        let cursor: String?
+        let operations: [SyncOperation]
+    }
+
+    func sync(cursor: String?, operations: [SyncOperation] = []) async throws -> SyncResponse {
+        let body = try JSONEncoder().encode(SyncRequestBody(cursor: cursor, operations: operations))
+        let request = makeRequest(path: "/v1/sync", method: "POST", body: body)
+        return try decoder.decode(SyncResponse.self, from: await send(request))
+    }
+
+    // MARK: - Health & connections
+
+    func healthReady() async throws {
+        _ = try await send(makeRequest(path: "/health/ready"))
+    }
+
+    func connectionStatuses() async throws -> [ConnectionStatus] {
+        try decoder.decode([ConnectionStatus].self, from: await send(makeRequest(path: "/v1/automations/status")))
+    }
+
+    func runDemoAutomation() async throws {
+        _ = try await send(makeRequest(path: "/v1/automations/demo/run", method: "POST"))
     }
 }
