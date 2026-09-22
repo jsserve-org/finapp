@@ -10,20 +10,20 @@ export default function RootLayout() {
 }
 
 function AuthenticatedTabs() {
-  const { token, loading } = useSession();
+  const { token, localOnly, loading } = useSession();
   const segments = useSegments();
   if (loading) return null;
-  if (!token) return segments[0] === "login" ? <Stack screenOptions={{ headerShown: false }}><Stack.Screen name="login" /></Stack> : <Redirect href="/login" />;
+  if (!token && !localOnly) return segments[0] === "login" ? <Stack screenOptions={{ headerShown: false }}><Stack.Screen name="login" /></Stack> : <Redirect href="/login" />;
   if (segments[0] === "login") return <Redirect href="/" />;
   return <Tabs screenOptions={{
     headerShown: false,
-    sceneStyle: { backgroundColor: "#071712" },
-    tabBarActiveTintColor: "#70D6AD",
-    tabBarInactiveTintColor: "#73847D",
+    sceneStyle: { backgroundColor: "#0B0C0F" },
+    tabBarActiveTintColor: "#9CB7FF",
+    tabBarInactiveTintColor: "#777E89",
     tabBarLabelStyle: { fontSize: 11, fontWeight: "600", marginTop: 2 },
     tabBarStyle: {
-      backgroundColor: "#0B1E17",
-      borderTopColor: "#1E3A30",
+      backgroundColor: "#12141A",
+      borderTopColor: "#292D36",
       height: 70,
       paddingTop: 8,
       paddingBottom: 8,

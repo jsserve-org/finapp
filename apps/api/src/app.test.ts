@@ -14,4 +14,10 @@ describe("health", () => {
     const response = await app.request("/v1/accounts");
     expect(response.status).toBe(401);
   });
+
+  it("publishes registration policy without authentication", async () => {
+    const response = await app.request("/v1/config");
+    expect(response.status).toBe(200);
+    expect((await response.json()).registrationEnabled).toBe(true);
+  });
 });

@@ -15,7 +15,7 @@ struct AccountDetailView: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(colors: [Color(red: 0.02, green: 0.12, blue: 0.09), Color(red: 0.03, green: 0.22, blue: 0.16)], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
+            LedgerlyBackground()
             ScrollView {
                 if let account = accounts.first {
                     LazyVStack(alignment: .leading, spacing: 16) {

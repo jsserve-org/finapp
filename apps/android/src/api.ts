@@ -5,6 +5,12 @@ import { endpoint, type AuthResponse } from "./session";
 
 const defaultApiUrl = process.env.EXPO_PUBLIC_API_URL ?? "http://10.0.2.2:3000";
 
+export async function serverConfig(apiUrl: string): Promise<{ registrationEnabled: boolean; convexUrl: string }> {
+  const response = await fetch(`${apiUrl.replace(/\/$/, "")}/v1/config`);
+  if (!response.ok) throw new Error("Server configuration unavailable");
+  return response.json();
+}
+
 export async function authenticate(apiUrl: string, convexUrl: string, username: string, password: string, register = false): Promise<AuthResponse | null> {
   const response = await fetch(`${apiUrl.replace(/\/$/, "")}/v1/auth/${register ? "register" : "login"}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, password, convexUrl }) });
   if (!response.ok) throw new Error(response.status === 401 ? "Invalid username or password" : `Server rejected the request (${response.status})`);

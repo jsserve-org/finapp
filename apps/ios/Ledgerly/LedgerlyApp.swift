@@ -7,26 +7,39 @@ struct LedgerlyApp: App {
     @State private var session = SessionController()
     var body: some Scene {
         WindowGroup {
-            if session.isAuthenticated { RootTabView().environment(session) }
+            if session.canUseApp { RootTabView().environment(session) }
             else { LoginView().environment(session) }
         }
-            .modelContainer(for: [CachedAccount.self, CachedTransaction.self, SyncSetting.self])
+            .modelContainer(for: [CachedAccount.self, CachedTransaction.self, SyncSetting.self, PendingMutation.self])
     }
 }
 
 @MainActor @Observable final class SessionController {
     var isAuthenticated = KeychainStore().token() != nil
+    var localOnly = UserDefaults.standard.bool(forKey: "ledgerly.localOnly")
+    var canUseApp: Bool { isAuthenticated || localOnly }
     func complete(_ response: AuthResponse) {
         KeychainStore().saveToken(response.token)
         UserDefaults.standard.set(response.context.apiUrl, forKey: "ledgerly.apiURL")
         UserDefaults.standard.set(response.context.convexUrl, forKey: "ledgerly.convexURL")
         UserDefaults.standard.set(response.user.username, forKey: "ledgerly.username")
         UserDefaults.standard.set(response.context.syncSessionId, forKey: "ledgerly.syncSessionId")
+        UserDefaults.standard.set(false, forKey: "ledgerly.localOnly")
+        localOnly = false
         isAuthenticated = true
+    }
+    func continueLocally() {
+        UserDefaults.standard.set(true, forKey: "ledgerly.localOnly")
+        localOnly = true
     }
     func logout() {
         Task { try? await APIClient.shared.logout() }
         KeychainStore().deleteToken()
+        isAuthenticated = false
+    }
+    func configureSync() {
+        UserDefaults.standard.set(false, forKey: "ledgerly.localOnly")
+        localOnly = false
         isAuthenticated = false
     }
 }
@@ -40,15 +53,22 @@ private struct LoginView: View {
     @State private var registration = false
     @State private var working = false
     @State private var error: String?
+    @State private var registrationEnabled = true
 
     var body: some View {
         ZStack {
             LedgerlyBackground()
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    Image(systemName: "chart.line.uptrend.xyaxis.circle.fill").font(.system(size: 58)).foregroundStyle(.mint)
-                    Text(registration ? "Create account" : "Welcome back").font(.largeTitle.bold())
-                    Text("Connect securely to your Ledgerly server.").foregroundStyle(.secondary)
+                    Text("LEDGERLY").font(.caption.bold()).tracking(2).foregroundStyle(.secondary)
+                    Text(registration ? "Create a sync account" : "Your money, on your device").font(.largeTitle.bold())
+                    Text(registration ? "Create credentials for your self-hosted server." : "Start locally, or sign in to sync across devices.").foregroundStyle(.secondary)
+                    if !registration {
+                        Button { session.continueLocally() } label: {
+                            Label("Continue on this iPhone", systemImage: "iphone").fontWeight(.semibold).frame(maxWidth: .infinity).padding(10)
+                        }.buttonStyle(.borderedProminent)
+                        HStack { Rectangle().frame(height: 1); Text("or connect a server").font(.caption); Rectangle().frame(height: 1) }.foregroundStyle(.tertiary)
+                    }
                     Group {
                         TextField("API endpoint", text: $apiURL).textContentType(.URL).textInputAutocapitalization(.never).keyboardType(.URL)
                         TextField("Convex endpoint", text: $convexURL).textContentType(.URL).textInputAutocapitalization(.never).keyboardType(.URL)
@@ -58,11 +78,13 @@ private struct LoginView: View {
                     if let error { Text(error).font(.caption).foregroundStyle(.red) }
                     Button { Task { await submit() } } label: {
                         Group { if working { ProgressView() } else { Text(registration ? "Create account" : "Log in").fontWeight(.bold) } }.frame(maxWidth: .infinity).padding(15)
-                    }.buttonStyle(.borderedProminent).tint(.mint).disabled(working || username.count < 3 || password.count < 10)
-                    Button(registration ? "Already have an account? Log in" : "Need an account? Register") { registration.toggle(); error = nil }.frame(maxWidth: .infinity)
+                    }.buttonStyle(.bordered).disabled(working || username.count < 3 || password.count < 10)
+                    if registration || registrationEnabled {
+                        Button(registration ? "Already have an account? Log in" : "Need an account? Register") { registration.toggle(); error = nil }.frame(maxWidth: .infinity)
+                    }
                 }.padding(28).frame(maxWidth: 520)
             }
-        }.preferredColorScheme(.dark)
+        }.preferredColorScheme(.dark).task { await loadServerConfig() }
     }
 
     private func submit() async {
@@ -75,6 +97,14 @@ private struct LoginView: View {
         } catch APIError.http(let status) { error = status == 401 ? "Invalid username or password." : "Server rejected the request (\(status))." }
         catch { error = "Could not reach the server." }
         working = false
+    }
+
+    private func loadServerConfig() async {
+        UserDefaults.standard.set(apiURL, forKey: "ledgerly.apiURL")
+        if let config = try? await APIClient.shared.serverConfig() {
+            registrationEnabled = config.registrationEnabled
+            if convexURL == "http://localhost:3210" { convexURL = config.convexUrl }
+        }
     }
 }
 
@@ -101,13 +131,15 @@ private struct RootTabView: View {
                 NavigationStack { SettingsView() }
             }
         }
-        .tint(.mint)
+        .tint(Color(red: 0.48, green: 0.66, blue: 1.0))
         .preferredColorScheme(.dark)
     }
 }
 
 private struct AccountsTabView: View {
+    @Environment(\.modelContext) private var context
     @Query(sort: \CachedAccount.name) private var accounts: [CachedAccount]
+    @State private var showingNewAccount = false
 
     private var total: Int { accounts.reduce(0) { $0 + $1.amountMinor } }
 
@@ -121,7 +153,7 @@ private struct AccountsTabView: View {
                         Text("ALL ACCOUNTS")
                             .font(.caption.bold())
                             .tracking(2)
-                            .foregroundStyle(.mint)
+                            .foregroundStyle(.blue)
 
                         Text(money(total, accounts.first?.currency ?? "USD"))
                             .font(.system(size: 38, weight: .bold, design: .rounded))
@@ -138,9 +170,9 @@ private struct AccountsTabView: View {
                                 HStack(spacing: 14) {
                                     Image(systemName: accountSymbol(account))
                                         .font(.title3.weight(.semibold))
-                                        .foregroundStyle(.mint)
+                                        .foregroundStyle(.blue)
                                         .frame(width: 46, height: 46)
-                                        .background(.mint.opacity(0.12), in: .rect(cornerRadius: 15))
+                                        .background(.blue.opacity(0.12), in: .rect(cornerRadius: 15))
 
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text(account.name).font(.headline)
@@ -163,7 +195,7 @@ private struct AccountsTabView: View {
                             ContentUnavailableView(
                                 "No accounts yet",
                                 systemImage: "building.columns",
-                                description: Text("Connect an account, then pull to sync from Overview.")
+                                description: Text("Create an account on this device. Sync is optional.")
                             )
                             .frame(maxWidth: .infinity)
                             .foregroundStyle(.white.opacity(0.8))
@@ -176,6 +208,8 @@ private struct AccountsTabView: View {
             }
             .navigationTitle("Accounts")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button { showingNewAccount = true } label: { Image(systemName: "plus") } } }
+            .sheet(isPresented: $showingNewAccount) { NewAccountView() }
         }
     }
 
@@ -212,11 +246,11 @@ private struct InsightsTabView: View {
                         Text("YOUR MONEY AT A GLANCE")
                             .font(.caption.bold())
                             .tracking(2)
-                            .foregroundStyle(.mint)
+                            .foregroundStyle(.blue)
 
-                        insightCard("Net worth", value: totalBalance, symbol: "sum", tint: .mint)
+                        insightCard("Net worth", value: totalBalance, symbol: "sum", tint: .blue)
                         HStack(spacing: 12) {
-                            insightCard("Money in", value: inflow, symbol: "arrow.down.left", tint: .mint)
+                            insightCard("Money in", value: inflow, symbol: "arrow.down.left", tint: .blue)
                             insightCard("Money out", value: outflow, symbol: "arrow.up.right", tint: .orange)
                         }
 
@@ -224,7 +258,7 @@ private struct InsightsTabView: View {
                             Label("Snapshot", systemImage: "chart.pie.fill")
                                 .font(.headline)
                             Text(transactions.isEmpty
-                                 ? "Your trends will appear after the first sync."
+                                 ? "Add transactions to see spending patterns."
                                  : "Based on \(transactions.count) saved transaction\(transactions.count == 1 ? "" : "s").")
                                 .foregroundStyle(.secondary)
                         }
@@ -273,7 +307,7 @@ private struct ActivityTabView: View {
                                 HStack(spacing: 12) {
                                     Image(systemName: transaction.amountMinor > 0 ? "arrow.down.left" : "arrow.up.right")
                                         .font(.callout.bold())
-                                        .foregroundStyle(transaction.amountMinor > 0 ? .mint : .orange)
+                                        .foregroundStyle(transaction.amountMinor > 0 ? .blue : .orange)
                                         .frame(width: 42, height: 42)
                                         .background(.white.opacity(0.07), in: .rect(cornerRadius: 14))
 
@@ -287,7 +321,7 @@ private struct ActivityTabView: View {
                                     Spacer(minLength: 8)
                                     VStack(alignment: .trailing, spacing: 4) {
                                         Text(money(transaction.amountMinor, transaction.currency))
-                                            .foregroundStyle(transaction.amountMinor > 0 ? .mint : .primary)
+                                            .foregroundStyle(transaction.amountMinor > 0 ? .blue : .primary)
                                         if transaction.pending {
                                             Text("Pending").font(.caption2).foregroundStyle(.orange)
                                         }
@@ -322,14 +356,50 @@ private struct ActivityTabView: View {
     }
 }
 
-private struct LedgerlyBackground: View {
+struct LedgerlyBackground: View {
     var body: some View {
-        LinearGradient(
-            colors: [Color(red: 0.02, green: 0.12, blue: 0.09), Color(red: 0.03, green: 0.22, blue: 0.16)],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .ignoresSafeArea()
+        Color(red: 0.045, green: 0.047, blue: 0.055).ignoresSafeArea()
+    }
+}
+
+struct NewAccountView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var context
+    @State private var name = ""
+    @State private var institution = ""
+    @State private var kind = "checking"
+    @State private var balance = ""
+    @State private var currency = "USD"
+    private let kinds = [("checking", "Checking"), ("savings", "Savings"), ("credit", "Credit card"), ("investment", "Investment"), ("cash", "Cash")]
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Account") {
+                    TextField("Name", text: $name)
+                    TextField("Institution (optional)", text: $institution)
+                    Picker("Type", selection: $kind) { ForEach(kinds, id: \.0) { Text($0.1).tag($0.0) } }
+                }
+                Section("Opening balance") {
+                    TextField("0.00", text: $balance).keyboardType(.decimalPad)
+                    TextField("Currency", text: $currency).textInputAutocapitalization(.characters)
+                }
+                Section { Text("This account is saved locally. You can enable sync later in Settings.").font(.caption).foregroundStyle(.secondary) }
+            }
+            .navigationTitle("New account").navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) { Button("Save") { save() }.disabled(name.trimmingCharacters(in: .whitespaces).isEmpty) }
+            }
+        }.preferredColorScheme(.dark)
+    }
+
+    private func save() {
+        let decimal = Decimal(string: balance.replacingOccurrences(of: ",", with: ".")) ?? 0
+        let minor = NSDecimalNumber(decimal: decimal * 100).intValue
+        context.insert(CachedAccount(name: name.trimmingCharacters(in: .whitespaces), institution: institution.trimmingCharacters(in: .whitespaces).isEmpty ? "Manual" : institution.trimmingCharacters(in: .whitespaces), kind: kind, amountMinor: minor, currency: currency.uppercased()))
+        try? context.save()
+        dismiss()
     }
 }
 

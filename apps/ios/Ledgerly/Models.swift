@@ -117,6 +117,17 @@ enum JSONValue: Codable, Equatable {
         updatedAt = dto.updatedAt
     }
 
+    init(name: String, institution: String, kind: String, amountMinor: Int, currency: String) {
+        id = UUID().uuidString.lowercased()
+        self.name = name
+        self.institution = institution
+        self.kind = kind
+        self.amountMinor = amountMinor
+        self.currency = currency
+        version = 1
+        updatedAt = ISO8601DateFormatter().string(from: Date())
+    }
+
     func apply(_ dto: AccountDTO, version: Int) {
         name = dto.name
         institution = dto.institution

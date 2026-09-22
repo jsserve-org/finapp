@@ -22,6 +22,7 @@ function requireDeployment(requested: string) {
 }
 
 app.get("/health/live", (c) => c.json({ status: "ok" }));
+app.get("/v1/config", (c) => c.json({ registrationEnabled: config.ALLOW_REGISTRATION, convexUrl: normalizedURL(config.PUBLIC_CONVEX_URL) }));
 app.get("/health/ready", async (c) => {
   try {
     await convexQuery("system:health", {});
