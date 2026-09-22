@@ -9,6 +9,18 @@ type Session = { userId: string; username: string; syncSessionId: string };
 type Variables = { sessionToken: string; session: Session };
 export const app = new Hono<{ Variables: Variables }>();
 
+app.use("*", async (c, next) => {
+  const startedAt = performance.now();
+  await next();
+  console.log(JSON.stringify({
+    event: "request",
+    method: c.req.method,
+    path: c.req.path,
+    status: c.res.status,
+    durationMs: Math.round(performance.now() - startedAt),
+  }));
+});
+
 const credentials = z.object({
   username: z.string().trim().toLowerCase().regex(/^[a-z0-9_.-]{3,40}$/),
   password: z.string().min(10).max(128),

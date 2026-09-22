@@ -14,40 +14,37 @@ struct AccountDetailView: View {
     }
 
     var body: some View {
-        ZStack {
-            LedgerlyBackground()
-            ScrollView {
-                if let account = accounts.first {
-                    LazyVStack(alignment: .leading, spacing: 16) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(account.name).font(.title.bold()).foregroundStyle(.white)
-                            Text("\(account.institution) · \(account.displayKind)").foregroundStyle(.secondary)
-                            Text(money(account.amountMinor, account.currency)).font(.system(size: 36, weight: .bold, design: .rounded))
-                        }.frame(maxWidth: .infinity, alignment: .leading).padding(24).ledgerlyGlass(cornerRadius: 28)
-
-                        Text("Transactions").font(.title3.bold()).foregroundStyle(.white)
-                        ForEach(transactions) { transaction in
-                            NavigationLink {
-                                TransactionDetailView(transactionID: transaction.id)
+        List {
+            if let account = accounts.first {
+                Section("Account") {
+                    LabeledContent("Balance") { Text(money(account.amountMinor, account.currency)).font(.title2.bold()) }
+                    LabeledContent("Institution", value: account.institution)
+                    LabeledContent("Type", value: account.displayKind)
+                }
+                Section("Transactions") {
+                    ForEach(transactions) { transaction in
+                        NavigationLink { TransactionDetailView(transactionID: transaction.id) } label: {
+                            LabeledContent {
+                                Text(money(transaction.amountMinor, transaction.currency))
                             } label: {
-                                HStack {
-                                    VStack(alignment: .leading) {
-                                        Text(transaction.title).fontWeight(.semibold)
-                                        Text(transaction.category ?? "Uncategorized").font(.subheadline).foregroundStyle(.secondary)
-                                    }
-                                    Spacer()
-                                    Text(money(transaction.amountMinor, transaction.currency))
-                                }.padding(14).ledgerlyGlass(cornerRadius: 16)
-                            }.buttonStyle(.plain)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(transaction.title).font(.headline)
+                                    Text(transaction.category ?? "Uncategorized").font(.subheadline).foregroundStyle(.secondary)
+                                }
+                            }
                         }
-                        if transactions.isEmpty {
-                            ContentUnavailableView("No transactions", systemImage: "tray")
-                        }
-                    }.padding(20)
+                    }
+                    if transactions.isEmpty {
+                        ContentUnavailableView("No transactions", systemImage: "tray")
+                    }
                 }
             }
-        }.preferredColorScheme(.dark)
+        }
+        .navigationTitle(accounts.first?.name ?? "Account")
+        .navigationBarTitleDisplayMode(.large)
     }
 
-    private func money(_ amount: Int, _ currency: String) -> String { (Double(amount) / 100).formatted(.currency(code: currency)) }
+    private func money(_ amount: Int, _ currency: String) -> String {
+        (Double(amount) / 100).formatted(.currency(code: currency).presentation(.isoCode))
+    }
 }

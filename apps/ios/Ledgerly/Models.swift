@@ -223,8 +223,8 @@ enum JSONValue: Codable, Equatable {
     var category: String
     var isActive: Bool
 
-    init(name: String, amountMinor: Int, currency: String, frequency: String, nextDate: Date, accountId: String?, category: String) {
-        id = UUID().uuidString.lowercased()
+    init(id: String = UUID().uuidString.lowercased(), name: String, amountMinor: Int, currency: String, frequency: String, nextDate: Date, accountId: String?, category: String, isActive: Bool = true) {
+        self.id = id
         self.name = name
         self.amountMinor = amountMinor
         self.currency = currency
@@ -232,7 +232,7 @@ enum JSONValue: Codable, Equatable {
         self.nextDate = nextDate
         self.accountId = accountId
         self.category = category
-        isActive = true
+        self.isActive = isActive
     }
 
     var frequencyLabel: String {
