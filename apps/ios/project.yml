@@ -3,17 +3,36 @@ options:
   bundleIdPrefix: com.ledgerly
   deploymentTarget:
     iOS: "18.0"
+settings:
+  base:
+    SWIFT_VERSION: 6.0
 targets:
   Ledgerly:
     type: application
     platform: iOS
     sources: [Ledgerly]
+    info:
+      path: Ledgerly/Info.plist
+      properties:
+        LedgerlyBaseURL: $(LEDGERLY_BASE_URL)
+        LedgerlyAPIToken: $(LEDGERLY_API_TOKEN)
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        UILaunchScreen: {}
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ledgerly.app
-        SWIFT_VERSION: 6.0
         GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
-        INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking: YES
+        LEDGERLY_BASE_URL: http://localhost:3000
+        LEDGERLY_API_TOKEN: local-development-token
     scheme:
-      testTargets: []
+      testTargets: [LedgerlyTests]
+  LedgerlyTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [LedgerlyTests]
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: Ledgerly

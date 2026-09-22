@@ -1,0 +1,427 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		11074CA4D54C74BB4A35F6EB /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E4F996392A4CF8542BEDE55 /* SettingsView.swift */; };
+		1572F5EE25317D50E836AD66 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FF3EFA1DE1CBD547994B2C5 /* APIClient.swift */; };
+		37499986F122BC64CE3A8C58 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDEEF15E27DB83D45F19BE51 /* Models.swift */; };
+		46881E480234BB5D846D1AC1 /* TransactionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CD186720D2E69A2B06E6E6D /* TransactionDetailView.swift */; };
+		5762EC5917970812C489302E /* SyncEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55C65570FEA7E03FA70CD303 /* SyncEngine.swift */; };
+		6091BDC00C18B4345EA546EB /* ConnectionHealthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9DC72A3EAAF59ED0F765873 /* ConnectionHealthView.swift */; };
+		85243F606AF4070693F950D1 /* LedgerlyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0C42285F60A69C2A53C0989 /* LedgerlyApp.swift */; };
+		90BDA2B01A8F3FE5BAA3E609 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF071C23BB846F913BD1DAC3 /* DashboardView.swift */; };
+		9678D187994E841D6BB06EE9 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E37E7C942B2B07B38BB6D62 /* AppConfig.swift */; };
+		CA97A2EF1F499AC7C00B1EC7 /* AccountDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0106C64BF0BF3AFFB28671 /* AccountDetailView.swift */; };
+		D97B47F1B729F380F03D276D /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C47DE8DA5D1977EEE8DB432 /* KeychainStore.swift */; };
+		FF22C721D942DED66BB719E3 /* SyncEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0357F0A8C8E8410C8283C386 /* SyncEngineTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		2700A79A8C758C1C65D45329 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C7BF75CBD46FB0B468322F26 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F7006B96BF3666240E9160E8;
+			remoteInfo = Ledgerly;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		0357F0A8C8E8410C8283C386 /* SyncEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncEngineTests.swift; sourceTree = "<group>"; };
+		1E37E7C942B2B07B38BB6D62 /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
+		276C5023F83277240143C5AE /* LedgerlyTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = LedgerlyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		4C47DE8DA5D1977EEE8DB432 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
+		55C65570FEA7E03FA70CD303 /* SyncEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncEngine.swift; sourceTree = "<group>"; };
+		5CD186720D2E69A2B06E6E6D /* TransactionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionDetailView.swift; sourceTree = "<group>"; };
+		5E4F996392A4CF8542BEDE55 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		9FF3EFA1DE1CBD547994B2C5 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		BF071C23BB846F913BD1DAC3 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
+		C9DC72A3EAAF59ED0F765873 /* ConnectionHealthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionHealthView.swift; sourceTree = "<group>"; };
+		CAED42728E34A08C40392FB5 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		DA0106C64BF0BF3AFFB28671 /* AccountDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountDetailView.swift; sourceTree = "<group>"; };
+		E0C42285F60A69C2A53C0989 /* LedgerlyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LedgerlyApp.swift; sourceTree = "<group>"; };
+		EDEEF15E27DB83D45F19BE51 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		F6773294291C9F0179902676 /* Ledgerly.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Ledgerly.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		2DB8D70D8C5C66B2CDD4520C /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				F6773294291C9F0179902676 /* Ledgerly.app */,
+				276C5023F83277240143C5AE /* LedgerlyTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		3F0E42B528ACE5C91D350212 = {
+			isa = PBXGroup;
+			children = (
+				829488D077E82BA3B870C6E5 /* Ledgerly */,
+				BEA9708B36748037398C109F /* LedgerlyTests */,
+				2DB8D70D8C5C66B2CDD4520C /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		829488D077E82BA3B870C6E5 /* Ledgerly */ = {
+			isa = PBXGroup;
+			children = (
+				DA0106C64BF0BF3AFFB28671 /* AccountDetailView.swift */,
+				9FF3EFA1DE1CBD547994B2C5 /* APIClient.swift */,
+				1E37E7C942B2B07B38BB6D62 /* AppConfig.swift */,
+				C9DC72A3EAAF59ED0F765873 /* ConnectionHealthView.swift */,
+				BF071C23BB846F913BD1DAC3 /* DashboardView.swift */,
+				CAED42728E34A08C40392FB5 /* Info.plist */,
+				4C47DE8DA5D1977EEE8DB432 /* KeychainStore.swift */,
+				E0C42285F60A69C2A53C0989 /* LedgerlyApp.swift */,
+				EDEEF15E27DB83D45F19BE51 /* Models.swift */,
+				5E4F996392A4CF8542BEDE55 /* SettingsView.swift */,
+				55C65570FEA7E03FA70CD303 /* SyncEngine.swift */,
+				5CD186720D2E69A2B06E6E6D /* TransactionDetailView.swift */,
+			);
+			path = Ledgerly;
+			sourceTree = "<group>";
+		};
+		BEA9708B36748037398C109F /* LedgerlyTests */ = {
+			isa = PBXGroup;
+			children = (
+				0357F0A8C8E8410C8283C386 /* SyncEngineTests.swift */,
+			);
+			path = LedgerlyTests;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		4D261B4A98D7FA9043BE77CC /* LedgerlyTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 667125EE684DB7468505C42F /* Build configuration list for PBXNativeTarget "LedgerlyTests" */;
+			buildPhases = (
+				3295EDAA8618BBD87077C8FC /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				7C333F7784D7C178B5825D93 /* PBXTargetDependency */,
+			);
+			name = LedgerlyTests;
+			packageProductDependencies = (
+			);
+			productName = LedgerlyTests;
+			productReference = 276C5023F83277240143C5AE /* LedgerlyTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		F7006B96BF3666240E9160E8 /* Ledgerly */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 57A050B7B6A622390E5C1AF9 /* Build configuration list for PBXNativeTarget "Ledgerly" */;
+			buildPhases = (
+				4086C50DCE5CB4D6F49B194A /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Ledgerly;
+			packageProductDependencies = (
+			);
+			productName = Ledgerly;
+			productReference = F6773294291C9F0179902676 /* Ledgerly.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		C7BF75CBD46FB0B468322F26 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+			};
+			buildConfigurationList = 4960720A0A9DF79D2E136324 /* Build configuration list for PBXProject "Ledgerly" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 3F0E42B528ACE5C91D350212;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				F7006B96BF3666240E9160E8 /* Ledgerly */,
+				4D261B4A98D7FA9043BE77CC /* LedgerlyTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		3295EDAA8618BBD87077C8FC /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FF22C721D942DED66BB719E3 /* SyncEngineTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4086C50DCE5CB4D6F49B194A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1572F5EE25317D50E836AD66 /* APIClient.swift in Sources */,
+				CA97A2EF1F499AC7C00B1EC7 /* AccountDetailView.swift in Sources */,
+				9678D187994E841D6BB06EE9 /* AppConfig.swift in Sources */,
+				6091BDC00C18B4345EA546EB /* ConnectionHealthView.swift in Sources */,
+				90BDA2B01A8F3FE5BAA3E609 /* DashboardView.swift in Sources */,
+				D97B47F1B729F380F03D276D /* KeychainStore.swift in Sources */,
+				85243F606AF4070693F950D1 /* LedgerlyApp.swift in Sources */,
+				37499986F122BC64CE3A8C58 /* Models.swift in Sources */,
+				11074CA4D54C74BB4A35F6EB /* SettingsView.swift in Sources */,
+				5762EC5917970812C489302E /* SyncEngine.swift in Sources */,
+				46881E480234BB5D846D1AC1 /* TransactionDetailView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		7C333F7784D7C178B5825D93 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F7006B96BF3666240E9160E8 /* Ledgerly */;
+			targetProxy = 2700A79A8C758C1C65D45329 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		3C56DF99DD683FF5AF023653 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.ledgerly.LedgerlyTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Ledgerly.app/Ledgerly";
+			};
+			name = Debug;
+		};
+		4B747A49BE544BB0F1048181 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.ledgerly.LedgerlyTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Ledgerly.app/Ledgerly";
+			};
+			name = Release;
+		};
+		684C2B76EB93D1D28C3C5817 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		6C728B79C085D19552094CEA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		918AFA0F3716EAAE9DCEB865 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Ledgerly/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LEDGERLY_API_TOKEN = "local-development-token";
+				LEDGERLY_BASE_URL = "http://localhost:3000";
+				PRODUCT_BUNDLE_IDENTIFIER = com.ledgerly.app;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		B206D5A66FF8F3FAA450B962 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Ledgerly/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LEDGERLY_API_TOKEN = "local-development-token";
+				LEDGERLY_BASE_URL = "http://localhost:3000";
+				PRODUCT_BUNDLE_IDENTIFIER = com.ledgerly.app;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		4960720A0A9DF79D2E136324 /* Build configuration list for PBXProject "Ledgerly" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6C728B79C085D19552094CEA /* Debug */,
+				684C2B76EB93D1D28C3C5817 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		57A050B7B6A622390E5C1AF9 /* Build configuration list for PBXNativeTarget "Ledgerly" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				918AFA0F3716EAAE9DCEB865 /* Debug */,
+				B206D5A66FF8F3FAA450B962 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		667125EE684DB7468505C42F /* Build configuration list for PBXNativeTarget "LedgerlyTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3C56DF99DD683FF5AF023653 /* Debug */,
+				4B747A49BE544BB0F1048181 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = C7BF75CBD46FB0B468322F26 /* Project object */;
+}

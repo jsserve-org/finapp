@@ -37,7 +37,7 @@ export default function Home() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#071712" }, content: { padding: 20, paddingBottom: 48, gap: 12 },
+  safe: { flex: 1, backgroundColor: "#071712" }, content: { padding: 20, paddingBottom: 24, gap: 12 },
   heading: { marginTop: 16, marginBottom: 14 }, eyebrow: { color: "#70D6AD", letterSpacing: 2, fontWeight: "700", fontSize: 12 }, title: { color: "#F4FFF9", fontSize: 34, fontWeight: "700", marginTop: 5 },
   offline: { color: "#FFD28A" }, hero: { backgroundColor: "#123E31", borderRadius: 28, padding: 24, marginBottom: 12 }, heroLabel: { color: "#93CBB4", fontSize: 12, letterSpacing: 1.4 }, heroValue: { color: "white", fontSize: 40, fontWeight: "700", marginVertical: 9 }, heroHint: { color: "#A8D7C4" },
   section: { color: "#E9FFF6", fontSize: 20, fontWeight: "700", marginTop: 14, marginBottom: 2 }, card: { backgroundColor: "#10241D", borderRadius: 18, padding: 18, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }, cardTitle: { color: "#F2FFF9", fontSize: 16, fontWeight: "600" }, muted: { color: "#7D9B8F", marginTop: 4 }, amount: { color: "#F2FFF9", fontWeight: "600" }, positive: { color: "#70D6AD" },
