@@ -10,7 +10,7 @@ struct LedgerlyApp: App {
             if session.canUseApp { RootTabView().environment(session) }
             else { LoginView().environment(session) }
         }
-            .modelContainer(for: [CachedAccount.self, CachedTransaction.self, SyncSetting.self, PendingMutation.self])
+            .modelContainer(for: [CachedAccount.self, CachedTransaction.self, SyncSetting.self, PendingMutation.self, PendingAccountMutation.self])
     }
 }
 
@@ -397,7 +397,9 @@ struct NewAccountView: View {
     private func save() {
         let decimal = Decimal(string: balance.replacingOccurrences(of: ",", with: ".")) ?? 0
         let minor = NSDecimalNumber(decimal: decimal * 100).intValue
-        context.insert(CachedAccount(name: name.trimmingCharacters(in: .whitespaces), institution: institution.trimmingCharacters(in: .whitespaces).isEmpty ? "Manual" : institution.trimmingCharacters(in: .whitespaces), kind: kind, amountMinor: minor, currency: currency.uppercased()))
+        let account = CachedAccount(name: name.trimmingCharacters(in: .whitespaces), institution: institution.trimmingCharacters(in: .whitespaces).isEmpty ? "Manual" : institution.trimmingCharacters(in: .whitespaces), kind: kind, amountMinor: minor, currency: currency.uppercased())
+        context.insert(account)
+        context.insert(PendingAccountMutation(entityId: account.id))
         try? context.save()
         dismiss()
     }

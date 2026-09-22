@@ -38,7 +38,7 @@ struct SyncResponse: Codable {
 /// transaction upserts/deletes with a base version are accepted.
 struct SyncOperation: Encodable {
     let mutationId: String
-    let entity = "transaction"
+    let entity: String
     let action: String
     let entityId: String
     let value: OperationValue?
@@ -47,14 +47,31 @@ struct SyncOperation: Encodable {
     struct OperationValue: Encodable {
         var description: String?
         var category: String?
+        var account: AccountDTO?
+
+        init(description: String? = nil, category: String? = nil, account: AccountDTO? = nil) {
+            self.description = description; self.category = category; self.account = account
+        }
 
         enum CodingKeys: String, CodingKey { case description; case category }
         func encode(to encoder: Encoder) throws {
+            if let account { try account.encode(to: encoder); return }
             var container = encoder.container(keyedBy: CodingKeys.self)
             if let description, !description.isEmpty { try container.encode(description, forKey: .description) }
             if let category { try container.encode(category, forKey: .category) }
         }
     }
+
+    init(mutationId: String, entity: String = "transaction", action: String, entityId: String, value: OperationValue?, baseVersion: Int) {
+        self.mutationId = mutationId; self.entity = entity; self.action = action; self.entityId = entityId; self.value = value; self.baseVersion = baseVersion
+    }
+}
+
+@Model final class PendingAccountMutation {
+    @Attribute(.unique) var mutationId: String
+    var entityId: String
+    var createdAt: Date
+    init(entityId: String) { mutationId = UUID().uuidString.lowercased(); self.entityId = entityId; createdAt = Date() }
 }
 
 /// Opaque JSON payload attached to a sync change.
