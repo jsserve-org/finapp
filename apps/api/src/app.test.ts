@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-process.env.API_TOKEN = "test-token-at-least-16-characters";
+process.env.CONVEX_URL = "http://localhost:3210";
 const { app } = await import("./app");
 
 describe("health", () => {
@@ -10,7 +10,7 @@ describe("health", () => {
     expect(await response.json()).toEqual({ status: "ok" });
   });
 
-  it("protects versioned routes", async () => {
+  it("protects sync routes", async () => {
     const response = await app.request("/v1/accounts");
     expect(response.status).toBe(401);
   });

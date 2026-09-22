@@ -1,0 +1,8 @@
+{
+  "name": "@ledgerly/convex",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": { "dev": "convex dev", "deploy": "convex deploy", "typecheck": "tsc --noEmit", "test": "echo 'Convex functions validated by typecheck'" },
+  "dependencies": { "convex": "^1.28.0" },
+  "devDependencies": { "typescript": "^5.9.2" }
+}

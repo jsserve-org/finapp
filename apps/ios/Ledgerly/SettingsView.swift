@@ -1,8 +1,7 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @AppStorage("ledgerly.useCustomToken") private var useCustomToken = false
-    @State private var customToken = ""
+    @Environment(SessionController.self) private var session
     @State private var healthState: String?
     @State private var isChecking = false
 
@@ -12,17 +11,8 @@ struct SettingsView: View {
             Form {
                 Section("API") {
                     LabeledContent("Base URL", value: AppConfig.baseURL.absoluteString)
-                    LabeledContent("Token source", value: useCustomToken ? "Keychain" : "Build config")
-                    Toggle("Use Keychain token", isOn: $useCustomToken)
-                    if useCustomToken {
-                        SecureField("Bearer token", text: $customToken)
-                        Button("Save token to Keychain") {
-                            KeychainStore().saveToken(customToken)
-                        }.disabled(customToken.isEmpty)
-                        Button("Remove saved token", role: .destructive) {
-                            KeychainStore().deleteToken()
-                        }
-                    }
+                    LabeledContent("Convex URL", value: AppConfig.convexURL.absoluteString)
+                    LabeledContent("Username", value: UserDefaults.standard.string(forKey: "ledgerly.username") ?? "—")
                 }
                 Section("Health") {
                     LabeledContent("Status", value: healthState ?? "—")
@@ -36,6 +26,7 @@ struct SettingsView: View {
                     LabeledContent("App", value: "Ledgerly")
                     LabeledContent("Sync", value: "Cursor-based /v1/sync")
                 }
+                Section { Button("Log out", role: .destructive) { session.logout() } }
             }.scrollContentBackground(.hidden)
         }
         .navigationTitle("Settings")

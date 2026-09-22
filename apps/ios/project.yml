@@ -15,7 +15,6 @@ targets:
       path: Ledgerly/Info.plist
       properties:
         LedgerlyBaseURL: $(LEDGERLY_BASE_URL)
-        LedgerlyAPIToken: $(LEDGERLY_API_TOKEN)
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
         UILaunchScreen: {}
@@ -24,7 +23,6 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.ledgerly.app
         GENERATE_INFOPLIST_FILE: YES
         LEDGERLY_BASE_URL: http://localhost:3000
-        LEDGERLY_API_TOKEN: local-development-token
     scheme:
       testTargets: [LedgerlyTests]
   LedgerlyTests:

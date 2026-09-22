@@ -9,7 +9,7 @@ The iOS client is a native SwiftUI/SwiftData app in `apps/ios/Ledgerly`. The bac
 - Cursor-based calls to `POST /v1/sync` via the `@MainActor` `SyncEngine`, which also drains a `PendingMutation` outbox (offline edits/deletes queue locally, flush on next sync, deduped by `mutationId`).
 - Transaction detail with edit/delete (outbox-backed), account detail with filtered history, connection-health screen (`GET /v1/automations/status` + demo import), and settings screen (Keychain token management, API health check).
 - Keychain-backed bearer token (`KeychainStore`) with build-config fallback.
-- Base URL and token come from build settings `LEDGERLY_BASE_URL` / `LEDGERLY_API_TOKEN` (see `project.yml`), read through `AppConfig.swift`. Use HTTPS for a physical device.
+- Users choose the API and Convex URLs at login. The opaque session token is stored in Keychain; use HTTPS on a physical device.
 - iOS 26 Liquid Glass via the availability-gated `ledgerlyGlass` modifier, with an iOS 18 material fallback.
 - Unit test target `LedgerlyTests` (11 tests): DTO decoding against the API's JSON shape, `JSONValue` ordering, cache upsert/merge/delete, cursor persistence, outbox operation encoding.
 - XcodeGen specification in `project.yml`.

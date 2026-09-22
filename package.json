@@ -6,8 +6,7 @@
     "dev": "bun --filter @ledgerly/api dev",
     "test": "bun --filter '*' test",
     "typecheck": "bun --filter '*' typecheck",
-    "db:generate": "bun --filter @ledgerly/api db:generate",
-    "db:migrate": "bun --filter @ledgerly/api db:migrate"
+    "convex:deploy": "bun --filter @ledgerly/convex deploy"
   },
   "engines": { "bun": ">=1.1.0" },
   "packageManager": "bun@1.4.2"

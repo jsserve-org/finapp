@@ -13,7 +13,7 @@ export default function Activity() {
   return <SafeAreaView style={styles.safe}><ScrollView contentContainerStyle={styles.content}>
     <Text style={styles.title}>Activity</Text>
     {transactions.map((item) => <View key={item.id} style={styles.row}>
-      <View style={styles.icon}><Ionicons name={item.amount.amountMinor > 0 ? "arrow-down-left" : "arrow-up-right"} color={item.amount.amountMinor > 0 ? "#70D6AD" : "#FFD28A"} size={18} /></View>
+      <View style={styles.icon}><Ionicons name={item.amount.amountMinor > 0 ? "arrow-down" : "arrow-up"} color={item.amount.amountMinor > 0 ? "#70D6AD" : "#FFD28A"} size={18} /></View>
       <View style={styles.grow}><Text style={styles.cardTitle}>{item.description}</Text><Text style={styles.muted}>{item.category ?? "Uncategorized"}</Text></View>
       <View><Text style={[styles.amount, item.amount.amountMinor > 0 && styles.positive]}>{money(item.amount.amountMinor, item.amount.currency)}</Text>{item.pending && <Text style={styles.pending}>Pending</Text>}</View>
     </View>)}

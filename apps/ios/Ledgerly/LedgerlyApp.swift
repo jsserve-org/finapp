@@ -1,11 +1,80 @@
 import SwiftData
 import SwiftUI
+import Observation
 
 @main
 struct LedgerlyApp: App {
+    @State private var session = SessionController()
     var body: some Scene {
-        WindowGroup { RootTabView() }
+        WindowGroup {
+            if session.isAuthenticated { RootTabView().environment(session) }
+            else { LoginView().environment(session) }
+        }
             .modelContainer(for: [CachedAccount.self, CachedTransaction.self, SyncSetting.self])
+    }
+}
+
+@MainActor @Observable final class SessionController {
+    var isAuthenticated = KeychainStore().token() != nil
+    func complete(_ response: AuthResponse) {
+        KeychainStore().saveToken(response.token)
+        UserDefaults.standard.set(response.context.apiUrl, forKey: "ledgerly.apiURL")
+        UserDefaults.standard.set(response.context.convexUrl, forKey: "ledgerly.convexURL")
+        UserDefaults.standard.set(response.user.username, forKey: "ledgerly.username")
+        UserDefaults.standard.set(response.context.syncSessionId, forKey: "ledgerly.syncSessionId")
+        isAuthenticated = true
+    }
+    func logout() {
+        Task { try? await APIClient.shared.logout() }
+        KeychainStore().deleteToken()
+        isAuthenticated = false
+    }
+}
+
+private struct LoginView: View {
+    @Environment(SessionController.self) private var session
+    @State private var apiURL = UserDefaults.standard.string(forKey: "ledgerly.apiURL") ?? "http://localhost:3000"
+    @State private var convexURL = UserDefaults.standard.string(forKey: "ledgerly.convexURL") ?? "http://localhost:3210"
+    @State private var username = ""
+    @State private var password = ""
+    @State private var registration = false
+    @State private var working = false
+    @State private var error: String?
+
+    var body: some View {
+        ZStack {
+            LedgerlyBackground()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    Image(systemName: "chart.line.uptrend.xyaxis.circle.fill").font(.system(size: 58)).foregroundStyle(.mint)
+                    Text(registration ? "Create account" : "Welcome back").font(.largeTitle.bold())
+                    Text("Connect securely to your Ledgerly server.").foregroundStyle(.secondary)
+                    Group {
+                        TextField("API endpoint", text: $apiURL).textContentType(.URL).textInputAutocapitalization(.never).keyboardType(.URL)
+                        TextField("Convex endpoint", text: $convexURL).textContentType(.URL).textInputAutocapitalization(.never).keyboardType(.URL)
+                        TextField("Username", text: $username).textContentType(.username).textInputAutocapitalization(.never)
+                        SecureField("Password (10+ characters)", text: $password).textContentType(registration ? .newPassword : .password)
+                    }.padding(15).background(.ultraThinMaterial, in: .rect(cornerRadius: 15))
+                    if let error { Text(error).font(.caption).foregroundStyle(.red) }
+                    Button { Task { await submit() } } label: {
+                        Group { if working { ProgressView() } else { Text(registration ? "Create account" : "Log in").fontWeight(.bold) } }.frame(maxWidth: .infinity).padding(15)
+                    }.buttonStyle(.borderedProminent).tint(.mint).disabled(working || username.count < 3 || password.count < 10)
+                    Button(registration ? "Already have an account? Log in" : "Need an account? Register") { registration.toggle(); error = nil }.frame(maxWidth: .infinity)
+                }.padding(28).frame(maxWidth: 520)
+            }
+        }.preferredColorScheme(.dark)
+    }
+
+    private func submit() async {
+        guard let api = URL(string: apiURL), let convex = URL(string: convexURL), ["http", "https"].contains(api.scheme), ["http", "https"].contains(convex.scheme) else { error = "Enter valid HTTP(S) endpoint URLs."; return }
+        working = true; error = nil
+        UserDefaults.standard.set(api.absoluteString, forKey: "ledgerly.apiURL")
+        do {
+            if let response = try await APIClient.shared.authenticate(username: username, password: password, convexURL: convex, register: registration) { session.complete(response) }
+            else { registration = false; error = "Account created. Log in to continue." }
+        } catch APIError.http(let status) { error = status == 401 ? "Invalid username or password." : "Server rejected the request (\(status))." }
+        catch { error = "Could not reach the server." }
+        working = false
     }
 }
 

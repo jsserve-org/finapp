@@ -21,12 +21,12 @@ export default function Insights() {
   return <SafeAreaView style={styles.safe}><ScrollView contentContainerStyle={styles.content}>
     <Text style={styles.title}>Insights</Text><Text style={styles.eyebrow}>YOUR MONEY AT A GLANCE</Text>
     <Metric title="Net worth" value={money(values.balance, currency)} icon="analytics" />
-    <View style={styles.row}><Metric title="Money in" value={money(values.income, currency)} icon="arrow-down-left" /><Metric title="Money out" value={money(values.spending, currency)} icon="arrow-up-right" /></View>
+    <View style={styles.row}><Metric title="Money in" value={money(values.income, currency)} icon="arrow-down" /><Metric title="Money out" value={money(values.spending, currency)} icon="arrow-up" /></View>
     <View style={styles.card}><Ionicons name="pie-chart" color="#70D6AD" size={24} /><Text style={styles.cardTitle}>Snapshot</Text><Text style={styles.muted}>{transactions.length ? `Based on ${transactions.length} saved transactions.` : "Your trends will appear after the first sync."}</Text></View>
   </ScrollView></SafeAreaView>;
 }
 
-function Metric({ title, value, icon }: { title: string; value: string; icon: "analytics" | "arrow-down-left" | "arrow-up-right" }) {
+function Metric({ title, value, icon }: { title: string; value: string; icon: "analytics" | "arrow-down" | "arrow-up" }) {
   return <View style={styles.metric}><Ionicons name={icon} color="#70D6AD" size={21} /><Text style={styles.muted}>{title}</Text><Text numberOfLines={1} adjustsFontSizeToFit style={styles.value}>{value}</Text></View>;
 }
 
