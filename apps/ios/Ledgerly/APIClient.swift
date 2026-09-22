@@ -2,7 +2,7 @@ import Foundation
 
 enum APIError: Error, Equatable {
     case invalidResponse
-    case http(Int)
+    case http(Int, String?)
     case offline
 }
 
@@ -54,12 +54,16 @@ actor APIClient {
         return request
     }
 
-    func authenticate(username: String, password: String, convexURL: URL, register: Bool = false) async throws -> AuthResponse? {
+    func authenticate(username: String, password: String, convexURL: URL, register: Bool = false) async throws -> AuthResponse {
         struct Body: Encodable { let username, password, convexUrl: String }
         let body = try JSONEncoder().encode(Body(username: username, password: password, convexUrl: convexURL.absoluteString))
         let request = makeRequest(path: register ? "/v1/auth/register" : "/v1/auth/login", method: "POST", body: body)
         let data = try await send(request)
-        return register ? nil : try decoder.decode(AuthResponse.self, from: data)
+        if register {
+            let loginRequest = makeRequest(path: "/v1/auth/login", method: "POST", body: body)
+            return try decoder.decode(AuthResponse.self, from: await send(loginRequest))
+        }
+        return try decoder.decode(AuthResponse.self, from: data)
     }
 
     func serverConfig() async throws -> ServerConfig {
@@ -74,7 +78,13 @@ actor APIClient {
         do {
             let (data, response) = try await session.data(for: request)
             guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
-            guard (200..<300).contains(http.statusCode) else { throw APIError.http(http.statusCode) }
+            guard (200..<300).contains(http.statusCode) else {
+                struct ErrorBody: Decodable { let message: String?; let error: String? }
+                let decoded = try? decoder.decode(ErrorBody.self, from: data)
+                let plainText = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+                let message = decoded?.message ?? decoded?.error ?? (plainText?.isEmpty == false ? plainText : nil)
+                throw APIError.http(http.statusCode, message)
+            }
             return data
         } catch let error as APIError {
             throw error

@@ -10,7 +10,7 @@ The iOS client is a native SwiftUI/SwiftData app in `apps/ios/Ledgerly`. The bac
 - Transaction detail with edit/delete (outbox-backed), account detail with filtered history, connection-health screen (`GET /v1/automations/status` + demo import), and settings screen (Keychain token management, API health check).
 - Keychain-backed bearer token (`KeychainStore`) with build-config fallback.
 - Users choose the API and Convex URLs at login. The opaque session token is stored in Keychain; use HTTPS on a physical device.
-- iOS 26 Liquid Glass via the availability-gated `ledgerlyGlass` modifier, with an iOS 18 material fallback.
+- Stock SwiftUI navigation, forms, lists, toolbars, and tab bar. iOS 26 supplies its native Liquid Glass treatment automatically, while earlier supported versions retain their system appearance.
 - Unit test target `LedgerlyTests` (11 tests): DTO decoding against the API's JSON shape, `JSONValue` ordering, cache upsert/merge/delete, cursor persistence, outbox operation encoding.
 - XcodeGen specification in `project.yml`.
 
@@ -28,7 +28,7 @@ xcodebuild -project Ledgerly.xcodeproj -scheme Ledgerly \
 ## Suggested next-agent scope
 
 1. Add UI tests for offline launch and pull-to-refresh behavior.
-2. Validate Liquid Glass against Apple's current iOS 26 API and accessibility settings (Reduced Motion/Transparency).
+2. Validate the stock iOS 26 Liquid Glass tab bar against accessibility settings (Reduced Motion/Transparency).
 3. Replace the development identity bearer token with OIDC once the API grows real auth.
 4. Consider background refresh (`BGTaskScheduler`) and pull-based pagination if change feeds exceed 500 entries.
 

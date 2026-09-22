@@ -9,7 +9,7 @@ final class SyncEngineTests: XCTestCase {
 
     override func setUpWithError() throws {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        let container = try ModelContainer(for: CachedAccount.self, CachedTransaction.self, SyncSetting.self, PendingMutation.self, PendingAccountMutation.self, configurations: config)
+        let container = try ModelContainer(for: CachedAccount.self, CachedTransaction.self, SyncSetting.self, PendingMutation.self, PendingAccountMutation.self, RecurringPayment.self, configurations: config)
         context = ModelContext(container)
         context.autosaveEnabled = false
         engine = SyncEngine(api: APIClient.shared)
@@ -148,5 +148,25 @@ final class SyncEngineTests: XCTestCase {
         let json = String(data: try JSONEncoder().encode(operation), encoding: .utf8) ?? ""
         XCTAssertTrue(json.contains("\"description\":\"Only title\""))
         XCTAssertFalse(json.contains("category"))
+    }
+
+    func testBackupRoundTripIsIdempotent() throws {
+        let account = CachedAccount(name: "Checking", institution: "Test Bank", kind: "checking", amountMinor: 12_345, currency: "TWD")
+        context.insert(account)
+        let timestamp = ISO8601DateFormatter().string(from: Date())
+        context.insert(CachedTransaction(dto: TransactionDTO(id: "transaction-1", accountId: account.id, description: "Coffee", amount: Money(amountMinor: -150, currency: "TWD"), bookedAt: timestamp, pending: false, category: "Dining", updatedAt: timestamp)))
+        context.insert(RecurringPayment(id: "recurring-1", name: "Rent", amountMinor: 18_000_00, currency: "TWD", frequency: "monthly", nextDate: Date(), accountId: account.id, category: "Housing"))
+        try context.save()
+
+        let backup = try LedgerlyBackupService.create(from: context)
+        let destinationConfig = ModelConfiguration(isStoredInMemoryOnly: true)
+        let destinationContainer = try ModelContainer(for: CachedAccount.self, CachedTransaction.self, SyncSetting.self, PendingMutation.self, PendingAccountMutation.self, RecurringPayment.self, configurations: destinationConfig)
+        let destination = ModelContext(destinationContainer)
+
+        XCTAssertEqual(try LedgerlyBackupService.restore(backup, into: destination), 3)
+        XCTAssertEqual(try LedgerlyBackupService.restore(backup, into: destination), 3)
+        XCTAssertEqual(try destination.fetchCount(FetchDescriptor<CachedAccount>()), 1)
+        XCTAssertEqual(try destination.fetchCount(FetchDescriptor<CachedTransaction>()), 1)
+        XCTAssertEqual(try destination.fetchCount(FetchDescriptor<RecurringPayment>()), 1)
     }
 }
