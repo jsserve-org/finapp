@@ -19,7 +19,7 @@ export default function Insights() {
   const currency = accounts[0]?.balance.currency ?? "USD";
 
   return <SafeAreaView style={styles.safe}><ScrollView contentContainerStyle={styles.content}>
-    <Text style={styles.title}>Insights</Text><Text style={styles.eyebrow}>YOUR MONEY AT A GLANCE</Text>
+    <Text style={styles.title}>Insights</Text><Text style={styles.sectionTitle}>Your money at a glance</Text>
     <Metric title="Net worth" value={money(values.balance, currency)} icon="analytics" />
     <View style={styles.row}><Metric title="Money in" value={money(values.income, currency)} icon="arrow-down" /><Metric title="Money out" value={money(values.spending, currency)} icon="arrow-up" /></View>
     <View style={styles.card}><Ionicons name="pie-chart" color="#9CB7FF" size={24} /><Text style={styles.cardTitle}>Snapshot</Text><Text style={styles.muted}>{transactions.length ? `Based on ${transactions.length} saved transactions.` : "Add transactions to see spending patterns."}</Text></View>
@@ -31,5 +31,5 @@ function Metric({ title, value, icon }: { title: string; value: string; icon: "a
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#0B0C0F" }, content: { padding: 20, paddingBottom: 24, gap: 14 }, title: { color: "#F5F6F8", fontSize: 22, fontWeight: "700", textAlign: "center", marginBottom: 16 }, eyebrow: { color: "#9298A2", fontSize: 12, fontWeight: "700", letterSpacing: 2 }, row: { flexDirection: "row", gap: 12 }, metric: { flex: 1, backgroundColor: "#17191F", borderRadius: 22, padding: 18, gap: 8 }, value: { color: "#F5F6F8", fontSize: 20, fontWeight: "700" }, card: { backgroundColor: "#17191F", borderRadius: 22, padding: 20, gap: 10 }, cardTitle: { color: "#F5F6F8", fontSize: 17, fontWeight: "600" }, muted: { color: "#9298A2" },
+  safe: { flex: 1, backgroundColor: "#0B0C0F" }, content: { padding: 20, paddingBottom: 24, gap: 14 }, title: { color: "#F5F6F8", fontSize: 34, fontWeight: "700", marginTop: 18, marginBottom: 10 }, sectionTitle: { color: "#9CB7FF", fontSize: 20, fontWeight: "700" }, row: { flexDirection: "row", gap: 12 }, metric: { flex: 1, backgroundColor: "#17191F", borderRadius: 22, padding: 18, gap: 8 }, value: { color: "#F5F6F8", fontSize: 20, fontWeight: "700" }, card: { backgroundColor: "#17191F", borderRadius: 22, padding: 20, gap: 10 }, cardTitle: { color: "#F5F6F8", fontSize: 18, fontWeight: "600" }, muted: { color: "#9298A2", fontSize: 15 },
 });

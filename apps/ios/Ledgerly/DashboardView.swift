@@ -68,10 +68,10 @@ struct DashboardView: View {
                 Text(session.localOnly ? "Saved on this iPhone" : (sync.isOffline ? "Offline" : "Up to date"))
                 if sync.isSyncing { ProgressView().controlSize(.small) }
                 if let syncedAt = sync.lastSyncedAt {
-                    Text("· synced \(syncedAt.formatted(.relative(presentation: .named)))").font(.caption2).foregroundStyle(.secondary)
+                    Text("· synced \(syncedAt.formatted(.relative(presentation: .named)))").font(.footnote).foregroundStyle(.secondary)
                 }
-            }.font(.caption).foregroundStyle(.secondary)
-            if pendingCount > 0 { Text("\(pendingCount) change\(pendingCount == 1 ? "" : "s") waiting to sync").font(.caption).foregroundStyle(.secondary) }
+            }.font(.subheadline).foregroundStyle(.secondary)
+            if pendingCount > 0 { Text("\(pendingCount) change\(pendingCount == 1 ? "" : "s") waiting to sync").font(.subheadline).foregroundStyle(.secondary) }
         }.frame(maxWidth: .infinity, alignment: .leading).padding(20).ledgerlyGlass(cornerRadius: 22)
     }
 
@@ -91,7 +91,7 @@ struct DashboardView: View {
         HStack {
             VStack(alignment: .leading) {
                 Text(item.name).font(.headline)
-                Text("\(item.institution) · \(item.displayKind)").font(.caption).foregroundStyle(.secondary)
+                Text("\(item.institution) · \(item.displayKind)").font(.subheadline).foregroundStyle(.secondary)
             }
             Spacer()
             Text(money(item.amountMinor, item.currency)).fontWeight(.semibold)
@@ -104,12 +104,12 @@ struct DashboardView: View {
             Image(systemName: "arrow.up.arrow.down").frame(width: 42, height: 42).background(.white.opacity(0.07), in: .rect(cornerRadius: 14))
             VStack(alignment: .leading) {
                 Text(item.title).fontWeight(.semibold)
-                Text(item.category ?? "Uncategorized").font(.caption).foregroundStyle(.secondary)
+                Text(item.category ?? "Uncategorized").font(.subheadline).foregroundStyle(.secondary)
             }
             Spacer()
             VStack(alignment: .trailing) {
                 Text(money(item.amountMinor, item.currency)).foregroundStyle(item.amountMinor > 0 ? Color(red: 0.48, green: 0.66, blue: 1.0) : .primary)
-                if item.pending { Text("Pending").font(.caption2).foregroundStyle(.orange) }
+                if item.pending { Text("Pending").font(.footnote).foregroundStyle(.orange) }
             }
         }.padding(.vertical, 5)
     }
