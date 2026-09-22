@@ -95,7 +95,7 @@ private struct LoginView: View {
             if let response = try await APIClient.shared.authenticate(username: username, password: password, convexURL: convex, register: registration) { session.complete(response) }
             else { registration = false; error = "Account created. Log in to continue." }
         } catch APIError.http(let status) { error = status == 401 ? "Invalid username or password." : "Server rejected the request (\(status))." }
-        catch { error = "Could not reach the server." }
+        catch { self.error = "Could not reach the server." }
         working = false
     }
 
