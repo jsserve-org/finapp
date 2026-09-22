@@ -1,0 +1,10 @@
+.git
+.env
+node_modules
+**/node_modules
+apps/ios
+coverage
+dist
+DerivedData
+.expo
+*.log
