@@ -22,10 +22,10 @@ export type Transaction = {
 
 export type SyncOperation = {
   mutationId: string;
-  entity: "transaction";
+  entity: "account" | "transaction";
   action: "upsert" | "delete";
   entityId: string;
-  value?: Partial<Pick<Transaction, "description" | "category">>;
+  value?: Account | Partial<Pick<Transaction, "description" | "category">>;
   baseVersion: number;
 };
 

@@ -8,6 +8,15 @@ export const exchange = mutation({ args: { tokenHash: v.string(), cursor: v.stri
   for (const operation of args.operations.slice(0, 100)) {
     const prior = await ctx.db.query("mutations").withIndex("by_user_mutation", (q) => q.eq("userId", session.userId).eq("mutationId", operation.mutationId)).unique();
     if (prior) { acceptedMutationIds.push(operation.mutationId); continue; }
+    if (operation.entity === "account" && operation.action === "upsert") {
+      const account = await ctx.db.query("accounts").withIndex("by_user_external", (q) => q.eq("userId", session.userId).eq("externalId", operation.entityId)).unique();
+      if (account) await ctx.db.patch(account._id, { value: operation.value, version: account.version + 1 });
+      else await ctx.db.insert("accounts", { userId: session.userId, externalId: operation.entityId, value: operation.value, version: 1 });
+      await addChange(ctx, session.userId, "account", operation.entityId, "upsert", operation.value);
+      await ctx.db.insert("mutations", { userId: session.userId, mutationId: operation.mutationId });
+      acceptedMutationIds.push(operation.mutationId);
+      continue;
+    }
     const transaction = await ctx.db.query("transactions").withIndex("by_user_external", (q) => q.eq("userId", session.userId).eq("externalId", operation.entityId)).unique();
     if (!transaction || transaction.version !== operation.baseVersion) continue;
     const deleted = operation.action === "delete";

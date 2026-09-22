@@ -2,7 +2,7 @@
 
 An offline-first finance app with native SwiftUI iOS, React Native Android, a Bun authentication/bank gateway, and a self-hosted Convex sync layer.
 
-Both apps can be used without a server account. Users can continue locally, create manual accounts immediately, and enable self-hosted sync later from Settings. Local account data is stored in SwiftData on iOS and SQLite on Android.
+Both apps can be used without a server account. Users can continue locally, create manual accounts immediately, and enable self-hosted sync later from Settings. Local account data is stored in SwiftData on iOS and SQLite on Android; an outbox uploads locally created accounts after the user opts into sync.
 
 ## Services
 

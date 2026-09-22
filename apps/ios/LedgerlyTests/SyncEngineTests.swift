@@ -9,7 +9,7 @@ final class SyncEngineTests: XCTestCase {
 
     override func setUpWithError() throws {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        let container = try ModelContainer(for: CachedAccount.self, CachedTransaction.self, SyncSetting.self, PendingMutation.self, configurations: config)
+        let container = try ModelContainer(for: CachedAccount.self, CachedTransaction.self, SyncSetting.self, PendingMutation.self, PendingAccountMutation.self, configurations: config)
         context = ModelContext(container)
         context.autosaveEnabled = false
         engine = SyncEngine(api: APIClient.shared)

@@ -12,7 +12,7 @@ struct DashboardView: View {
 
     private var total: Int { accounts.reduce(0) { $0 + $1.amountMinor } }
     private var pendingCount: Int {
-        (try? context.fetchCount(FetchDescriptor<PendingMutation>())) ?? 0
+        ((try? context.fetchCount(FetchDescriptor<PendingMutation>())) ?? 0) + ((try? context.fetchCount(FetchDescriptor<PendingAccountMutation>())) ?? 0)
     }
 
     var body: some View {

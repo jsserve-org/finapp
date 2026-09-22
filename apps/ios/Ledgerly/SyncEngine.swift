@@ -18,11 +18,21 @@ struct SyncEngine {
         // 1. Drain the outbox alongside the pull so accepted offline edits
         //    come back in the same change feed.
         let pending = try context.fetch(FetchDescriptor<PendingMutation>(sortBy: [SortDescriptor(\.createdAt)]))
+        let pendingAccounts = try context.fetch(FetchDescriptor<PendingAccountMutation>(sortBy: [SortDescriptor(\.createdAt)]))
+        let accountOperations: [SyncOperation] = try pendingAccounts.compactMap { mutation in
+            guard let account = try fetchOne(CachedAccount.self, id: mutation.entityId, context: context) else { return nil }
+            let dto = AccountDTO(id: account.id, name: account.name, institution: account.institution, kind: account.kind, balance: Money(amountMinor: account.amountMinor, currency: account.currency), updatedAt: account.updatedAt)
+            return SyncOperation(mutationId: mutation.mutationId, entity: "account", action: "upsert", entityId: account.id, value: .init(account: dto), baseVersion: 0)
+        }
         var accepted = 0
-        if !pending.isEmpty {
-            let result = try await api.sync(cursor: cursor, operations: pending.map(\.operation))
+        if !pending.isEmpty || !pendingAccounts.isEmpty {
+            let result = try await api.sync(cursor: cursor, operations: accountOperations + pending.map(\.operation))
             let acceptedIds = Set(result.acceptedMutationIds)
             for mutation in pending where acceptedIds.contains(mutation.mutationId) {
+                context.delete(mutation)
+                accepted += 1
+            }
+            for mutation in pendingAccounts where acceptedIds.contains(mutation.mutationId) {
                 context.delete(mutation)
                 accepted += 1
             }

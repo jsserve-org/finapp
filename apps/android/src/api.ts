@@ -1,5 +1,5 @@
 import type { SyncResponse } from "@ledgerly/contracts";
-import { applySync, cursor } from "./db";
+import { acceptMutations, applySync, cursor, pendingOperations } from "./db";
 import * as SecureStore from "expo-secure-store";
 import { endpoint, type AuthResponse } from "./session";
 
@@ -24,10 +24,11 @@ export async function syncNow(): Promise<SyncResponse> {
   const response = await fetch(`${apiUrl}/v1/sync`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ cursor: cursor(), operations: [] }),
+    body: JSON.stringify({ cursor: cursor(), operations: pendingOperations() }),
   });
   if (!response.ok) throw new Error(`Sync failed (${response.status})`);
   const body = await response.json() as SyncResponse;
+  acceptMutations(body.acceptedMutationIds);
   applySync(body);
   return body;
 }
