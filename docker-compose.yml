@@ -32,9 +32,8 @@ services:
     restart: unless-stopped
 
   api:
-    build:
-      context: .
-      target: runtime
+    image: ${LEDGERLY_API_IMAGE:-ghcr.io/jsserve-org/finapp-api:latest}
+    pull_policy: always
     environment:
       CONVEX_URL: http://convex:3210
       PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:3000}
@@ -55,9 +54,8 @@ services:
     restart: unless-stopped
 
   convex-deploy:
-    build:
-      context: .
-      target: runtime
+    image: ${LEDGERLY_API_IMAGE:-ghcr.io/jsserve-org/finapp-api:latest}
+    pull_policy: always
     working_dir: /app/apps/convex
     command: ["sh", "-ec", "bun convex env set API_SERVICE_SECRET \"$$API_SERVICE_SECRET\" && bun convex deploy"]
     environment:
