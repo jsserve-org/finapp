@@ -17,6 +17,30 @@ final class SyncEngineTests: XCTestCase {
 
     // MARK: - JSONValue
 
+    func testScreenshotPaymentParserFindsTWDPaymentAndIgnoresBalance() {
+        let payment = ScreenshotPaymentParser.parse(lines: [
+            "Cathay United Bank", "Available balance TWD 81,851.00", "Payment successful",
+            "Louisa Coffee", "Amount TWD 165.00",
+        ], currency: "TWD")
+        XCTAssertEqual(payment, ScreenshotPayment(amountMinor: 16_500, title: "Louisa Coffee"))
+    }
+
+    func testScreenshotPaymentParserRequiresCurrencyOrAmountLabel() {
+        XCTAssertNil(ScreenshotPaymentParser.parse(lines: ["Account", "123456789", "Sep 24"], currency: "USD"))
+    }
+
+    func testScreenshotPaymentParserDoesNotImportAnAccountBalance() {
+        XCTAssertNil(ScreenshotPaymentParser.parse(lines: [
+            "Account balance", "TWD 81,851.00", "Available to spend",
+        ], currency: "TWD"))
+    }
+
+    func testScreenshotPaymentParserAcceptsNearbyPaymentContext() {
+        XCTAssertEqual(ScreenshotPaymentParser.parse(lines: [
+            "Payment successful", "TWD 165.00", "Louisa Coffee",
+        ], currency: "TWD"), ScreenshotPayment(amountMinor: 16_500, title: "Louisa Coffee"))
+    }
+
     func testJSONValueDecodesBoolBeforeNumber() throws {
         let data = Data(#"{"flag": true, "count": 3, "name": "x", "nothing": null, "list": [1, "two"]}"#.utf8)
         let value = try JSONDecoder().decode(JSONValue.self, from: data)
