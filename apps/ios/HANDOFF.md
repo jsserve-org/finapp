@@ -12,9 +12,10 @@ The iOS client is a native SwiftUI/SwiftData app in `apps/ios/Ledgerly`. The bac
 - Users choose the API and Convex URLs at login. The opaque session token is stored in Keychain; use HTTPS on a physical device.
 - Stock SwiftUI navigation, forms, lists, toolbars, and tab bar. iOS 26 supplies its native Liquid Glass treatment automatically, while earlier supported versions retain their system appearance.
 - App Intents for creating one-time and recurring bills through Apple Shortcuts; both use the authenticated bill API and server-backed account picker.
+- Screenshot Sync imports the newest payment screenshot into a user-selected account when Ledgerly becomes active. Vision OCR remains on-device, Photos assets are deduplicated by local identifier, and only the resulting transaction enters the normal sync outbox.
 - Account deletion cascades to linked transactions and recurring bills locally and through the sync server.
 - An AppIcon asset catalog plus an iOS 18-safe SF Symbol catalog for visible icons throughout the supported OS range.
-- Unit test target `LedgerlyTests` (13 tests): DTO decoding against the API's JSON shape, `JSONValue` ordering, cache upsert/merge/delete, cursor persistence, outbox operation encoding, and backup restoration.
+- Unit test target `LedgerlyTests` (17 tests): DTO decoding against the API's JSON shape, `JSONValue` ordering, cache upsert/merge/delete, cursor persistence, outbox operation encoding, backup restoration, and Screenshot Sync payment parsing.
 - XcodeGen specification in `project.yml`.
 
 ## Build & test

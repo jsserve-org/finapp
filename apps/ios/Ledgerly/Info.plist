@@ -25,6 +25,8 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Ledgerly reads the newest screenshot you choose to import a payment into your selected account. OCR stays on this iPhone.</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 </dict>

@@ -17,13 +17,14 @@ targets:
         LedgerlyBaseURL: $(LEDGERLY_BASE_URL)
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
+        NSPhotoLibraryUsageDescription: Ledgerly reads the newest screenshot you choose to import a payment into your selected account. OCR stays on this iPhone.
         UILaunchScreen: {}
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ledgerly.app
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        MARKETING_VERSION: 0.1.6
-        CURRENT_PROJECT_VERSION: 7
+        MARKETING_VERSION: 0.1.7
+        CURRENT_PROJECT_VERSION: 8
         GENERATE_INFOPLIST_FILE: YES
         LEDGERLY_BASE_URL: http://localhost:3000
     scheme:

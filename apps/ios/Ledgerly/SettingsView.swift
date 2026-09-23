@@ -36,6 +36,15 @@ struct SettingsView: View {
                     Button("Export backup", systemImage: "square.and.arrow.up") { exportBackup() }
                     Button("Import backup", systemImage: "square.and.arrow.down") { showingImporter = true }
                 }
+                Section("Automation") {
+                    NavigationLink {
+                        ScreenshotSyncSettingsView()
+                    } label: {
+                        Label("Screenshot Sync", systemImage: "photo.on.rectangle")
+                    }
+                    Text("Import a payment screenshot into the account you choose.")
+                        .foregroundStyle(.secondary)
+                }
                 #if DEBUG
                 Section("Demo") {
                     Button("Load sample data", systemImage: "sparkles") { loadDemo() }
