@@ -106,18 +106,38 @@ struct NativeActivityView: View {
                 Section {
                     VStack(spacing: 12) {
                         Button { showingNewBill = true } label: {
-                            Label("Add one-time bill", systemImage: "plus.circle.fill")
+                            HStack(spacing: 10) {
+                                Image(systemName: "plus")
+                                    .symbolRenderingMode(.monochrome)
+                                    .fontWeight(.bold)
+                                Text("Add one-time bill")
+                                    .fontWeight(.semibold)
+                            }
                                 .frame(maxWidth: .infinity)
+                                .contentShape(Rectangle())
+                                .foregroundStyle(.white)
                         }
                         .buttonStyle(.borderedProminent)
+                        .tint(Color(red: 0, green: 0.32, blue: 0.68))
                         .controlSize(.large)
+                        .accessibilityLabel("Add one-time bill")
 
                         Button { showingNewRecurringPayment = true } label: {
-                            Label("Add recurring bill", systemImage: AppIcon.recurring)
+                            HStack(spacing: 10) {
+                                Image(systemName: AppIcon.recurring)
+                                    .symbolRenderingMode(.monochrome)
+                                    .fontWeight(.bold)
+                                Text("Add recurring bill")
+                                    .fontWeight(.semibold)
+                            }
                                 .frame(maxWidth: .infinity)
+                                .contentShape(Rectangle())
+                                .foregroundStyle(.primary)
                         }
                         .buttonStyle(.bordered)
+                        .tint(.primary)
                         .controlSize(.large)
+                        .accessibilityLabel("Add recurring bill")
                     }
                     .padding(.vertical, 8)
                     .listRowBackground(Color.clear)
