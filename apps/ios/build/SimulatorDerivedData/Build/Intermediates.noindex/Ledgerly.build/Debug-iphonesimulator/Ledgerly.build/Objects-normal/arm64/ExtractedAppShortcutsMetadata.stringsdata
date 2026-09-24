@@ -1,0 +1,66 @@
+{
+  "source" : "\/Users\/howard\/ai\/finapp\/apps\/ios\/Ledgerly\/BillShortcuts.swift",
+  "version" : 2,
+  "tables" : {
+    "AppShortcuts" : [
+      {
+        "values" : [
+          "Add a bill in ${applicationName}",
+          "Create a bill in ${applicationName}"
+        ],
+        "appShortcutMetadata" : [
+          {
+            "actionIdentifier" : "AddOneTimeBillIntent",
+            "index" : 0,
+            "parameterDisplayRepresentations" : {
+              "BillAccountEntity" : [
+                "Ledgerly Account"
+              ]
+            },
+            "parameterTypes" : {
+              "account" : "BillAccountEntity"
+            },
+            "title" : "Add One-Time Bill"
+          }
+        ],
+        "key" : "Add a bill in ${applicationName}",
+        "location" : {
+          "startingColumn" : 0,
+          "startingLine" : 111
+        }
+      },
+      {
+        "values" : [
+          "Add a recurring bill in ${applicationName}"
+        ],
+        "appShortcutMetadata" : [
+          {
+            "actionIdentifier" : "AddRecurringBillIntent",
+            "index" : 1,
+            "parameterDisplayRepresentations" : {
+              "BillAccountEntity" : [
+                "Ledgerly Account"
+              ],
+              "BillFrequency" : [
+                "Weekly",
+                "Every 2 weeks",
+                "Monthly",
+                "Yearly"
+              ]
+            },
+            "parameterTypes" : {
+              "frequency" : "BillFrequency",
+              "account" : "BillAccountEntity"
+            },
+            "title" : "Add Recurring Bill"
+          }
+        ],
+        "key" : "Add a recurring bill in ${applicationName}",
+        "location" : {
+          "startingColumn" : 0,
+          "startingLine" : 111
+        }
+      }
+    ]
+  }
+}

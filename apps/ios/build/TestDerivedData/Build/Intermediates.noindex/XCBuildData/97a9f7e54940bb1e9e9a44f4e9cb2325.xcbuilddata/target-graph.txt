@@ -1,0 +1,4 @@
+Target dependency graph (2 targets)
+Target 'LedgerlyTests' in project 'Ledgerly'
+➜ Explicit dependency on target 'Ledgerly' in project 'Ledgerly'
+Target 'Ledgerly' in project 'Ledgerly' (no dependencies)

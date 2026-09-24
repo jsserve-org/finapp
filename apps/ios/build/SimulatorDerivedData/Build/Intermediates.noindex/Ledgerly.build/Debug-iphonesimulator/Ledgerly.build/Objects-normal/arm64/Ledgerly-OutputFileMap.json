@@ -1,0 +1,219 @@
+{
+  "" : {
+    "diagnostics" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/Ledgerly-primary.dia",
+    "emit-module-dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/Ledgerly-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/Ledgerly-primary-emit-module.dia",
+    "pch" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/Ledgerly-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/Ledgerly-primary.swiftdeps"
+  },
+  "/Users/howard/ai/finapp/apps/ios/Ledgerly/APIClient.swift" : {
+    "const-values" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/APIClient.swiftconstvalues",
+    "dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/APIClient.d",
+    "diagnostics" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/APIClient.dia",
+    "index-unit-output-path" : "/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/APIClient.o",
+    "llvm-bc" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/APIClient.bc",
+    "object" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/APIClient.o",
+    "swift-dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/APIClient.swiftdeps",
+    "swiftmodule" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/APIClient~partial.swiftmodule"
+  },
+  "/Users/howard/ai/finapp/apps/ios/Ledgerly/AccountDetailView.swift" : {
+    "const-values" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/AccountDetailView.swiftconstvalues",
+    "dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/AccountDetailView.d",
+    "diagnostics" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/AccountDetailView.dia",
+    "index-unit-output-path" : "/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/AccountDetailView.o",
+    "llvm-bc" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/AccountDetailView.bc",
+    "object" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/AccountDetailView.o",
+    "swift-dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/AccountDetailView.swiftdeps",
+    "swiftmodule" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/AccountDetailView~partial.swiftmodule"
+  },
+  "/Users/howard/ai/finapp/apps/ios/Ledgerly/AppConfig.swift" : {
+    "const-values" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/AppConfig.swiftconstvalues",
+    "dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/AppConfig.d",
+    "diagnostics" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/AppConfig.dia",
+    "index-unit-output-path" : "/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/AppConfig.o",
+    "llvm-bc" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/AppConfig.bc",
+    "object" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/AppConfig.o",
+    "swift-dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/AppConfig.swiftdeps",
+    "swiftmodule" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/AppConfig~partial.swiftmodule"
+  },
+  "/Users/howard/ai/finapp/apps/ios/Ledgerly/AppIcon.swift" : {
+    "const-values" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/AppIcon.swiftconstvalues",
+    "dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/AppIcon.d",
+    "diagnostics" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/AppIcon.dia",
+    "index-unit-output-path" : "/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/AppIcon.o",
+    "llvm-bc" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/AppIcon.bc",
+    "object" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/AppIcon.o",
+    "swift-dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/AppIcon.swiftdeps",
+    "swiftmodule" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/AppIcon~partial.swiftmodule"
+  },
+  "/Users/howard/ai/finapp/apps/ios/Ledgerly/BillShortcuts.swift" : {
+    "const-values" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/BillShortcuts.swiftconstvalues",
+    "dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/BillShortcuts.d",
+    "diagnostics" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/BillShortcuts.dia",
+    "index-unit-output-path" : "/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/BillShortcuts.o",
+    "llvm-bc" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/BillShortcuts.bc",
+    "object" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/BillShortcuts.o",
+    "swift-dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/BillShortcuts.swiftdeps",
+    "swiftmodule" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/BillShortcuts~partial.swiftmodule"
+  },
+  "/Users/howard/ai/finapp/apps/ios/Ledgerly/ConnectionHealthView.swift" : {
+    "const-values" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/ConnectionHealthView.swiftconstvalues",
+    "dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/ConnectionHealthView.d",
+    "diagnostics" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/ConnectionHealthView.dia",
+    "index-unit-output-path" : "/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/ConnectionHealthView.o",
+    "llvm-bc" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/ConnectionHealthView.bc",
+    "object" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/ConnectionHealthView.o",
+    "swift-dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/ConnectionHealthView.swiftdeps",
+    "swiftmodule" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/ConnectionHealthView~partial.swiftmodule"
+  },
+  "/Users/howard/ai/finapp/apps/ios/Ledgerly/DashboardView.swift" : {
+    "const-values" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/DashboardView.swiftconstvalues",
+    "dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/DashboardView.d",
+    "diagnostics" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/DashboardView.dia",
+    "index-unit-output-path" : "/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/DashboardView.o",
+    "llvm-bc" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/DashboardView.bc",
+    "object" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/DashboardView.o",
+    "swift-dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/DashboardView.swiftdeps",
+    "swiftmodule" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/DashboardView~partial.swiftmodule"
+  },
+  "/Users/howard/ai/finapp/apps/ios/Ledgerly/DemoData.swift" : {
+    "const-values" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/DemoData.swiftconstvalues",
+    "dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/DemoData.d",
+    "diagnostics" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/DemoData.dia",
+    "index-unit-output-path" : "/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/DemoData.o",
+    "llvm-bc" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/DemoData.bc",
+    "object" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/DemoData.o",
+    "swift-dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/DemoData.swiftdeps",
+    "swiftmodule" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/DemoData~partial.swiftmodule"
+  },
+  "/Users/howard/ai/finapp/apps/ios/Ledgerly/KeychainStore.swift" : {
+    "const-values" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/KeychainStore.swiftconstvalues",
+    "dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/KeychainStore.d",
+    "diagnostics" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/KeychainStore.dia",
+    "index-unit-output-path" : "/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/KeychainStore.o",
+    "llvm-bc" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/KeychainStore.bc",
+    "object" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/KeychainStore.o",
+    "swift-dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/KeychainStore.swiftdeps",
+    "swiftmodule" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/KeychainStore~partial.swiftmodule"
+  },
+  "/Users/howard/ai/finapp/apps/ios/Ledgerly/LedgerlyApp.swift" : {
+    "const-values" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/LedgerlyApp.swiftconstvalues",
+    "dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/LedgerlyApp.d",
+    "diagnostics" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/LedgerlyApp.dia",
+    "index-unit-output-path" : "/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/LedgerlyApp.o",
+    "llvm-bc" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/LedgerlyApp.bc",
+    "object" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/LedgerlyApp.o",
+    "swift-dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/LedgerlyApp.swiftdeps",
+    "swiftmodule" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/LedgerlyApp~partial.swiftmodule"
+  },
+  "/Users/howard/ai/finapp/apps/ios/Ledgerly/LedgerlyBackup.swift" : {
+    "const-values" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/LedgerlyBackup.swiftconstvalues",
+    "dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/LedgerlyBackup.d",
+    "diagnostics" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/LedgerlyBackup.dia",
+    "index-unit-output-path" : "/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/LedgerlyBackup.o",
+    "llvm-bc" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/LedgerlyBackup.bc",
+    "object" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/LedgerlyBackup.o",
+    "swift-dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/LedgerlyBackup.swiftdeps",
+    "swiftmodule" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/LedgerlyBackup~partial.swiftmodule"
+  },
+  "/Users/howard/ai/finapp/apps/ios/Ledgerly/Models.swift" : {
+    "const-values" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/Models.swiftconstvalues",
+    "dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/Models.d",
+    "diagnostics" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/Models.dia",
+    "index-unit-output-path" : "/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/Models.o",
+    "llvm-bc" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/Models.bc",
+    "object" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/Models.o",
+    "swift-dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/Models.swiftdeps",
+    "swiftmodule" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/Models~partial.swiftmodule"
+  },
+  "/Users/howard/ai/finapp/apps/ios/Ledgerly/NativeTabs.swift" : {
+    "const-values" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/NativeTabs.swiftconstvalues",
+    "dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/NativeTabs.d",
+    "diagnostics" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/NativeTabs.dia",
+    "index-unit-output-path" : "/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/NativeTabs.o",
+    "llvm-bc" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/NativeTabs.bc",
+    "object" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/NativeTabs.o",
+    "swift-dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/NativeTabs.swiftdeps",
+    "swiftmodule" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/NativeTabs~partial.swiftmodule"
+  },
+  "/Users/howard/ai/finapp/apps/ios/Ledgerly/NewBillView.swift" : {
+    "const-values" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/NewBillView.swiftconstvalues",
+    "dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/NewBillView.d",
+    "diagnostics" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/NewBillView.dia",
+    "index-unit-output-path" : "/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/NewBillView.o",
+    "llvm-bc" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/NewBillView.bc",
+    "object" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/NewBillView.o",
+    "swift-dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/NewBillView.swiftdeps",
+    "swiftmodule" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/NewBillView~partial.swiftmodule"
+  },
+  "/Users/howard/ai/finapp/apps/ios/Ledgerly/ScreenshotSync.swift" : {
+    "const-values" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/ScreenshotSync.swiftconstvalues",
+    "dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/ScreenshotSync.d",
+    "diagnostics" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/ScreenshotSync.dia",
+    "index-unit-output-path" : "/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/ScreenshotSync.o",
+    "llvm-bc" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/ScreenshotSync.bc",
+    "object" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/ScreenshotSync.o",
+    "swift-dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/ScreenshotSync.swiftdeps",
+    "swiftmodule" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/ScreenshotSync~partial.swiftmodule"
+  },
+  "/Users/howard/ai/finapp/apps/ios/Ledgerly/ScreenshotSyncSettingsView.swift" : {
+    "const-values" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/ScreenshotSyncSettingsView.swiftconstvalues",
+    "dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/ScreenshotSyncSettingsView.d",
+    "diagnostics" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/ScreenshotSyncSettingsView.dia",
+    "index-unit-output-path" : "/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/ScreenshotSyncSettingsView.o",
+    "llvm-bc" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/ScreenshotSyncSettingsView.bc",
+    "object" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/ScreenshotSyncSettingsView.o",
+    "swift-dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/ScreenshotSyncSettingsView.swiftdeps",
+    "swiftmodule" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/ScreenshotSyncSettingsView~partial.swiftmodule"
+  },
+  "/Users/howard/ai/finapp/apps/ios/Ledgerly/SettingsView.swift" : {
+    "const-values" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/SettingsView.swiftconstvalues",
+    "dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/SettingsView.d",
+    "diagnostics" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/SettingsView.dia",
+    "index-unit-output-path" : "/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/SettingsView.o",
+    "llvm-bc" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/SettingsView.bc",
+    "object" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/SettingsView.o",
+    "swift-dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/SettingsView.swiftdeps",
+    "swiftmodule" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/SettingsView~partial.swiftmodule"
+  },
+  "/Users/howard/ai/finapp/apps/ios/Ledgerly/SupportedCurrency.swift" : {
+    "const-values" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/SupportedCurrency.swiftconstvalues",
+    "dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/SupportedCurrency.d",
+    "diagnostics" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/SupportedCurrency.dia",
+    "index-unit-output-path" : "/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/SupportedCurrency.o",
+    "llvm-bc" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/SupportedCurrency.bc",
+    "object" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/SupportedCurrency.o",
+    "swift-dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/SupportedCurrency.swiftdeps",
+    "swiftmodule" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/SupportedCurrency~partial.swiftmodule"
+  },
+  "/Users/howard/ai/finapp/apps/ios/Ledgerly/SyncEngine.swift" : {
+    "const-values" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/SyncEngine.swiftconstvalues",
+    "dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/SyncEngine.d",
+    "diagnostics" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/SyncEngine.dia",
+    "index-unit-output-path" : "/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/SyncEngine.o",
+    "llvm-bc" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/SyncEngine.bc",
+    "object" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/SyncEngine.o",
+    "swift-dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/SyncEngine.swiftdeps",
+    "swiftmodule" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/SyncEngine~partial.swiftmodule"
+  },
+  "/Users/howard/ai/finapp/apps/ios/Ledgerly/TransactionDetailView.swift" : {
+    "const-values" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/TransactionDetailView.swiftconstvalues",
+    "dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/TransactionDetailView.d",
+    "diagnostics" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/TransactionDetailView.dia",
+    "index-unit-output-path" : "/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/TransactionDetailView.o",
+    "llvm-bc" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/TransactionDetailView.bc",
+    "object" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/TransactionDetailView.o",
+    "swift-dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/TransactionDetailView.swiftdeps",
+    "swiftmodule" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/TransactionDetailView~partial.swiftmodule"
+  },
+  "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/DerivedSources/GeneratedAssetSymbols.swift" : {
+    "const-values" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/GeneratedAssetSymbols.swiftconstvalues",
+    "dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/GeneratedAssetSymbols.d",
+    "diagnostics" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/GeneratedAssetSymbols.dia",
+    "index-unit-output-path" : "/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/GeneratedAssetSymbols.o",
+    "llvm-bc" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/GeneratedAssetSymbols.bc",
+    "object" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/GeneratedAssetSymbols.o",
+    "swift-dependencies" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/GeneratedAssetSymbols.swiftdeps",
+    "swiftmodule" : "/Users/howard/ai/finapp/apps/ios/build/SimulatorDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/Ledgerly.build/Objects-normal/arm64/GeneratedAssetSymbols~partial.swiftmodule"
+  }
+}

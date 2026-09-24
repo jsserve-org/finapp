@@ -1,0 +1,19 @@
+{
+  "" : {
+    "diagnostics" : "/Users/howard/ai/finapp/apps/ios/build/TestDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/LedgerlyTests.build/Objects-normal/arm64/LedgerlyTests-primary.dia",
+    "emit-module-dependencies" : "/Users/howard/ai/finapp/apps/ios/build/TestDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/LedgerlyTests.build/Objects-normal/arm64/LedgerlyTests-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/howard/ai/finapp/apps/ios/build/TestDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/LedgerlyTests.build/Objects-normal/arm64/LedgerlyTests-primary-emit-module.dia",
+    "pch" : "/Users/howard/ai/finapp/apps/ios/build/TestDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/LedgerlyTests.build/Objects-normal/arm64/LedgerlyTests-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/howard/ai/finapp/apps/ios/build/TestDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/LedgerlyTests.build/Objects-normal/arm64/LedgerlyTests-primary.swiftdeps"
+  },
+  "/Users/howard/ai/finapp/apps/ios/LedgerlyTests/SyncEngineTests.swift" : {
+    "const-values" : "/Users/howard/ai/finapp/apps/ios/build/TestDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/LedgerlyTests.build/Objects-normal/arm64/SyncEngineTests.swiftconstvalues",
+    "dependencies" : "/Users/howard/ai/finapp/apps/ios/build/TestDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/LedgerlyTests.build/Objects-normal/arm64/SyncEngineTests.d",
+    "diagnostics" : "/Users/howard/ai/finapp/apps/ios/build/TestDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/LedgerlyTests.build/Objects-normal/arm64/SyncEngineTests.dia",
+    "index-unit-output-path" : "/Ledgerly.build/Debug-iphonesimulator/LedgerlyTests.build/Objects-normal/arm64/SyncEngineTests.o",
+    "llvm-bc" : "/Users/howard/ai/finapp/apps/ios/build/TestDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/LedgerlyTests.build/Objects-normal/arm64/SyncEngineTests.bc",
+    "object" : "/Users/howard/ai/finapp/apps/ios/build/TestDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/LedgerlyTests.build/Objects-normal/arm64/SyncEngineTests.o",
+    "swift-dependencies" : "/Users/howard/ai/finapp/apps/ios/build/TestDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/LedgerlyTests.build/Objects-normal/arm64/SyncEngineTests.swiftdeps",
+    "swiftmodule" : "/Users/howard/ai/finapp/apps/ios/build/TestDerivedData/Build/Intermediates.noindex/Ledgerly.build/Debug-iphonesimulator/LedgerlyTests.build/Objects-normal/arm64/SyncEngineTests~partial.swiftmodule"
+  }
+}
