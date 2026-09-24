@@ -22,6 +22,16 @@ struct RemoteAccount: Codable, Identifiable {
 
 struct CreatedBill: Codable { let id: String; let created: Bool }
 
+struct APIKeySummary: Codable, Identifiable, Equatable {
+    let id, name, prefix: String
+    let createdAt: Double
+}
+
+struct CreatedAPIKey: Codable, Identifiable, Equatable {
+    let id, name, prefix, key: String
+    let createdAt: Double
+}
+
 struct ConnectionStatus: Codable, Equatable {
     let connectionId: String
     let state: String
@@ -120,6 +130,20 @@ actor APIClient {
     func createBill(_ bill: ShortcutBillRequest) async throws -> CreatedBill {
         let body = try JSONEncoder().encode(bill)
         return try decoder.decode(CreatedBill.self, from: await send(makeRequest(path: "/v1/bills", method: "POST", body: body)))
+    }
+
+    func apiKeys() async throws -> [APIKeySummary] {
+        try decoder.decode([APIKeySummary].self, from: await send(makeRequest(path: "/v1/api-keys")))
+    }
+
+    func createAPIKey(name: String) async throws -> CreatedAPIKey {
+        struct Body: Encodable { let name: String }
+        let body = try JSONEncoder().encode(Body(name: name))
+        return try decoder.decode(CreatedAPIKey.self, from: await send(makeRequest(path: "/v1/api-keys", method: "POST", body: body)))
+    }
+
+    func revokeAPIKey(id: String) async throws {
+        _ = try await send(makeRequest(path: "/v1/api-keys/\(id)", method: "DELETE"))
     }
 
     // MARK: - Health & connections

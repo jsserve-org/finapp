@@ -181,7 +181,9 @@ struct NativeActivityView: View {
                     Text(payment.name).font(.headline)
                     Text("\(payment.frequencyLabel) · next due \(payment.nextDate.formatted(date: .abbreviated, time: .omitted))").font(.subheadline).foregroundStyle(.secondary)
                 }
-            } icon: { Image(systemName: AppIcon.recurring).ledgerlyIcon() }
+            } icon: {
+                Image(systemName: PaymentIcon.symbol(title: payment.name, category: payment.category, amountMinor: -payment.amountMinor)).ledgerlyIcon()
+            }
         }
     }
 
@@ -189,16 +191,35 @@ struct NativeActivityView: View {
         LabeledContent {
             Text(money(transaction.amountMinor, transaction.currency)).foregroundStyle(transaction.amountMinor > 0 ? .blue : .primary)
         } label: {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(transaction.title).font(.headline)
-                Text(transaction.category ?? "Uncategorized").font(.subheadline).foregroundStyle(.secondary)
+            Label {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(transaction.title).font(.headline)
+                    Text(transactionSubtitle(transaction)).font(.subheadline).foregroundStyle(.secondary)
+                }
+            } icon: {
+                Image(systemName: PaymentIcon.symbol(title: transaction.title, category: transaction.category, amountMinor: transaction.amountMinor))
+                    .ledgerlyIcon(color: PaymentIcon.color(amountMinor: transaction.amountMinor))
             }
         }
+    }
+
+    private func transactionSubtitle(_ transaction: CachedTransaction) -> String {
+        let category = transaction.category ?? "Uncategorized"
+        guard let id = transaction.recurringPaymentId,
+              let payment = recurringPayments.first(where: { $0.id == id }) else { return category }
+        return "\(category) · \(payment.name)"
     }
 
     private func deleteRecurringPayments(at offsets: IndexSet) {
         for index in offsets {
             let payment = recurringPayments[index]
+            for transaction in transactions where transaction.recurringPaymentId == payment.id {
+                transaction.recurringPaymentId = nil
+                context.insert(PendingMutation(
+                    entityId: transaction.id, action: "upsert", newDescription: nil, newCategory: nil,
+                    newRecurringPaymentId: nil, updatesRecurringPayment: true, baseVersion: transaction.version
+                ))
+            }
             context.insert(PendingRecurringMutation(entityId: payment.id, action: "delete"))
             context.delete(payment)
         }

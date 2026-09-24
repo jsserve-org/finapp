@@ -1,20 +1,20 @@
-import Photos
+import PhotosUI
 import SwiftData
 import SwiftUI
 
 struct ScreenshotSyncSettingsView: View {
     @Environment(\.modelContext) private var context
+    @Environment(SessionController.self) private var session
     @Query(sort: \CachedAccount.name) private var accounts: [CachedAccount]
-    @State private var enabled = ScreenshotSyncService.isEnabled
     @State private var accountID = ScreenshotSyncService.accountID
     @State private var message = ScreenshotSyncService.lastMessage
     @State private var working = false
+    @State private var selectedPhoto: PhotosPickerItem?
+    @State private var sync = SyncController()
 
     var body: some View {
         Form {
             Section {
-                Toggle("Automatic import", isOn: $enabled)
-                    .onChange(of: enabled) { _, value in Task { await updateEnabled(value) } }
                 Picker("Save payments to", selection: $accountID) {
                     Text("Choose an account").tag("")
                     ForEach(accounts) { account in
@@ -27,44 +27,43 @@ struct ScreenshotSyncSettingsView: View {
             } header: {
                 Text("Screenshot Sync")
             } footer: {
-                Text("Take a payment screenshot in your banking app, then return to Ledgerly. The newest screenshot is read on this iPhone and imported once.")
+                Text("Choose exactly which banking screenshot to import. Ledgerly never scans or imports your photo library automatically.")
             }
 
             Section("Privacy") {
                 Label("OCR runs entirely on this iPhone", systemImage: "iphone")
                 Label("Screenshots are never uploaded", systemImage: "lock.fill")
-                Label("Full Photos access is required", systemImage: "photo.stack")
+                Label("Only the photo you select is opened", systemImage: "hand.tap.fill")
             }
 
             Section {
-                Button { Task { await importNow() } } label: {
-                    if working { ProgressView() }
-                    else { Label("Import latest screenshot", systemImage: "photo.badge.checkmark") }
+                PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                    Label("Choose payment screenshot", systemImage: "photo.badge.plus")
                 }
                 .disabled(working || accountID.isEmpty)
+                .onChange(of: selectedPhoto) { _, item in
+                    guard let item else { return }
+                    Task { await importSelected(item) }
+                }
+                if working { ProgressView("Reading screenshot…") }
                 if let message { Text(message).foregroundStyle(.secondary) }
             } footer: {
-                Text("Use this button to retry the newest screenshot. Check the imported transaction before relying on OCR-generated details.")
+                Text("Check the imported transaction before relying on OCR-generated details.")
             }
         }
         .navigationTitle("Screenshot Sync")
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    private func updateEnabled(_ value: Bool) async {
-        if value, accountID.isEmpty, let first = accounts.first {
-            accountID = first.id
-            UserDefaults.standard.set(first.id, forKey: ScreenshotSyncService.accountIDKey)
-        }
-        let actual = await ScreenshotSyncService.shared.setEnabled(value)
-        enabled = actual
-        if value, !actual { message = ScreenshotSyncResult.permissionDenied.message }
-    }
-
-    private func importNow() async {
+    private func importSelected(_ item: PhotosPickerItem) async {
         working = true
-        let result = await ScreenshotSyncService.shared.importLatest(context: context, force: true)
+        defer { working = false; selectedPhoto = nil }
+        guard let data = try? await item.loadTransferable(type: Data.self) else {
+            message = ScreenshotSyncResult.unreadableImage.message
+            return
+        }
+        let result = await ScreenshotSyncService.shared.importImageData(data, assetID: item.itemIdentifier, context: context)
         message = result.message
-        working = false
+        if case .imported = result, session.isAuthenticated { await sync.refresh(context: context) }
     }
 }

@@ -115,11 +115,6 @@ private struct LoginView: View {
 }
 
 private struct RootTabView: View {
-    @Environment(\.modelContext) private var context
-    @Environment(\.scenePhase) private var scenePhase
-    @Environment(SessionController.self) private var session
-    @State private var screenshotSync = SyncController()
-
     var body: some View {
         TabView {
             Tab("Overview", systemImage: AppIcon.overview) {
@@ -143,17 +138,6 @@ private struct RootTabView: View {
             }
         }
         .tint(.blue)
-        .task { await importNewestScreenshot() }
-        .onChange(of: scenePhase) { _, phase in
-            if phase == .active { Task { await importNewestScreenshot() } }
-        }
-    }
-
-    private func importNewestScreenshot() async {
-        let result = await ScreenshotSyncService.shared.importLatest(context: context)
-        if case .imported = result, session.isAuthenticated {
-            await screenshotSync.refresh(context: context)
-        }
     }
 }
 

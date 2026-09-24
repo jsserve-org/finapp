@@ -85,6 +85,7 @@ final class SyncEngineTests: XCTestCase {
         """
         let transaction = try JSONDecoder().decode(TransactionDTO.self, from: Data(transactionJSON.utf8))
         XCTAssertNil(transaction.category)
+        XCTAssertNil(transaction.recurringPaymentId)
     }
 
     // MARK: - Cache application
@@ -186,11 +187,27 @@ final class SyncEngineTests: XCTestCase {
         XCTAssertFalse(json.contains("category"))
     }
 
+    func testRecurringPaymentLinkAndUnlinkEncodeExplicitly() throws {
+        let link = PendingMutation(
+            entityId: "transaction-1", action: "upsert", newDescription: nil, newCategory: nil,
+            newRecurringPaymentId: "recurring-1", updatesRecurringPayment: true, baseVersion: 1
+        )
+        let linkJSON = String(data: try JSONEncoder().encode(link.operation), encoding: .utf8) ?? ""
+        XCTAssertTrue(linkJSON.contains(#""recurringPaymentId":"recurring-1""#))
+
+        let unlink = PendingMutation(
+            entityId: "transaction-1", action: "upsert", newDescription: nil, newCategory: nil,
+            newRecurringPaymentId: nil, updatesRecurringPayment: true, baseVersion: 1
+        )
+        let unlinkJSON = String(data: try JSONEncoder().encode(unlink.operation), encoding: .utf8) ?? ""
+        XCTAssertTrue(unlinkJSON.contains(#""recurringPaymentId":null"#))
+    }
+
     func testBackupRoundTripIsIdempotent() throws {
         let account = CachedAccount(name: "Checking", institution: "Test Bank", kind: "checking", amountMinor: 12_345, currency: "TWD")
         context.insert(account)
         let timestamp = ISO8601DateFormatter().string(from: Date())
-        context.insert(CachedTransaction(dto: TransactionDTO(id: "transaction-1", accountId: account.id, description: "Coffee", amount: Money(amountMinor: -150, currency: "TWD"), bookedAt: timestamp, pending: false, category: "Dining", updatedAt: timestamp)))
+        context.insert(CachedTransaction(dto: TransactionDTO(id: "transaction-1", accountId: account.id, description: "Coffee", amount: Money(amountMinor: -150, currency: "TWD"), bookedAt: timestamp, pending: false, category: "Dining", recurringPaymentId: "recurring-1", updatedAt: timestamp)))
         context.insert(RecurringPayment(id: "recurring-1", name: "Rent", amountMinor: 18_000_00, currency: "TWD", frequency: "monthly", nextDate: Date(), accountId: account.id, category: "Housing"))
         try context.save()
 
@@ -204,5 +221,6 @@ final class SyncEngineTests: XCTestCase {
         XCTAssertEqual(try destination.fetchCount(FetchDescriptor<CachedAccount>()), 1)
         XCTAssertEqual(try destination.fetchCount(FetchDescriptor<CachedTransaction>()), 1)
         XCTAssertEqual(try destination.fetchCount(FetchDescriptor<RecurringPayment>()), 1)
+        XCTAssertEqual(try destination.fetch(FetchDescriptor<CachedTransaction>()).first?.recurringPaymentId, "recurring-1")
     }
 }

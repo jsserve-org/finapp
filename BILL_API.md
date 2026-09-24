@@ -4,7 +4,9 @@ This is the stable interface an AI agent, Apple Shortcut, or mobile HTTP client 
 
 ## Authenticate
 
-Log in and retain the returned `token`. Sessions currently last 30 days.
+The easiest option is Settings → API Keys in the iPhone app. Create a named key for your agent, copy it when shown, and revoke it from the same screen when it is no longer needed. The full key is shown only once.
+
+You can also log in and retain the returned `token`. Sessions currently last 30 days.
 
 ```sh
 curl -X POST "$LEDGERLY_API/v1/auth/login" \
@@ -12,7 +14,7 @@ curl -X POST "$LEDGERLY_API/v1/auth/login" \
   -d '{"username":"YOUR_USERNAME","password":"YOUR_PASSWORD","convexUrl":"YOUR_CONVEX_URL"}'
 ```
 
-Send the token as `Authorization: Bearer YOUR_TOKEN` on the requests below. Do not put a token in source control or give it to an untrusted agent.
+Send either the API key or login token as `Authorization: Bearer YOUR_TOKEN` on the requests below. Do not put it in source control or give it to an untrusted agent.
 
 ## Find an account ID
 

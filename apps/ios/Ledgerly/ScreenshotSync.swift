@@ -1,5 +1,4 @@
 import Foundation
-import Photos
 import SwiftData
 import UIKit
 import Vision
@@ -92,22 +91,18 @@ enum ScreenshotPaymentParser {
 
 enum ScreenshotSyncResult: Equatable {
     case imported(ScreenshotPayment)
-    case disabled
-    case permissionDenied
-    case noScreenshot
     case alreadyImported
     case accountMissing
+    case unreadableImage
     case amountNotFound
 
     var message: String {
         switch self {
         case .imported(let payment): "Imported \(payment.title)."
-        case .disabled: "Screenshot Sync is off."
-        case .permissionDenied: "Allow photo access in Settings to use Screenshot Sync."
-        case .noScreenshot: "No screenshot was found."
-        case .alreadyImported: "The latest screenshot was already imported."
+        case .alreadyImported: "That screenshot was already imported."
         case .accountMissing: "Choose an account for Screenshot Sync."
-        case .amountNotFound: "No payment amount was found in the latest screenshot."
+        case .unreadableImage: "That image could not be read."
+        case .amountNotFound: "No payment amount was found in that screenshot."
         }
     }
 }
@@ -116,54 +111,33 @@ enum ScreenshotSyncResult: Equatable {
 final class ScreenshotSyncService {
     static let shared = ScreenshotSyncService()
 
-    static let enabledKey = "ledgerly.screenshotSync.enabled"
     static let accountIDKey = "ledgerly.screenshotSync.accountID"
-    private static let enabledAtKey = "ledgerly.screenshotSync.enabledAt"
     private static let lastAssetIDKey = "ledgerly.screenshotSync.lastAssetID"
+    private static let importedAssetIDsKey = "ledgerly.screenshotSync.importedAssetIDs"
     private static let lastMessageKey = "ledgerly.screenshotSync.lastMessage"
 
     private var isImporting = false
 
-    static var isEnabled: Bool { UserDefaults.standard.bool(forKey: enabledKey) }
     static var accountID: String { UserDefaults.standard.string(forKey: accountIDKey) ?? "" }
     static var lastMessage: String? { UserDefaults.standard.string(forKey: lastMessageKey) }
 
-    func setEnabled(_ enabled: Bool) async -> Bool {
-        guard enabled else {
-            UserDefaults.standard.set(false, forKey: Self.enabledKey)
-            return false
-        }
-        let status = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
-        let allowed = status == .authorized
-        UserDefaults.standard.set(allowed, forKey: Self.enabledKey)
-        if allowed { UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: Self.enabledAtKey) }
-        return allowed
-    }
-
-    func importLatest(context: ModelContext, force: Bool = false) async -> ScreenshotSyncResult {
-        guard Self.isEnabled || force else { return .disabled }
+    func importImageData(_ data: Data, assetID: String?, context: ModelContext) async -> ScreenshotSyncResult {
         guard !isImporting else { return .alreadyImported }
         isImporting = true
         defer { isImporting = false }
 
-        let authorization = PHPhotoLibrary.authorizationStatus(for: .readWrite)
-        guard authorization == .authorized else { return finish(.permissionDenied) }
         guard !Self.accountID.isEmpty,
               let account = try? context.fetch(FetchDescriptor<CachedAccount>()).first(where: { $0.id == Self.accountID }) else {
             return finish(.accountMissing)
         }
-        guard let asset = newestScreenshot() else { return finish(.noScreenshot) }
-        if asset.localIdentifier == UserDefaults.standard.string(forKey: Self.lastAssetIDKey) { return .alreadyImported }
-
-        let enabledAt = Date(timeIntervalSince1970: UserDefaults.standard.double(forKey: Self.enabledAtKey))
-        if !force, let created = asset.creationDate, created < enabledAt { return .alreadyImported }
-        guard let image = image(for: asset) else { return finish(.noScreenshot, assetID: asset.localIdentifier) }
+        if let assetID, importedAssetIDs().contains(assetID) { return .alreadyImported }
+        guard let image = UIImage(data: data)?.cgImage else { return finish(.unreadableImage, assetID: assetID) }
         let lines = recognizedLines(in: image)
         guard let payment = ScreenshotPaymentParser.parse(lines: lines, currency: account.currency) else {
-            return finish(.amountNotFound, assetID: asset.localIdentifier)
+            return finish(.amountNotFound, assetID: assetID)
         }
 
-        let timestamp = ISO8601DateFormatter().string(from: asset.creationDate ?? Date())
+        let timestamp = ISO8601DateFormatter().string(from: Date())
         let transaction = CachedTransaction(dto: TransactionDTO(
             id: UUID().uuidString.lowercased(), accountId: account.id, description: payment.title,
             amount: Money(amountMinor: -payment.amountMinor, currency: account.currency), bookedAt: timestamp,
@@ -175,37 +149,25 @@ final class ScreenshotSyncService {
         account.updatedAt = ISO8601DateFormatter().string(from: Date())
         context.insert(PendingAccountMutation(entityId: account.id))
         try? context.save()
-        return finish(.imported(payment), assetID: asset.localIdentifier)
+        return finish(.imported(payment), assetID: assetID)
     }
 
     private func finish(_ result: ScreenshotSyncResult, assetID: String? = nil) -> ScreenshotSyncResult {
-        if let assetID { UserDefaults.standard.set(assetID, forKey: Self.lastAssetIDKey) }
+        if case .imported = result, let assetID {
+            var ids = importedAssetIDs()
+            ids.removeAll { $0 == assetID }
+            ids.append(assetID)
+            UserDefaults.standard.set(Array(ids.suffix(100)), forKey: Self.importedAssetIDsKey)
+            UserDefaults.standard.set(assetID, forKey: Self.lastAssetIDKey)
+        }
         UserDefaults.standard.set(result.message, forKey: Self.lastMessageKey)
         return result
     }
 
-    private func newestScreenshot() -> PHAsset? {
-        let options = PHFetchOptions()
-        options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
-        options.fetchLimit = 30
-        let assets = PHAsset.fetchAssets(with: .image, options: options)
-        for index in 0..<assets.count {
-            let asset = assets.object(at: index)
-            if asset.mediaSubtypes.contains(.photoScreenshot) { return asset }
-        }
-        return nil
-    }
-
-    private func image(for asset: PHAsset) -> CGImage? {
-        let options = PHImageRequestOptions()
-        options.isSynchronous = true
-        options.deliveryMode = .highQualityFormat
-        options.isNetworkAccessAllowed = false
-        var result: CGImage?
-        PHImageManager.default().requestImage(for: asset, targetSize: PHImageManagerMaximumSize, contentMode: .aspectFit, options: options) { image, _ in
-            result = image?.cgImage
-        }
-        return result
+    private func importedAssetIDs() -> [String] {
+        var ids = UserDefaults.standard.stringArray(forKey: Self.importedAssetIDsKey) ?? []
+        if let legacy = UserDefaults.standard.string(forKey: Self.lastAssetIDKey), !ids.contains(legacy) { ids.append(legacy) }
+        return ids
     }
 
     private func recognizedLines(in image: CGImage) -> [String] {

@@ -28,9 +28,14 @@ export const createSession = mutation({ args: { userId: v.id("users"), tokenHash
 
 export const validateSession = query({ args: { tokenHash: v.string(), now: v.number() }, handler: async (ctx, args) => {
   const session = await ctx.db.query("sessions").withIndex("by_token", (q) => q.eq("tokenHash", args.tokenHash)).unique();
-  if (!session || session.revokedAt || session.expiresAt <= args.now) return null;
-  const user = await ctx.db.get(session.userId);
-  return user ? { userId: user._id, username: user.username, syncSessionId: session.syncSessionId, context: session.context } : null;
+  if (session && !session.revokedAt && session.expiresAt > args.now) {
+    const user = await ctx.db.get(session.userId);
+    return user ? { userId: user._id, username: user.username, syncSessionId: session.syncSessionId, context: session.context } : null;
+  }
+  const apiKey = await ctx.db.query("apiKeys").withIndex("by_token", (q) => q.eq("tokenHash", args.tokenHash)).unique();
+  if (!apiKey || apiKey.revokedAt) return null;
+  const user = await ctx.db.get(apiKey.userId);
+  return user ? { userId: user._id, username: user.username, syncSessionId: `api-key:${apiKey._id}` } : null;
 } });
 
 export const revokeSession = mutation({ args: { tokenHash: v.string() }, handler: async (ctx, args) => {

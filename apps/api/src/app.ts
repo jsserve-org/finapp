@@ -28,6 +28,7 @@ const credentials = z.object({
 });
 
 const currency = z.enum(["TWD", "USD", "JPY", "PHP", "EUR", "GBP", "CNY", "HKD", "SGD", "KRW", "AUD", "CAD", "THB", "MYR", "VND", "INR", "IDR"]);
+const apiKeyName = z.object({ name: z.string().trim().min(1).max(80) });
 const bill = z.discriminatedUnion("type", [
   z.object({
     id: z.string().uuid().optional(), type: z.literal("oneTime"), name: z.string().trim().min(1).max(120),
@@ -105,6 +106,23 @@ app.post("/v1/sync", async (c) => {
 });
 
 app.get("/v1/accounts", async (c) => c.json(await convexQuery("bills:listAccounts", { tokenHash: await sha256(c.get("sessionToken")), now: Date.now() })));
+
+app.get("/v1/api-keys", async (c) => c.json(await convexQuery("apiKeys:list", { tokenHash: await sha256(c.get("sessionToken")), now: Date.now() })));
+
+app.post("/v1/api-keys", zValidator("json", apiKeyName), async (c) => {
+  const name = c.req.valid("json").name;
+  const key = `ledgerly_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
+  const prefix = key.slice(0, 16);
+  const record = await convexMutation<{ id: string; name: string; prefix: string; createdAt: number }>("apiKeys:create", {
+    tokenHash: await sha256(c.get("sessionToken")), now: Date.now(), name, keyHash: await sha256(key), prefix,
+  });
+  return c.json({ ...record, key }, 201);
+});
+
+app.delete("/v1/api-keys/:id", async (c) => {
+  await convexMutation("apiKeys:revoke", { tokenHash: await sha256(c.get("sessionToken")), now: Date.now(), id: c.req.param("id") });
+  return c.body(null, 204);
+});
 
 app.post("/v1/bills", zValidator("json", bill), async (c) => {
   const input = c.req.valid("json");

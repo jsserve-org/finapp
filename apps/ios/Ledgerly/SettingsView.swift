@@ -26,6 +26,11 @@ struct SettingsView: View {
                         } label: {
                             Label("Server", systemImage: "server.rack")
                         }
+                        NavigationLink {
+                            APIKeysView()
+                        } label: {
+                            Label("API keys", systemImage: "key.fill")
+                        }
                         NavigationLink { ConnectionHealthView() } label: { Label("Server status", systemImage: "network") }
                         LabeledContent("Status", value: healthState ?? "—")
                         Button { Task { await check() } } label: {

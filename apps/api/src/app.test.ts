@@ -20,6 +20,12 @@ describe("health", () => {
     expect((await app.request("/v1/bills", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })).status).toBe(401);
   });
 
+  it("protects API key management", async () => {
+    expect((await app.request("/v1/api-keys")).status).toBe(401);
+    expect((await app.request("/v1/api-keys", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "Agent" }) })).status).toBe(401);
+    expect((await app.request("/v1/api-keys/key-id", { method: "DELETE" })).status).toBe(401);
+  });
+
   it("publishes registration policy without authentication", async () => {
     const response = await app.request("/v1/config");
     expect(response.status).toBe(200);
