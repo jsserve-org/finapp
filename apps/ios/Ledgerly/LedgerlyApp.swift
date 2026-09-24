@@ -18,10 +18,13 @@ struct LedgerlyApp: App {
     var isAuthenticated = KeychainStore().token() != nil
     var localOnly = UserDefaults.standard.bool(forKey: "ledgerly.localOnly")
     var canUseApp: Bool { isAuthenticated || localOnly }
-    func complete(_ response: AuthResponse) {
+    func complete(_ response: AuthResponse, apiURL: URL, convexURL: URL) {
         KeychainStore().saveToken(response.token)
-        UserDefaults.standard.set(response.context.apiUrl, forKey: "ledgerly.apiURL")
-        UserDefaults.standard.set(response.context.convexUrl, forKey: "ledgerly.convexURL")
+        // Keep the addresses that this device successfully used. The API's
+        // advertised URL can be an internal Docker/localhost address that is
+        // not reachable from an iPhone.
+        UserDefaults.standard.set(apiURL.absoluteString, forKey: "ledgerly.apiURL")
+        UserDefaults.standard.set(convexURL.absoluteString, forKey: "ledgerly.convexURL")
         UserDefaults.standard.set(response.user.username, forKey: "ledgerly.username")
         UserDefaults.standard.set(response.context.syncSessionId, forKey: "ledgerly.syncSessionId")
         UserDefaults.standard.set(false, forKey: "ledgerly.localOnly")
@@ -46,8 +49,8 @@ struct LedgerlyApp: App {
 
 private struct LoginView: View {
     @Environment(SessionController.self) private var session
-    @State private var apiURL = UserDefaults.standard.string(forKey: "ledgerly.apiURL") ?? "http://localhost:3000"
-    @State private var convexURL = UserDefaults.standard.string(forKey: "ledgerly.convexURL") ?? "http://localhost:3210"
+    @State private var apiURL = AppConfig.baseURL.absoluteString
+    @State private var convexURL = AppConfig.convexURL.absoluteString
     @State private var username = ""
     @State private var password = ""
     @State private var registration = false
@@ -94,7 +97,7 @@ private struct LoginView: View {
         UserDefaults.standard.set(api.absoluteString, forKey: "ledgerly.apiURL")
         do {
             let response = try await APIClient.shared.authenticate(username: username, password: password, convexURL: convex, register: registration)
-            session.complete(response)
+            session.complete(response, apiURL: api, convexURL: convex)
         } catch APIError.http(let status, let message) {
             error = message ?? (status == 401 ? "Invalid username or password." : "Server rejected the request (\(status)).")
         }
@@ -106,7 +109,7 @@ private struct LoginView: View {
         UserDefaults.standard.set(apiURL, forKey: "ledgerly.apiURL")
         if let config = try? await APIClient.shared.serverConfig() {
             registrationEnabled = config.registrationEnabled
-            if convexURL == "http://localhost:3210" { convexURL = config.convexUrl }
+            if UserDefaults.standard.string(forKey: "ledgerly.convexURL") == nil { convexURL = config.convexUrl }
         }
     }
 }

@@ -17,16 +17,17 @@ targets:
         LedgerlyBaseURL: $(LEDGERLY_BASE_URL)
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
+        NSLocalNetworkUsageDescription: Ledgerly connects to your self-hosted server on the local network to sync your financial data.
         NSPhotoLibraryUsageDescription: Ledgerly reads the newest screenshot you choose to import a payment into your selected account. OCR stays on this iPhone.
         UILaunchScreen: {}
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ledgerly.app
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        MARKETING_VERSION: 0.1.7
-        CURRENT_PROJECT_VERSION: 8
+        MARKETING_VERSION: 0.1.8
+        CURRENT_PROJECT_VERSION: 9
         GENERATE_INFOPLIST_FILE: YES
-        LEDGERLY_BASE_URL: http://localhost:3000
+        LEDGERLY_BASE_URL: http://10.99.1.6:3000
     scheme:
       testTargets: [LedgerlyTests]
   LedgerlyTests:
