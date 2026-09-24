@@ -6,6 +6,8 @@ Users choose the API and Convex URLs on the login screen, and can update them la
 
 After signing in, Apple's Shortcuts app exposes **Add One-Time Bill** and **Add Recurring Bill** actions. Account choices are loaded from the configured Ledgerly server, and the session token remains in Ledgerly's Keychain rather than being copied into a Shortcut.
 
+Settings → Screenshot Sync imports only a screenshot explicitly selected with Apple's photo picker; there is no background photo-library scanning. Transaction details can link any imported or regular payment to a compatible recurring bill. Settings → API Keys creates named, revocable keys for agents and automations, with the secret shown once.
+
 ## Screenshot Sync
 
 Open **Settings → Screenshot Sync**, choose the Ledgerly account that represents the banking or payment app, and enable automatic import. After taking a payment screenshot, return to Ledgerly: on-device Vision OCR reads the newest screenshot, creates a transaction, adjusts the selected balance, and queues the usual server sync. The Photos asset identifier is stored locally so the same screenshot is not imported twice.

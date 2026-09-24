@@ -31,7 +31,7 @@ struct SyncEngine {
         }
         let transactionOperations: [SyncOperation] = try pendingTransactions.compactMap { mutation in
             guard let transaction = try fetchOne(CachedTransaction.self, id: mutation.entityId, context: context) else { return nil }
-            let dto = TransactionDTO(id: transaction.id, accountId: transaction.accountId, description: transaction.title, amount: Money(amountMinor: transaction.amountMinor, currency: transaction.currency), bookedAt: transaction.bookedAt, pending: transaction.pending, category: transaction.category, updatedAt: transaction.updatedAt)
+            let dto = TransactionDTO(id: transaction.id, accountId: transaction.accountId, description: transaction.title, amount: Money(amountMinor: transaction.amountMinor, currency: transaction.currency), bookedAt: transaction.bookedAt, pending: transaction.pending, category: transaction.category, recurringPaymentId: transaction.recurringPaymentId, updatedAt: transaction.updatedAt)
             return SyncOperation(mutationId: mutation.mutationId, action: "upsert", entityId: transaction.id, value: .init(transaction: dto), baseVersion: 0)
         }
         let recurringOperations: [SyncOperation] = try pendingRecurring.compactMap { mutation in

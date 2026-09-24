@@ -121,7 +121,9 @@ struct DashboardView: View {
 
     private func transactionRow(_ item: CachedTransaction) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: AppIcon.transaction).ledgerlyIcon().frame(width: 32)
+            Image(systemName: PaymentIcon.symbol(title: item.title, category: item.category, amountMinor: item.amountMinor))
+                .ledgerlyIcon(color: PaymentIcon.color(amountMinor: item.amountMinor))
+                .frame(width: 32)
             VStack(alignment: .leading, spacing: 3) {
                 Text(item.title).fontWeight(.semibold)
                 Text(item.category ?? "Uncategorized").font(.subheadline).foregroundStyle(.secondary)

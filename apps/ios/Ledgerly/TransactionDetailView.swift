@@ -6,10 +6,12 @@ struct TransactionDetailView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     @Query private var transactions: [CachedTransaction]
+    @Query(sort: \RecurringPayment.name) private var recurringPayments: [RecurringPayment]
     @State private var editedTitle = ""
     @State private var editedCategory = ""
     @State private var isEditing = false
     @State private var showDeleteConfirm = false
+    @State private var selectedRecurringPaymentID = ""
 
     init(transactionID: String) {
         self.transactionID = transactionID
@@ -21,6 +23,13 @@ struct TransactionDetailView: View {
         Form {
             if let transaction = transactions.first {
                 Section("Transaction") {
+                    HStack {
+                        Spacer()
+                        Image(systemName: PaymentIcon.symbol(title: transaction.title, category: transaction.category, amountMinor: transaction.amountMinor))
+                            .font(.largeTitle)
+                            .foregroundStyle(PaymentIcon.color(amountMinor: transaction.amountMinor))
+                        Spacer()
+                    }
                     if isEditing {
                         TextField("Description", text: $editedTitle)
                         TextField("Category", text: $editedCategory)
@@ -35,6 +44,22 @@ struct TransactionDetailView: View {
                         LabeledContent("Date", value: date.formatted(date: .abbreviated, time: .omitted))
                     }
                     if transaction.pending { Label("Pending", systemImage: "clock").foregroundStyle(.orange) }
+                }
+                Section {
+                    Picker("Recurring bill", selection: $selectedRecurringPaymentID) {
+                        Text("Not linked").tag("")
+                        ForEach(compatiblePayments(for: transaction)) { payment in
+                            Text(payment.name).tag(payment.id)
+                        }
+                    }
+                    .onChange(of: selectedRecurringPaymentID) { _, value in
+                        let linkedID = transaction.recurringPaymentId ?? ""
+                        if value != linkedID { link(transaction, to: value) }
+                    }
+                } header: {
+                    Text("Subscription")
+                } footer: {
+                    Text("Link imported and regular payments to the recurring bill they fulfill.")
                 }
                 Section {
                     if isEditing {
@@ -52,9 +77,27 @@ struct TransactionDetailView: View {
             }
         }
         .navigationTitle("Transaction")
+        .onAppear { selectedRecurringPaymentID = transactions.first?.recurringPaymentId ?? "" }
         .confirmationDialog("Delete this transaction?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
             Button("Delete", role: .destructive) { if let transaction = transactions.first { delete(transaction) } }
         }
+    }
+
+    private func compatiblePayments(for transaction: CachedTransaction) -> [RecurringPayment] {
+        recurringPayments.filter {
+            $0.currency == transaction.currency && ($0.accountId == nil || $0.accountId == transaction.accountId)
+        }
+    }
+
+    private func link(_ transaction: CachedTransaction, to paymentID: String) {
+        let linkedID = paymentID.isEmpty ? nil : paymentID
+        transaction.recurringPaymentId = linkedID
+        transaction.updatedAt = ISO8601DateFormatter().string(from: Date())
+        context.insert(PendingMutation(
+            entityId: transaction.id, action: "upsert", newDescription: nil, newCategory: nil,
+            newRecurringPaymentId: linkedID, updatesRecurringPayment: true, baseVersion: transaction.version
+        ))
+        try? context.save()
     }
 
     private func save(_ transaction: CachedTransaction) {

@@ -32,9 +32,14 @@ struct AccountDetailView: View {
                             LabeledContent {
                                 Text(money(transaction.amountMinor, transaction.currency))
                             } label: {
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(transaction.title).font(.headline)
-                                    Text(transaction.category ?? "Uncategorized").font(.subheadline).foregroundStyle(.secondary)
+                                Label {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(transaction.title).font(.headline)
+                                        Text(transaction.category ?? "Uncategorized").font(.subheadline).foregroundStyle(.secondary)
+                                    }
+                                } icon: {
+                                    Image(systemName: PaymentIcon.symbol(title: transaction.title, category: transaction.category, amountMinor: transaction.amountMinor))
+                                        .ledgerlyIcon(color: PaymentIcon.color(amountMinor: transaction.amountMinor))
                                 }
                             }
                         }

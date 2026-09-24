@@ -39,6 +39,12 @@ export const exchange = mutation({ args: { tokenHash: v.string(), cursor: v.stri
       const payment = await ctx.db.query("recurringPayments").withIndex("by_user_external", (q) => q.eq("userId", session.userId).eq("externalId", operation.entityId)).unique();
       if (operation.action === "delete") {
         if (payment) await ctx.db.patch(payment._id, { deleted: true, version: payment.version + 1 });
+        const linkedTransactions = await ctx.db.query("transactions").withIndex("by_user", (q) => q.eq("userId", session.userId)).collect();
+        for (const transaction of linkedTransactions.filter((item) => !item.deleted && item.value?.recurringPaymentId === operation.entityId)) {
+          const value = { ...transaction.value, recurringPaymentId: null, updatedAt: new Date(args.now).toISOString() };
+          await ctx.db.patch(transaction._id, { value, version: transaction.version + 1 });
+          await addChange(ctx, session.userId, "transaction", transaction.externalId, "upsert", value);
+        }
         await addChange(ctx, session.userId, "recurringPayment", operation.entityId, "delete", null);
       } else if (operation.value?.id === operation.entityId) {
         if (payment) await ctx.db.patch(payment._id, { value: operation.value, deleted: false, version: payment.version + 1 });
@@ -59,7 +65,7 @@ export const exchange = mutation({ args: { tokenHash: v.string(), cursor: v.stri
       acceptedMutationIds.push(operation.mutationId);
       continue;
     }
-    if (!transaction || transaction.version !== operation.baseVersion) continue;
+    if (!transaction) continue;
     const deleted = operation.action === "delete";
     const value = deleted ? null : { ...transaction.value, ...operation.value, updatedAt: new Date(args.now).toISOString() };
     await ctx.db.patch(transaction._id, { value, deleted, version: transaction.version + 1 });

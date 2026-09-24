@@ -24,6 +24,7 @@ struct LedgerlyBackup: Codable {
         let bookedAt: String
         let pending: Bool
         let category: String?
+        let recurringPaymentId: String?
         let version: Int
         let updatedAt: String
     }
@@ -86,7 +87,7 @@ enum LedgerlyBackupService {
             LedgerlyBackup.Account(id: $0.id, name: $0.name, institution: $0.institution, kind: $0.kind, amountMinor: $0.amountMinor, currency: $0.currency, version: $0.version, updatedAt: $0.updatedAt)
         }
         let transactions = try context.fetch(FetchDescriptor<CachedTransaction>()).map {
-            LedgerlyBackup.Transaction(id: $0.id, accountId: $0.accountId, title: $0.title, amountMinor: $0.amountMinor, currency: $0.currency, bookedAt: $0.bookedAt, pending: $0.pending, category: $0.category, version: $0.version, updatedAt: $0.updatedAt)
+            LedgerlyBackup.Transaction(id: $0.id, accountId: $0.accountId, title: $0.title, amountMinor: $0.amountMinor, currency: $0.currency, bookedAt: $0.bookedAt, pending: $0.pending, category: $0.category, recurringPaymentId: $0.recurringPaymentId, version: $0.version, updatedAt: $0.updatedAt)
         }
         let recurring = try context.fetch(FetchDescriptor<RecurringPayment>()).map {
             LedgerlyBackup.Recurring(id: $0.id, name: $0.name, amountMinor: $0.amountMinor, currency: $0.currency, frequency: $0.frequency, nextDate: $0.nextDate, accountId: $0.accountId, category: $0.category, isActive: $0.isActive)
@@ -112,7 +113,7 @@ enum LedgerlyBackupService {
             else { context.insert(CachedAccount(dto: dto, initialVersion: item.version)) }
         }
         for item in backup.transactions {
-            let dto = TransactionDTO(id: item.id, accountId: item.accountId, description: item.title, amount: Money(amountMinor: item.amountMinor, currency: item.currency), bookedAt: item.bookedAt, pending: item.pending, category: item.category, updatedAt: item.updatedAt)
+            let dto = TransactionDTO(id: item.id, accountId: item.accountId, description: item.title, amount: Money(amountMinor: item.amountMinor, currency: item.currency), bookedAt: item.bookedAt, pending: item.pending, category: item.category, recurringPaymentId: item.recurringPaymentId, updatedAt: item.updatedAt)
             if let existing = transactionsByID[item.id] { existing.apply(dto, version: item.version) }
             else { context.insert(CachedTransaction(dto: dto, initialVersion: item.version)) }
         }

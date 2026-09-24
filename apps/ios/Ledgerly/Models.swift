@@ -17,7 +17,14 @@ struct TransactionDTO: Codable, Equatable, Identifiable {
     let bookedAt: String
     let pending: Bool
     let category: String?
+    let recurringPaymentId: String?
     let updatedAt: String
+
+    init(id: String, accountId: String, description: String, amount: Money, bookedAt: String, pending: Bool, category: String?, recurringPaymentId: String? = nil, updatedAt: String) {
+        self.id = id; self.accountId = accountId; self.description = description; self.amount = amount
+        self.bookedAt = bookedAt; self.pending = pending; self.category = category
+        self.recurringPaymentId = recurringPaymentId; self.updatedAt = updatedAt
+    }
 }
 
 struct RecurringPaymentDTO: Codable, Equatable, Identifiable {
@@ -57,15 +64,19 @@ struct SyncOperation: Encodable {
     struct OperationValue: Encodable {
         var description: String?
         var category: String?
+        var recurringPaymentId: String?
+        var includesRecurringPaymentId: Bool
         var account: AccountDTO?
         var transaction: TransactionDTO?
         var recurringPayment: RecurringPaymentDTO?
 
-        init(description: String? = nil, category: String? = nil, account: AccountDTO? = nil, transaction: TransactionDTO? = nil, recurringPayment: RecurringPaymentDTO? = nil) {
-            self.description = description; self.category = category; self.account = account; self.transaction = transaction; self.recurringPayment = recurringPayment
+        init(description: String? = nil, category: String? = nil, recurringPaymentId: String? = nil, includesRecurringPaymentId: Bool = false, account: AccountDTO? = nil, transaction: TransactionDTO? = nil, recurringPayment: RecurringPaymentDTO? = nil) {
+            self.description = description; self.category = category; self.recurringPaymentId = recurringPaymentId
+            self.includesRecurringPaymentId = includesRecurringPaymentId
+            self.account = account; self.transaction = transaction; self.recurringPayment = recurringPayment
         }
 
-        enum CodingKeys: String, CodingKey { case description; case category }
+        enum CodingKeys: String, CodingKey { case description; case category; case recurringPaymentId }
         func encode(to encoder: Encoder) throws {
             if let account { try account.encode(to: encoder); return }
             if let transaction { try transaction.encode(to: encoder); return }
@@ -73,6 +84,10 @@ struct SyncOperation: Encodable {
             var container = encoder.container(keyedBy: CodingKeys.self)
             if let description, !description.isEmpty { try container.encode(description, forKey: .description) }
             if let category { try container.encode(category, forKey: .category) }
+            if includesRecurringPaymentId {
+                if let recurringPaymentId { try container.encode(recurringPaymentId, forKey: .recurringPaymentId) }
+                else { try container.encodeNil(forKey: .recurringPaymentId) }
+            }
         }
     }
 
@@ -213,6 +228,7 @@ enum JSONValue: Codable, Equatable {
     var bookedAt: String
     var pending: Bool
     var category: String?
+    var recurringPaymentId: String?
     var version: Int
     var updatedAt: String
 
@@ -225,6 +241,7 @@ enum JSONValue: Codable, Equatable {
         bookedAt = dto.bookedAt
         pending = dto.pending
         category = dto.category
+        recurringPaymentId = dto.recurringPaymentId
         version = initialVersion
         updatedAt = dto.updatedAt
     }
@@ -237,6 +254,7 @@ enum JSONValue: Codable, Equatable {
         bookedAt = dto.bookedAt
         pending = dto.pending
         category = dto.category
+        recurringPaymentId = dto.recurringPaymentId
         self.version = version
         updatedAt = dto.updatedAt
     }
@@ -299,15 +317,19 @@ enum JSONValue: Codable, Equatable {
     var action: String
     var newDescription: String?
     var newCategory: String?
+    var newRecurringPaymentId: String?
+    var updatesRecurringPayment: Bool = false
     var baseVersion: Int
     var createdAt: Date
 
-    init(entityId: String, action: String, newDescription: String?, newCategory: String?, baseVersion: Int, createdAt: Date = Date()) {
+    init(entityId: String, action: String, newDescription: String?, newCategory: String?, newRecurringPaymentId: String? = nil, updatesRecurringPayment: Bool = false, baseVersion: Int, createdAt: Date = Date()) {
         mutationId = UUID().uuidString.lowercased()
         self.entityId = entityId
         self.action = action
         self.newDescription = newDescription
         self.newCategory = newCategory
+        self.newRecurringPaymentId = newRecurringPaymentId
+        self.updatesRecurringPayment = updatesRecurringPayment
         self.baseVersion = baseVersion
         self.createdAt = createdAt
     }
@@ -317,7 +339,7 @@ enum JSONValue: Codable, Equatable {
             mutationId: mutationId,
             action: action,
             entityId: entityId,
-            value: action == "delete" ? nil : SyncOperation.OperationValue(description: newDescription, category: newCategory),
+            value: action == "delete" ? nil : SyncOperation.OperationValue(description: newDescription, category: newCategory, recurringPaymentId: newRecurringPaymentId, includesRecurringPaymentId: updatesRecurringPayment),
             baseVersion: baseVersion
         )
     }
