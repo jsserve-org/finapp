@@ -32,6 +32,8 @@ docker compose up --build -d api
 curl http://localhost:3000/health/ready
 ```
 
+The generated value is the self-hosted equivalent of a cloud `CONVEX_DEPLOYMENT`; keep the complete value, including its `convex-self-hosted|...` prefix. If it is blank, the Convex CLI falls back to cloud mode and prints the misleading `No CONVEX_DEPLOYMENT set` error. The `.env` file must be beside `compose.yml` on a Compose-only server.
+
 The login screens let users set both endpoints. Emulator defaults are `http://10.0.2.2:3000` and `http://10.0.2.2:3210`; the iOS Simulator uses `localhost`. Administrators can set `ALLOW_REGISTRATION=false` and restart the API after creating users. The API then rejects registration with HTTP 403 and `/v1/config` tells both apps to hide the registration option.
 
 ## Opening ports

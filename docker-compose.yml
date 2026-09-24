@@ -57,7 +57,17 @@ services:
     image: ${LEDGERLY_API_IMAGE:-ghcr.io/jsserve-org/finapp-api:latest}
     pull_policy: always
     working_dir: /app/apps/convex
-    command: ["sh", "-ec", "bun convex env set API_SERVICE_SECRET \"$$API_SERVICE_SECRET\" && bun convex deploy"]
+    command:
+      - sh
+      - -ec
+      - |
+        if [ -z "$$CONVEX_SELF_HOSTED_ADMIN_KEY" ]; then
+          echo >&2 "Missing CONVEX_SELF_HOSTED_ADMIN_KEY. Run: docker compose exec convex ./generate_admin_key.sh"
+          echo >&2 "Then save the complete generated key as CONVEX_SELF_HOSTED_ADMIN_KEY in the .env file beside compose.yml."
+          exit 64
+        fi
+        bun convex env set API_SERVICE_SECRET "$$API_SERVICE_SECRET"
+        bun convex deploy
     environment:
       CONVEX_SELF_HOSTED_URL: http://convex:3210
       CONVEX_SELF_HOSTED_ADMIN_KEY: ${CONVEX_SELF_HOSTED_ADMIN_KEY:-}
