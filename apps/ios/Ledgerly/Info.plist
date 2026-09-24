@@ -25,6 +25,8 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Ledgerly connects to your self-hosted server on the local network to sync your financial data.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Ledgerly reads the newest screenshot you choose to import a payment into your selected account. OCR stays on this iPhone.</string>
 	<key>UILaunchScreen</key>

@@ -21,6 +21,11 @@ struct SettingsView: View {
                         Button("Set up sync") { session.configureSync() }
                     } else {
                         LabeledContent("Account", value: UserDefaults.standard.string(forKey: "ledgerly.username") ?? "—")
+                        NavigationLink {
+                            ServerSettingsView()
+                        } label: {
+                            Label("Server", systemImage: "server.rack")
+                        }
                         NavigationLink { ConnectionHealthView() } label: { Label("Server status", systemImage: "network") }
                         LabeledContent("Status", value: healthState ?? "—")
                         Button { Task { await check() } } label: {
@@ -125,4 +130,76 @@ struct SettingsView: View {
         }
     }
     #endif
+}
+
+private struct ServerSettingsView: View {
+    @State private var apiURL = AppConfig.baseURL.absoluteString
+    @State private var convexURL = AppConfig.convexURL.absoluteString
+    @State private var isTesting = false
+    @State private var message: String?
+
+    var body: some View {
+        Form {
+            Section {
+                TextField("API endpoint", text: $apiURL)
+                    .textContentType(.URL)
+                    .textInputAutocapitalization(.never)
+                    .keyboardType(.URL)
+                TextField("Convex endpoint", text: $convexURL)
+                    .textContentType(.URL)
+                    .textInputAutocapitalization(.never)
+                    .keyboardType(.URL)
+            } header: {
+                Text("Endpoints")
+            } footer: {
+                Text("The app syncs through the API. The Convex address identifies your self-hosted deployment during login.")
+            }
+
+            Section {
+                Button {
+                    Task { await saveAndTest() }
+                } label: {
+                    if isTesting { ProgressView() } else { Label("Save and test", systemImage: "checkmark.circle") }
+                }
+                .disabled(isTesting)
+
+                if let message {
+                    Text(message)
+                        .foregroundStyle(message == "Connection ready" ? .green : .red)
+                }
+            }
+        }
+        .navigationTitle("Server")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func saveAndTest() async {
+        let trimmedAPI = apiURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedConvex = convexURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let api = URL(string: trimmedAPI),
+              let convex = URL(string: trimmedConvex),
+              let apiScheme = api.scheme?.lowercased(),
+              let convexScheme = convex.scheme?.lowercased(),
+              ["http", "https"].contains(apiScheme),
+              ["http", "https"].contains(convexScheme),
+              api.host != nil, convex.host != nil else {
+            message = "Enter valid HTTP(S) endpoint URLs."
+            return
+        }
+
+        isTesting = true
+        message = nil
+        UserDefaults.standard.set(api.absoluteString, forKey: "ledgerly.apiURL")
+        UserDefaults.standard.set(convex.absoluteString, forKey: "ledgerly.convexURL")
+        apiURL = api.absoluteString
+        convexURL = convex.absoluteString
+
+        do {
+            try await APIClient.shared.healthReady()
+            message = "Connection ready"
+        } catch {
+            message = "Saved, but the API is unreachable."
+        }
+        isTesting = false
+    }
 }
