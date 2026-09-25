@@ -68,42 +68,16 @@ struct TransactionDetailView: View {
     @State private var showRefundPicker = false
     @State private var showRefundAccounts = false
     @State private var showMergeReview = false
+    @State private var linkedCandidates: [LinkedTransactionCandidate] = []
+    @State private var mergeCandidate: TransactionMergeCandidate?
     @Query(sort: \CachedAccount.name) private var accounts: [CachedAccount]
-    @Query(sort: \CachedTransaction.bookedAt, order: .reverse) private var allTransactions: [CachedTransaction]
 
     private var reimbursementAccounts: [CachedAccount] {
         accounts.filter { $0.currency == transaction.currency && $0.kind != "sharedCredit" }
     }
 
-    private var incomingCandidates: [LinkedTransactionCandidate] {
-        allTransactions.filter {
-            $0.id != transaction.id && $0.amountMinor > 0 && $0.currency == transaction.currency &&
-            $0.reimbursementTransactionId == nil && $0.refundedTransactionId == nil
-        }.map { candidate in
-            LinkedTransactionCandidate(candidate, account: accounts.first { $0.id == candidate.accountId })
-        }
-    }
-
-    private var expenseCandidates: [LinkedTransactionCandidate] {
-        allTransactions.filter {
-            $0.id != transaction.id && $0.amountMinor < 0 && $0.currency == transaction.currency && $0.refundTransactionId == nil
-        }.map { candidate in
-            LinkedTransactionCandidate(candidate, account: accounts.first { $0.id == candidate.accountId })
-        }
-    }
-
-    private var mergeCandidate: TransactionMergeCandidate? {
-        guard let model = fetchTransaction() else { return nil }
-        return TransactionMerger.candidate(for: model, among: allTransactions)
-    }
-
     init(transaction: TransactionSnapshot) {
         _transaction = State(initialValue: transaction)
-        var descriptor = FetchDescriptor<CachedTransaction>(
-            sortBy: [SortDescriptor(\CachedTransaction.bookedAt, order: .reverse)]
-        )
-        descriptor.fetchLimit = 500
-        _allTransactions = Query(descriptor)
     }
 
     var body: some View {
@@ -151,6 +125,7 @@ struct TransactionDetailView: View {
                     detailRow("Status", transaction.reimbursementStatus == "reimbursed" ? "Reimbursed" : "Waiting for repayment")
                     if transaction.reimbursementStatus == "pending" {
                         Button("Link existing reimbursement", systemImage: "link") {
+                            linkedCandidates = loadLinkedCandidates(moneyIn: true)
                             showReimbursementPicker = true
                         }
                         Button("Add reimbursement", systemImage: "plus.circle.fill") {
@@ -166,13 +141,19 @@ struct TransactionDetailView: View {
                     if transaction.refundTransactionID != nil {
                         Label("Refunded", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
                     } else {
-                        Button("Link existing refund", systemImage: "link") { showRefundPicker = true }
+                        Button("Link existing refund", systemImage: "link") {
+                            linkedCandidates = loadLinkedCandidates(moneyIn: true)
+                            showRefundPicker = true
+                        }
                         Button("Add refund", systemImage: "plus.circle.fill") { showRefundAccounts = true }
                     }
                 } else if transaction.refundedTransactionID != nil {
                     Label("Marked as refund", systemImage: "arrow.uturn.backward.circle.fill").foregroundStyle(.green)
                 } else {
-                    Button("Mark as refund", systemImage: "arrow.uturn.backward.circle") { showRefundPicker = true }
+                    Button("Mark as refund", systemImage: "arrow.uturn.backward.circle") {
+                        linkedCandidates = loadLinkedCandidates(moneyIn: false)
+                        showRefundPicker = true
+                    }
                 }
             }
 
@@ -230,11 +211,12 @@ struct TransactionDetailView: View {
         }
         .navigationTitle("Transaction")
         .navigationBarTitleDisplayMode(.inline)
+        .task { loadMergeCandidate() }
         .sheet(isPresented: $showingEditor, onDismiss: refreshTransaction) {
             EditTransactionView(transaction: transaction)
         }
         .sheet(isPresented: $showReimbursementPicker) {
-            LinkedTransactionPicker(title: "Select reimbursement", candidates: incomingCandidates) { candidate in
+            LinkedTransactionPicker(title: "Select reimbursement", candidates: linkedCandidates) { candidate in
                 linkReimbursement(candidate.id)
                 showReimbursementPicker = false
             }
@@ -242,7 +224,7 @@ struct TransactionDetailView: View {
         .sheet(isPresented: $showRefundPicker) {
             LinkedTransactionPicker(
                 title: transaction.amountMinor < 0 ? "Select refund" : "Select purchase",
-                candidates: transaction.amountMinor < 0 ? incomingCandidates : expenseCandidates
+                candidates: linkedCandidates
             ) { candidate in
                 linkRefund(candidate.id)
                 showRefundPicker = false
@@ -328,6 +310,51 @@ struct TransactionDetailView: View {
         transaction.transferAccountID = model.transferAccountId
         transaction.transferDirection = model.transferDirection
         transaction.transferAccountName = model.transferAccountId.flatMap { fetchAccount(id: $0)?.name }
+        loadMergeCandidate()
+    }
+
+    private func loadLinkedCandidates(moneyIn: Bool) -> [LinkedTransactionCandidate] {
+        let currentID = transaction.id
+        let currency = transaction.currency
+        let accountsByID = Dictionary(uniqueKeysWithValues: accounts.map { ($0.id, $0) })
+        var descriptor: FetchDescriptor<CachedTransaction>
+        if moneyIn {
+            descriptor = FetchDescriptor(
+                predicate: #Predicate { $0.id != currentID && $0.currency == currency && $0.amountMinor > 0 },
+                sortBy: [SortDescriptor(\CachedTransaction.bookedAt, order: .reverse)]
+            )
+        } else {
+            descriptor = FetchDescriptor(
+                predicate: #Predicate { $0.id != currentID && $0.currency == currency && $0.amountMinor < 0 },
+                sortBy: [SortDescriptor(\CachedTransaction.bookedAt, order: .reverse)]
+            )
+        }
+        descriptor.fetchLimit = 200
+        let candidates = (try? context.fetch(descriptor)) ?? []
+        return candidates.filter {
+            moneyIn
+                ? $0.reimbursementTransactionId == nil && $0.refundedTransactionId == nil
+                : $0.refundTransactionId == nil
+        }.map { LinkedTransactionCandidate($0, account: accountsByID[$0.accountId]) }
+    }
+
+    private func loadMergeCandidate() {
+        guard let model = fetchTransaction() else {
+            mergeCandidate = nil
+            return
+        }
+        let currentID = model.id
+        let accountID = model.accountId
+        let currency = model.currency
+        let amount = model.amountMinor
+        var descriptor = FetchDescriptor<CachedTransaction>(
+            predicate: #Predicate {
+                $0.id != currentID && $0.accountId == accountID && $0.currency == currency && $0.amountMinor == amount
+            },
+            sortBy: [SortDescriptor(\CachedTransaction.bookedAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = 50
+        mergeCandidate = TransactionMerger.candidate(for: model, among: (try? context.fetch(descriptor)) ?? [])
     }
 
     private func fetchTransaction() -> CachedTransaction? {

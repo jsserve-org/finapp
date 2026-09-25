@@ -77,29 +77,28 @@ struct NativeActivityView: View {
         _transactions = Query(descriptor)
     }
 
-    private var dateFilteredTransactions: [CachedTransaction] {
-        transactions.filter {
+    private var visibleTransactions: [CachedTransaction] {
+        let accountsByID = Dictionary(uniqueKeysWithValues: accounts.map { ($0.id, $0) })
+        let paymentsByID = Dictionary(uniqueKeysWithValues: recurringPayments.map { ($0.id, $0) })
+        return transactions.filter { transaction in
             ActivityDateFilter.includes(
-                $0.bookedDate,
+                transaction.bookedDate,
                 filter: dateFilter,
                 customStart: customStartDate,
                 customEnd: customEndDate
-            )
-        }
-    }
-
-    private var visibleTransactions: [CachedTransaction] {
-        dateFilteredTransactions.filter { transaction in
-            TransactionSearch.matches(
+            ) && TransactionSearch.matches(
                 searchText,
                 transaction: transaction,
-                account: accounts.first { $0.id == transaction.accountId },
-                recurringPayment: recurringPayments.first { $0.id == transaction.recurringPaymentId }
+                account: accountsByID[transaction.accountId],
+                recurringPayment: transaction.recurringPaymentId.flatMap { paymentsByID[$0] }
             )
         }
     }
 
     var body: some View {
+        let displayedTransactions = visibleTransactions
+        let accountsByID = Dictionary(uniqueKeysWithValues: accounts.map { ($0.id, $0) })
+        let paymentsByID = Dictionary(uniqueKeysWithValues: recurringPayments.map { ($0.id, $0) })
         NavigationStack {
             List {
                 Section {
@@ -160,12 +159,12 @@ struct NativeActivityView: View {
                 }
 
                 Section {
-                    ForEach(visibleTransactions) { transaction in
+                    ForEach(displayedTransactions) { transaction in
                         let snapshot = TransactionSnapshot(
                             transaction,
-                            account: accounts.first { $0.id == transaction.accountId },
-                            recurringPayment: recurringPayments.first { $0.id == transaction.recurringPaymentId },
-                            transferAccount: accounts.first { $0.id == transaction.transferAccountId }
+                            account: accountsByID[transaction.accountId],
+                            recurringPayment: transaction.recurringPaymentId.flatMap { paymentsByID[$0] },
+                            transferAccount: transaction.transferAccountId.flatMap { accountsByID[$0] }
                         )
                         Button { selectedTransaction = snapshot } label: {
                             HStack(spacing: 10) {
@@ -180,7 +179,7 @@ struct NativeActivityView: View {
                     }
                     if transactions.isEmpty {
                         ContentUnavailableView("No activity", systemImage: AppIcon.activity, description: Text("Transactions you add or sync will appear here."))
-                    } else if visibleTransactions.isEmpty {
+                    } else if displayedTransactions.isEmpty {
                         ContentUnavailableView(
                             searchText.isEmpty ? "No transactions in this range" : "No search results",
                             systemImage: searchText.isEmpty ? "calendar" : "magnifyingglass",
@@ -211,7 +210,7 @@ struct NativeActivityView: View {
                         .textCase(nil)
                     }
                 } footer: {
-                    Text("Showing \(visibleTransactions.count) transactions. Ledgerly loads at most the newest 500 records to keep Activity responsive.")
+                    Text("Showing \(displayedTransactions.count) transactions. Ledgerly loads at most the newest 500 records to keep Activity responsive.")
                 }
             }
             .navigationTitle("Activity")

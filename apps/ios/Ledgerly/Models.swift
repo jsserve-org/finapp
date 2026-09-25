@@ -1,6 +1,16 @@
 import Foundation
 import SwiftData
 
+enum LedgerlyISODate {
+    private static let fractional = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
+    private static let standard = Date.ISO8601FormatStyle()
+
+    static func parse(_ value: String) -> Date? {
+        if let date = try? fractional.parse(value) { return date }
+        return try? standard.parse(value)
+    }
+}
+
 // MARK: - API DTOs (mirror the Hono contracts in apps/api/src)
 
 struct Money: Codable, Equatable { let amountMinor: Int; let currency: String }
@@ -353,15 +363,11 @@ enum JSONValue: Codable, Equatable {
     }
 
     var bookedDate: Date? {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter.date(from: bookedAt) ?? ISO8601DateFormatter().date(from: bookedAt)
+        LedgerlyISODate.parse(bookedAt)
     }
 
     var updatedDate: Date? {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter.date(from: updatedAt) ?? ISO8601DateFormatter().date(from: updatedAt)
+        LedgerlyISODate.parse(updatedAt)
     }
 }
 
