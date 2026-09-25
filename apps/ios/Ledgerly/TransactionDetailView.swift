@@ -65,10 +65,14 @@ struct TransactionDetailView: View {
     @State private var showDeleteConfirm = false
     @State private var showReimbursementAccounts = false
     @State private var showReimbursementPicker = false
+    @State private var showExpenseReimbursementPicker = false
     @State private var showRefundPicker = false
     @State private var showRefundAccounts = false
     @State private var showMergeReview = false
     @State private var linkedCandidates: [LinkedTransactionCandidate] = []
+    @State private var moneyInCandidates: [LinkedTransactionCandidate] = []
+    @State private var moneyOutCandidates: [LinkedTransactionCandidate] = []
+    @State private var reimbursableExpenseCandidates: [LinkedTransactionCandidate] = []
     @State private var mergeCandidate: TransactionMergeCandidate?
     @Query(sort: \CachedAccount.name) private var accounts: [CachedAccount]
 
@@ -125,7 +129,7 @@ struct TransactionDetailView: View {
                     detailRow("Status", transaction.reimbursementStatus == "reimbursed" ? "Reimbursed" : "Waiting for repayment")
                     if transaction.reimbursementStatus == "pending" {
                         Button("Link existing reimbursement", systemImage: "link") {
-                            linkedCandidates = loadLinkedCandidates(moneyIn: true)
+                            linkedCandidates = moneyInCandidates
                             showReimbursementPicker = true
                         }
                         Button("Add reimbursement", systemImage: "plus.circle.fill") {
@@ -136,13 +140,26 @@ struct TransactionDetailView: View {
                 }
             }
 
+            if transaction.amountMinor > 0 {
+                Section("Reimbursement") {
+                    Button("Link reimbursed expenses", systemImage: "checkmark.circle.badge.questionmark") {
+                        showExpenseReimbursementPicker = true
+                    }
+                    if reimbursableExpenseCandidates.isEmpty {
+                        Text("No expenses are waiting for reimbursement.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
             Section("Refund") {
                 if transaction.amountMinor < 0 {
                     if transaction.refundTransactionID != nil {
                         Label("Refunded", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
                     } else {
                         Button("Link existing refund", systemImage: "link") {
-                            linkedCandidates = loadLinkedCandidates(moneyIn: true)
+                            linkedCandidates = moneyInCandidates
                             showRefundPicker = true
                         }
                         Button("Add refund", systemImage: "plus.circle.fill") { showRefundAccounts = true }
@@ -151,7 +168,7 @@ struct TransactionDetailView: View {
                     Label("Marked as refund", systemImage: "arrow.uturn.backward.circle.fill").foregroundStyle(.green)
                 } else {
                     Button("Mark as refund", systemImage: "arrow.uturn.backward.circle") {
-                        linkedCandidates = loadLinkedCandidates(moneyIn: false)
+                        linkedCandidates = moneyOutCandidates
                         showRefundPicker = true
                     }
                 }
@@ -211,7 +228,12 @@ struct TransactionDetailView: View {
         }
         .navigationTitle("Transaction")
         .navigationBarTitleDisplayMode(.inline)
-        .task { loadMergeCandidate() }
+        .task {
+            loadMergeCandidate()
+            moneyInCandidates = loadLinkedCandidates(moneyIn: true)
+            moneyOutCandidates = loadLinkedCandidates(moneyIn: false)
+            reimbursableExpenseCandidates = loadReimbursableExpenseCandidates()
+        }
         .sheet(isPresented: $showingEditor, onDismiss: refreshTransaction) {
             EditTransactionView(transaction: transaction)
         }
@@ -219,6 +241,16 @@ struct TransactionDetailView: View {
             LinkedTransactionPicker(title: "Select reimbursement", candidates: linkedCandidates) { candidate in
                 linkReimbursement(candidate.id)
                 showReimbursementPicker = false
+            }
+        }
+        .sheet(isPresented: $showExpenseReimbursementPicker) {
+            ReimbursedExpensesPicker(
+                candidates: reimbursableExpenseCandidates,
+                availableAmountMinor: transaction.amountMinor,
+                currency: transaction.currency
+            ) { candidateIDs in
+                linkReimbursedExpenses(candidateIDs)
+                showExpenseReimbursementPicker = false
             }
         }
         .sheet(isPresented: $showRefundPicker) {
@@ -311,6 +343,28 @@ struct TransactionDetailView: View {
         transaction.transferDirection = model.transferDirection
         transaction.transferAccountName = model.transferAccountId.flatMap { fetchAccount(id: $0)?.name }
         loadMergeCandidate()
+        moneyInCandidates = loadLinkedCandidates(moneyIn: true)
+        moneyOutCandidates = loadLinkedCandidates(moneyIn: false)
+        reimbursableExpenseCandidates = loadReimbursableExpenseCandidates()
+    }
+
+    private func loadReimbursableExpenseCandidates() -> [LinkedTransactionCandidate] {
+        let currentID = transaction.id
+        let currency = transaction.currency
+        let accountsByID = Dictionary(uniqueKeysWithValues: accounts.map { ($0.id, $0) })
+        var descriptor = FetchDescriptor<CachedTransaction>(
+            predicate: #Predicate {
+                $0.id != currentID &&
+                $0.currency == currency &&
+                $0.amountMinor < 0 &&
+                $0.reimbursementStatus == "pending"
+            },
+            sortBy: [SortDescriptor(\CachedTransaction.bookedAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = 100
+        return ((try? context.fetch(descriptor)) ?? []).map {
+            LinkedTransactionCandidate($0, account: accountsByID[$0.accountId])
+        }
     }
 
     private func loadLinkedCandidates(moneyIn: Bool) -> [LinkedTransactionCandidate] {
@@ -329,7 +383,7 @@ struct TransactionDetailView: View {
                 sortBy: [SortDescriptor(\CachedTransaction.bookedAt, order: .reverse)]
             )
         }
-        descriptor.fetchLimit = 200
+        descriptor.fetchLimit = 100
         let candidates = (try? context.fetch(descriptor)) ?? []
         return candidates.filter {
             moneyIn
@@ -379,6 +433,13 @@ struct TransactionDetailView: View {
     private func linkReimbursement(_ candidateID: String) {
         guard let expense = fetchTransaction(), let payment = fetchTransaction(id: candidateID) else { return }
         ReimbursementService.link(expense, to: payment, context: context)
+        refreshTransaction()
+    }
+
+    private func linkReimbursedExpenses(_ candidateIDs: Set<String>) {
+        guard let payment = fetchTransaction() else { return }
+        let expenses = candidateIDs.compactMap(fetchTransaction(id:))
+        ReimbursementService.link(expenses, to: payment, context: context)
         refreshTransaction()
     }
 
@@ -511,6 +572,73 @@ private struct LinkedTransactionPicker: View {
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
+        }
+    }
+}
+
+private struct ReimbursedExpensesPicker: View {
+    @Environment(\.dismiss) private var dismiss
+    let candidates: [LinkedTransactionCandidate]
+    let availableAmountMinor: Int
+    let currency: String
+    let link: (Set<String>) -> Void
+    @State private var selection: Set<String> = []
+
+    private var selectedTotal: Int {
+        candidates.filter { selection.contains($0.id) }.reduce(0) { $0 + abs($1.amountMinor) }
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    LabeledContent("Reimbursement", value: money(availableAmountMinor, currency))
+                    LabeledContent("Selected expenses", value: money(-selectedTotal, currency))
+                } footer: {
+                    Text("Select every expense covered by this reimbursement. The selected total cannot exceed the money received.")
+                }
+
+                Section("Expenses waiting for reimbursement") {
+                    ForEach(candidates) { candidate in
+                        Button { toggle(candidate) } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: selection.contains(candidate.id) ? "checkmark.circle.fill" : "circle")
+                                    .font(.title3)
+                                    .foregroundStyle(selection.contains(candidate.id) ? Color.accentColor : .secondary)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(candidate.title).font(.headline).foregroundStyle(.primary)
+                                    Text("\(candidate.accountName) · \(candidate.date?.formatted(date: .abbreviated, time: .omitted) ?? "Unknown date")")
+                                        .font(.subheadline).foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Text(money(candidate.amountMinor, candidate.currency))
+                                    .fontWeight(.semibold).foregroundStyle(.red)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    if candidates.isEmpty {
+                        ContentUnavailableView("No expenses waiting", systemImage: "checkmark.circle", description: Text("Mark an expense as expecting reimbursement first."))
+                    }
+                }
+            }
+            .navigationTitle("Reimbursed expenses")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Link") { link(selection) }
+                        .disabled(selection.isEmpty || selectedTotal > availableAmountMinor)
+                }
+            }
+        }
+    }
+
+    private func toggle(_ candidate: LinkedTransactionCandidate) {
+        if selection.contains(candidate.id) {
+            selection.remove(candidate.id)
+        } else if selectedTotal + abs(candidate.amountMinor) <= availableAmountMinor {
+            selection.insert(candidate.id)
         }
     }
 }

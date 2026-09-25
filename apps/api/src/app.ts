@@ -150,9 +150,6 @@ app.post("/v1/bills", zValidator("json", bill), async (c) => {
   }
 });
 
-app.get("/v1/automations/status", async (c) => c.json(await convexQuery("automation:statuses", { tokenHash: await sha256(c.get("sessionToken")), now: Date.now() })));
-app.post("/v1/automations/demo/run", async (c) => c.json(await convexMutation("automation:runDemo", { tokenHash: await sha256(c.get("sessionToken")), now: Date.now() }), 202));
-
 app.onError((error, c) => {
   if (error instanceof HTTPException) return error.getResponse();
   console.error(JSON.stringify({ event: "request_error", message: error instanceof Error ? error.message : "unknown" }));

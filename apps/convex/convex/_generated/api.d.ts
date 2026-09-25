@@ -9,7 +9,6 @@
  */
 
 import type * as auth from "../auth.js";
-import type * as automation from "../automation.js";
 import type * as bills from "../bills.js";
 import type * as lib from "../lib.js";
 import type * as sync from "../sync.js";
@@ -23,7 +22,6 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
-  automation: typeof automation;
   bills: typeof bills;
   lib: typeof lib;
   sync: typeof sync;

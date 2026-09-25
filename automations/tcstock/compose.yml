@@ -1,0 +1,22 @@
+name: tcstock-runner
+
+services:
+  runner:
+    build: .
+    init: true
+    shm_size: 1gb
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      TZ: Asia/Taipei
+      TCSTOCK_BROWSER_CHANNEL: chromium
+      TCSTOCK_HEADLESS: "false"
+      TCSTOCK_OUTPUT_DIR: /app/output
+      TCSTOCK_PROFILE_DIR: /app/profile
+    ports:
+      - "${TCSTOCK_BIND_IP:-127.0.0.1}:${TCSTOCK_WEB_PORT:-8080}:8080"
+    volumes:
+      - ./remote-profile:/app/profile
+      - ./output:/app/output
+    restart: unless-stopped

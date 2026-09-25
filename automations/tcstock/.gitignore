@@ -1,0 +1,9 @@
+.env
+profile/
+remote-profile/
+native-profile/
+output/
+node_modules/
+cron.log
+local-control.log
+local-control.pid

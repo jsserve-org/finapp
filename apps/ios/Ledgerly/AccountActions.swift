@@ -73,6 +73,7 @@ struct AccountEntryView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Query(sort: \CachedAccount.name) private var accounts: [CachedAccount]
     let direction: AccountEntryDirection
     private let preferredAccountID: String?
@@ -83,6 +84,7 @@ struct AccountEntryView: View {
     @State private var category = ""
     @State private var date = Date()
     @State private var step: Step = .account
+    @State private var movesForward = true
 
     init(account: CachedAccount? = nil, direction: AccountEntryDirection) {
         self.direction = direction
@@ -95,13 +97,15 @@ struct AccountEntryView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
+            ZStack {
                 switch step {
                 case .account: accountStep
                 case .amount: amountStep
                 case .details: detailsStep
                 }
             }
+            .id(step)
+            .transition(stepTransition)
             .navigationTitle(step.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -147,7 +151,7 @@ struct AccountEntryView: View {
         }
         .safeAreaInset(edge: .bottom) {
             FlowButton(title: "Enter amount", systemImage: "arrow.right", tint: direction.color, disabled: selectedAccount == nil) {
-                step = .amount
+                goForward(to: .amount)
             }
         }
     }
@@ -162,7 +166,7 @@ struct AccountEntryView: View {
         }
         .safeAreaInset(edge: .bottom) {
             FlowButton(title: "Additional information", systemImage: "arrow.right", tint: direction.color, disabled: parsedAmount <= 0) {
-                step = .details
+                goForward(to: .details)
             }
         }
     }
@@ -214,7 +218,25 @@ struct AccountEntryView: View {
 
     private func goBack() {
         guard let previous = Step(rawValue: step.rawValue - 1) else { return }
-        step = previous
+        movesForward = false
+        withAnimation(stepAnimation) { step = previous }
+    }
+
+    private func goForward(to next: Step) {
+        movesForward = true
+        withAnimation(stepAnimation) { step = next }
+    }
+
+    private var stepAnimation: Animation? {
+        reduceMotion ? nil : .snappy(duration: 0.38, extraBounce: 0.04)
+    }
+
+    private var stepTransition: AnyTransition {
+        guard !reduceMotion else { return .opacity }
+        return .asymmetric(
+            insertion: .move(edge: movesForward ? .trailing : .leading).combined(with: .opacity),
+            removal: .move(edge: movesForward ? .leading : .trailing).combined(with: .opacity)
+        )
     }
 
     private func money(_ amount: Int, _ code: String) -> String {
@@ -259,6 +281,7 @@ struct AccountTransferView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Query(sort: \CachedAccount.name) private var accounts: [CachedAccount]
     private let preferredSourceID: String?
     @State private var sourceID: String
@@ -268,6 +291,7 @@ struct AccountTransferView: View {
     @State private var note = "Transfer"
     @State private var date = Date()
     @State private var step: Step = .source
+    @State private var movesForward = true
 
     init(source: CachedAccount? = nil) {
         preferredSourceID = source?.id
@@ -281,7 +305,7 @@ struct AccountTransferView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
+            ZStack {
                 switch step {
                 case .source: sourceStep
                 case .destination: destinationStep
@@ -289,6 +313,8 @@ struct AccountTransferView: View {
                 case .details: detailsStep
                 }
             }
+            .id(step)
+            .transition(stepTransition)
             .navigationTitle(step.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -329,7 +355,7 @@ struct AccountTransferView: View {
         }
         .safeAreaInset(edge: .bottom) {
             FlowButton(title: "Choose destination", systemImage: "arrow.right", tint: .blue, disabled: source == nil) {
-                step = .destination
+                goForward(to: .destination)
             }
         }
     }
@@ -352,7 +378,7 @@ struct AccountTransferView: View {
         }
         .safeAreaInset(edge: .bottom) {
             FlowButton(title: "Enter amount", systemImage: "arrow.right", tint: .blue, disabled: destination == nil) {
-                step = .amount
+                goForward(to: .amount)
             }
         }
     }
@@ -367,7 +393,7 @@ struct AccountTransferView: View {
         }
         .safeAreaInset(edge: .bottom) {
             FlowButton(title: "Additional information", systemImage: "arrow.right", tint: .blue, disabled: parsedAmount <= 0) {
-                step = .details
+                goForward(to: .details)
             }
         }
     }
@@ -432,7 +458,25 @@ struct AccountTransferView: View {
 
     private func goBack() {
         guard let previous = Step(rawValue: step.rawValue - 1) else { return }
-        step = previous
+        movesForward = false
+        withAnimation(stepAnimation) { step = previous }
+    }
+
+    private func goForward(to next: Step) {
+        movesForward = true
+        withAnimation(stepAnimation) { step = next }
+    }
+
+    private var stepAnimation: Animation? {
+        reduceMotion ? nil : .snappy(duration: 0.38, extraBounce: 0.04)
+    }
+
+    private var stepTransition: AnyTransition {
+        guard !reduceMotion else { return .opacity }
+        return .asymmetric(
+            insertion: .move(edge: movesForward ? .trailing : .leading).combined(with: .opacity),
+            removal: .move(edge: movesForward ? .leading : .trailing).combined(with: .opacity)
+        )
     }
 
     private var parsedAmount: Int {
@@ -448,7 +492,7 @@ struct AccountTransferView: View {
     }
 }
 
-private struct FlowStepHeader: View {
+struct FlowStepHeader: View {
     let current: Int
     let total: Int
     let instruction: String
@@ -467,7 +511,7 @@ private struct FlowStepHeader: View {
     }
 }
 
-private struct FlowButton: View {
+struct FlowButton: View {
     let title: String
     let systemImage: String
     let tint: Color

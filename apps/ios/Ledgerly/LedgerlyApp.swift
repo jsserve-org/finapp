@@ -253,8 +253,22 @@ struct NewAccountView: View {
 }
 
 struct NewRecurringPaymentView: View {
+    private enum Step: Int {
+        case account, amount, schedule, details
+
+        var title: String {
+            switch self {
+            case .account: "Choose account"
+            case .amount: "Enter amount"
+            case .schedule: "Schedule"
+            case .details: "Additional information"
+            }
+        }
+    }
+
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Query(sort: \CachedAccount.name) private var accounts: [CachedAccount]
     @State private var name = ""
     @State private var amount = ""
@@ -263,6 +277,8 @@ struct NewRecurringPaymentView: View {
     @State private var nextDate = Date()
     @State private var accountId = ""
     @State private var category = "Bills"
+    @State private var step: Step = .account
+    @State private var movesForward = true
     private let existingPayment: RecurringPayment?
     private let transactionID: String?
     private let onSave: ((RecurringPayment) -> Void)?
@@ -297,48 +313,162 @@ struct NewRecurringPaymentView: View {
     }
 
     private var availableAccounts: [CachedAccount] { accounts }
+    private var selectedAccount: CachedAccount? { accounts.first { $0.id == accountId } }
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    MoneyAmountHeader(title: "Amount", amount: $amount, currency: $currency)
-                }
-                Section("Bill") {
-                    TextField("Name", text: $name)
-                        .font(.body)
-                    TransactionCategoryPicker(selection: $category)
-                }
-                Section("Repeats") {
-                    Picker("Repeats", selection: $frequency) {
-                        ForEach(frequencies, id: \.0) { Text($0.1).tag($0.0) }
-                    }
-                    DatePicker("Next payment", selection: $nextDate, displayedComponents: .date)
-                }
-                if !accounts.isEmpty {
-                    Section("Account") {
-                        Picker("Pay from", selection: $accountId) {
-                            Text("Not selected").tag("")
-                            ForEach(availableAccounts) { Text("\($0.name) · \($0.currency)").tag($0.id) }
+            Group {
+                if existingPayment != nil {
+                    editForm
+                } else {
+                    ZStack {
+                        switch step {
+                        case .account: accountStep
+                        case .amount: amountStep
+                        case .schedule: scheduleStep
+                        case .details: detailsStep
                         }
-                        Text("The bank may settle this bill in the account's currency. The bill keeps its original currency.")
-                            .font(.footnote).foregroundStyle(.secondary)
                     }
-                }
-                Section {
-                    Text("This bill repeats automatically in Ledgerly. It does not move money or charge the account.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                    .id(step)
+                    .transition(stepTransition)
                 }
             }
-            .navigationTitle(existingPayment == nil ? "Add recurring bill" : "Edit recurring bill")
+            .navigationTitle(existingPayment == nil ? step.title : "Edit recurring bill")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) { Button("Save") { save() }.disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || parsedAmount <= 0) }
+                ToolbarItem(placement: .cancellationAction) {
+                    if existingPayment != nil || step == .account { Button("Cancel") { dismiss() } }
+                    else { Button("Back", systemImage: "chevron.left") { goBack() } }
+                }
+                if existingPayment != nil {
+                    ToolbarItem(placement: .confirmationAction) { Button("Save") { save() }.disabled(!canSave) }
+                } else if step != .account {
+                    ToolbarItem(placement: .confirmationAction) { Button("Cancel") { dismiss() } }
+                }
             }
             .task { selectDefaultAccount() }
         }
+    }
+
+    private var editForm: some View {
+        Form {
+            Section { MoneyAmountHeader(title: "Amount", amount: $amount, currency: $currency) }
+            Section("Bill") { TextField("Name", text: $name); TransactionCategoryPicker(selection: $category) }
+            Section("Repeats") { frequencyPicker; DatePicker("Next payment", selection: $nextDate, displayedComponents: .date) }
+            Section("Account") {
+                Picker("Pay from", selection: $accountId) {
+                    Text("Not selected").tag("")
+                    ForEach(availableAccounts) { Text("\($0.name) · \($0.currency)").tag($0.id) }
+                }
+            }
+        }
+    }
+
+    private var accountStep: some View {
+        Form {
+            Section { FlowStepHeader(current: 1, total: 4, instruction: "Which account usually pays this bill?") }
+                .listRowBackground(Color.clear)
+            Section("Pay from") {
+                ForEach(availableAccounts) { account in
+                    Button {
+                        accountId = account.id
+                        if amount.isEmpty { currency = account.currency }
+                    } label: { accountRow(account, selected: account.id == accountId) }
+                        .buttonStyle(.plain)
+                }
+                Button { accountId = "" } label: {
+                    Label("No account", systemImage: accountId.isEmpty ? "checkmark.circle.fill" : "circle")
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            FlowButton(title: "Enter amount", systemImage: "arrow.right", tint: .blue, disabled: false) { goForward(to: .amount) }
+        }
+    }
+
+    private var amountStep: some View {
+        Form {
+            Section {
+                FlowStepHeader(current: 2, total: 4, instruction: selectedAccount?.name ?? "Recurring amount")
+                MoneyAmountHeader(title: "Amount", amount: $amount, currency: $currency, tint: .blue)
+            }
+            .listRowBackground(Color.clear)
+        }
+        .safeAreaInset(edge: .bottom) {
+            FlowButton(title: "Choose schedule", systemImage: "arrow.right", tint: .blue, disabled: parsedAmount <= 0) { goForward(to: .schedule) }
+        }
+    }
+
+    private var scheduleStep: some View {
+        Form {
+            Section { FlowStepHeader(current: 3, total: 4, instruction: "When does it repeat?") }
+                .listRowBackground(Color.clear)
+            Section("Repeats") { frequencyPicker; DatePicker("Next payment", selection: $nextDate, displayedComponents: .date) }
+        }
+        .safeAreaInset(edge: .bottom) {
+            FlowButton(title: "Additional information", systemImage: "arrow.right", tint: .blue, disabled: false) { goForward(to: .details) }
+        }
+    }
+
+    private var detailsStep: some View {
+        Form {
+            Section { FlowStepHeader(current: 4, total: 4, instruction: "Review and save") }
+                .listRowBackground(Color.clear)
+            Section("Summary") {
+                LabeledContent("Account", value: selectedAccount?.name ?? "No account")
+                LabeledContent("Amount", value: recurringMoney(parsedAmount, currency))
+                LabeledContent("Schedule", value: frequencies.first(where: { $0.0 == frequency })?.1 ?? frequency)
+            }
+            Section("Bill") { TextField("Name", text: $name); TransactionCategoryPicker(selection: $category) }
+            Section { Text("Ledgerly tracks this schedule. It does not move money or charge the account.").font(.subheadline).foregroundStyle(.secondary) }
+        }
+        .safeAreaInset(edge: .bottom) {
+            FlowButton(title: "Add recurring bill", systemImage: "repeat", tint: .blue, disabled: !canSave, action: save)
+        }
+    }
+
+    private var frequencyPicker: some View {
+        Picker("Repeats", selection: $frequency) { ForEach(frequencies, id: \.0) { Text($0.1).tag($0.0) } }
+    }
+
+    private func accountRow(_ account: CachedAccount, selected: Bool) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: AppIcon.account(kind: account.kind)).ledgerlyIcon()
+            VStack(alignment: .leading, spacing: 2) {
+                Text(account.name).font(.headline).foregroundStyle(.primary)
+                Text("\(account.institution) · \(recurringMoney(account.amountMinor, account.currency))").font(.subheadline).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Image(systemName: selected ? "checkmark.circle.fill" : "circle").foregroundStyle(selected ? Color.blue : Color.secondary.opacity(0.45))
+        }
+        .contentShape(Rectangle())
+    }
+
+    private var canSave: Bool { !name.trimmingCharacters(in: .whitespaces).isEmpty && parsedAmount > 0 }
+
+    private func goBack() {
+        guard let previous = Step(rawValue: step.rawValue - 1) else { return }
+        movesForward = false
+        withAnimation(stepAnimation) { step = previous }
+    }
+
+    private func goForward(to next: Step) {
+        movesForward = true
+        withAnimation(stepAnimation) { step = next }
+    }
+
+    private var stepAnimation: Animation? { reduceMotion ? nil : .snappy(duration: 0.38, extraBounce: 0.04) }
+    private var stepTransition: AnyTransition {
+        guard !reduceMotion else { return .opacity }
+        return .asymmetric(
+            insertion: .move(edge: movesForward ? .trailing : .leading).combined(with: .opacity),
+            removal: .move(edge: movesForward ? .leading : .trailing).combined(with: .opacity)
+        )
+    }
+
+    private func recurringMoney(_ amount: Int, _ code: String) -> String {
+        (Double(amount) / 100).formatted(.currency(code: code).presentation(.isoCode))
     }
 
     private var parsedAmount: Int {
@@ -347,10 +477,7 @@ struct NewRecurringPaymentView: View {
     }
 
     private func save() {
-        let bill = existingPayment ?? RecurringPayment(
-            name: name, amountMinor: parsedAmount, currency: currency, frequency: frequency,
-            nextDate: nextDate, accountId: nil, category: category
-        )
+        let bill = existingPayment ?? RecurringPayment(name: name, amountMinor: parsedAmount, currency: currency, frequency: frequency, nextDate: nextDate, accountId: nil, category: category)
         bill.name = name.trimmingCharacters(in: .whitespaces)
         bill.amountMinor = parsedAmount
         bill.currency = currency
@@ -366,9 +493,7 @@ struct NewRecurringPaymentView: View {
             transaction.updatedAt = ISO8601DateFormatter().string(from: Date())
             enqueueFullTransaction(context: context, transactionID: transaction.id)
         }
-        for transaction in transactions where transaction.recurringPaymentId == nil {
-            autoLinkRecurringPayment(transaction, payments: [bill], context: context)
-        }
+        for transaction in transactions where transaction.recurringPaymentId == nil { autoLinkRecurringPayment(transaction, payments: [bill], context: context) }
         try? context.save()
         onSave?(bill)
         dismiss()

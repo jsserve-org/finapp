@@ -91,7 +91,7 @@ final class SyncEngineTests: XCTestCase {
 
     func testDecodesAccountAndTransactionDTO() throws {
         let accountJSON = """
-        {"id":"a1","name":"Checking","institution":"Demo Bank","kind":"checking","balance":{"amountMinor":123456,"currency":"USD"},"updatedAt":"2026-09-21T10:00:00.000Z"}
+        {"id":"a1","name":"Checking","institution":"Test Bank","kind":"checking","balance":{"amountMinor":123456,"currency":"USD"},"updatedAt":"2026-09-21T10:00:00.000Z"}
         """
         let account = try JSONDecoder().decode(AccountDTO.self, from: Data(accountJSON.utf8))
         XCTAssertEqual(account.balance.amountMinor, 123456)
@@ -129,7 +129,7 @@ final class SyncEngineTests: XCTestCase {
     }
 
     func testApplyUpsertsAccountAndTransaction() throws {
-        try engine.apply([change(5, entity: "account", id: "acc-1", value: #"{"id":"acc-1","name":"Checking","institution":"Demo Bank","kind":"checking","balance":{"amountMinor":50000,"currency":"USD"},"updatedAt":"2026-09-21T10:00:00.000Z"}"#)], context: context)
+        try engine.apply([change(5, entity: "account", id: "acc-1", value: #"{"id":"acc-1","name":"Checking","institution":"Test Bank","kind":"checking","balance":{"amountMinor":50000,"currency":"USD"},"updatedAt":"2026-09-21T10:00:00.000Z"}"#)], context: context)
         try engine.apply([change(6, entity: "transaction", id: "txn-1", value: #"{"id":"txn-1","accountId":"acc-1","description":"Coffee","amount":{"amountMinor":-450,"currency":"USD"},"bookedAt":"2026-09-21T10:00:00.000Z","pending":false,"updatedAt":"2026-09-21T10:00:00.000Z"}"#)], context: context)
 
         let accounts = try context.fetch(FetchDescriptor<CachedAccount>())
@@ -472,7 +472,7 @@ final class SyncEngineTests: XCTestCase {
     }
 
     func testTransactionSearchMatchesMeaningfulFields() {
-        let account = CachedAccount(name: "School Cash", institution: "Demo Bank", kind: "cash", amountMinor: 0, currency: "TWD")
+        let account = CachedAccount(name: "School Cash", institution: "Test Bank", kind: "cash", amountMinor: 0, currency: "TWD")
         let item = transaction(title: "Campus lunch", amountMinor: -120_00, currency: "TWD", accountID: account.id, category: "Food")
         XCTAssertTrue(TransactionSearch.matches("campus", transaction: item, account: account, recurringPayment: nil))
         XCTAssertTrue(TransactionSearch.matches("food", transaction: item, account: account, recurringPayment: nil))
@@ -504,6 +504,24 @@ final class SyncEngineTests: XCTestCase {
         XCTAssertEqual(expense.reimbursementStatus, "reimbursed")
         XCTAssertEqual(expense.reimbursementTransactionId, payment.id)
         XCTAssertEqual(payment.reimbursementTransactionId, expense.id)
+    }
+
+    func testOneReimbursementCanCoverMultipleExpenses() throws {
+        let account = CachedAccount(name: "Checking", institution: "Bank", kind: "checking", amountMinor: 50_000, currency: "TWD")
+        let lunch = transaction(title: "School lunch", amountMinor: -1_200, currency: "TWD", accountID: account.id, category: "School")
+        let supplies = transaction(title: "School supplies", amountMinor: -2_000, currency: "TWD", accountID: account.id, category: "School")
+        lunch.reimbursementStatus = "pending"
+        supplies.reimbursementStatus = "pending"
+        let payment = transaction(title: "Dad paid me", amountMinor: 4_000, currency: "TWD", accountID: account.id, category: "Transfer")
+        context.insert(account); context.insert(lunch); context.insert(supplies); context.insert(payment)
+
+        ReimbursementService.link([lunch, supplies], to: payment, context: context)
+
+        XCTAssertEqual(account.amountMinor, 50_000)
+        XCTAssertEqual(lunch.reimbursementStatus, "reimbursed")
+        XCTAssertEqual(supplies.reimbursementStatus, "reimbursed")
+        XCTAssertEqual(lunch.reimbursementTransactionId, payment.id)
+        XCTAssertEqual(supplies.reimbursementTransactionId, payment.id)
     }
 
     func testLinkingExistingRefundDoesNotChangeBalance() {

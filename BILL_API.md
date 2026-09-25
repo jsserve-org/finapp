@@ -18,6 +18,8 @@ Send either the API key or login token as `Authorization: Bearer YOUR_TOKEN` on 
 
 ## Find an account ID
 
+Ledgerly does not use a separate bank-connection ID. The `id` returned here is the exact `accountId` an automation should send. Match accounts by a configured, stable ID—not by list position or a guessed bank name.
+
 ```sh
 curl "$LEDGERLY_API/v1/accounts" \
   -H 'Authorization: Bearer YOUR_TOKEN'
@@ -47,7 +49,7 @@ For example, a JPY 1,000 purchase settled as TWD 215 against a TWD account uses 
 
 ## Create a recurring bill
 
-Valid frequencies are `weekly`, `everyTwoWeeks`, `monthly`, and `yearly`.
+Valid frequencies are `weekly`, `everyTwoWeeks`, `monthly`, `yearly`, and `everyTwoYears`.
 
 ```sh
 curl -X POST "$LEDGERLY_API/v1/bills" \

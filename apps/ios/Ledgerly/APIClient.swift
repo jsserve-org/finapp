@@ -49,14 +49,6 @@ struct CreatedAPIKey: Codable, Identifiable, Equatable {
     let createdAt: Double
 }
 
-struct ConnectionStatus: Codable, Equatable {
-    let connectionId: String
-    let state: String
-    let lastSuccessAt: String?
-    let lastError: String?
-    let nextCheckAt: String
-}
-
 /// Actor wrapping all calls to the Docker Compose API. Endpoint shapes match
 /// `apps/api/src/app.ts` and `apps/api/src/routes/sync.ts`.
 actor APIClient {
@@ -165,17 +157,10 @@ actor APIClient {
         _ = try await send(makeRequest(path: "/v1/api-keys/\(id)", method: "DELETE"))
     }
 
-    // MARK: - Health & connections
+    // MARK: - Health
 
     func healthReady() async throws {
         _ = try await send(makeRequest(path: "/health/ready"))
     }
 
-    func connectionStatuses() async throws -> [ConnectionStatus] {
-        try decoder.decode([ConnectionStatus].self, from: await send(makeRequest(path: "/v1/automations/status")))
-    }
-
-    func runDemoAutomation() async throws {
-        _ = try await send(makeRequest(path: "/v1/automations/demo/run", method: "POST"))
-    }
 }

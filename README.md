@@ -80,6 +80,6 @@ bun test
 docker compose logs -f api convex
 ```
 
-The demo automation remains available after login at `POST /v1/automations/demo/run`. Real bank access belongs behind a regulated Open Banking provider and requires encrypted provider tokens, audit logs, rate limiting, and privacy review.
+Ledgerly does not create abstract “bank connections” for agents. Automations authenticate with an API key, read concrete account IDs from `GET /v1/accounts`, and send records to those IDs through the sync API. No demo-import endpoint or sample-data loader is included.
 
 See [BILL_API.md](BILL_API.md) for the authenticated one-time and recurring bill API intended for AI agents and mobile automation. The iOS app also publishes matching actions to Apple's Shortcuts app.
