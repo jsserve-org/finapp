@@ -435,6 +435,58 @@ final class SyncEngineTests: XCTestCase {
         XCTAssertEqual(backup.stockTrades?.first?.side, "buy")
     }
 
+    func testTransactionSearchMatchesMeaningfulFields() {
+        let account = CachedAccount(name: "School Cash", institution: "Demo Bank", kind: "cash", amountMinor: 0, currency: "TWD")
+        let item = transaction(title: "Campus lunch", amountMinor: -120_00, currency: "TWD", accountID: account.id, category: "Food")
+        XCTAssertTrue(TransactionSearch.matches("campus", transaction: item, account: account, recurringPayment: nil))
+        XCTAssertTrue(TransactionSearch.matches("food", transaction: item, account: account, recurringPayment: nil))
+        XCTAssertTrue(TransactionSearch.matches("school cash", transaction: item, account: account, recurringPayment: nil))
+        XCTAssertFalse(TransactionSearch.matches("train ticket", transaction: item, account: account, recurringPayment: nil))
+    }
+
+    func testLinkingExistingReimbursementDoesNotChangeBalance() throws {
+        let account = CachedAccount(name: "Checking", institution: "Bank", kind: "checking", amountMinor: 50_000, currency: "TWD")
+        let expense = transaction(title: "School supplies", amountMinor: -2_000, currency: "TWD", accountID: account.id, category: "School")
+        expense.reimbursementStatus = "pending"
+        let payment = transaction(title: "Dad paid me", amountMinor: 2_000, currency: "TWD", accountID: account.id, category: "Transfer")
+        context.insert(account); context.insert(expense); context.insert(payment)
+        ReimbursementService.link(expense, to: payment, context: context)
+        XCTAssertEqual(account.amountMinor, 50_000)
+        XCTAssertEqual(expense.reimbursementStatus, "reimbursed")
+        XCTAssertEqual(expense.reimbursementTransactionId, payment.id)
+        XCTAssertEqual(payment.reimbursementTransactionId, expense.id)
+    }
+
+    func testLinkingExistingRefundDoesNotChangeBalance() {
+        let account = CachedAccount(name: "Card", institution: "Bank", kind: "credit", amountMinor: 10_000, currency: "TWD")
+        let expense = transaction(title: "Returned item", amountMinor: -3_000, currency: "TWD", accountID: account.id, category: "Shopping")
+        let refund = transaction(title: "Merchant refund", amountMinor: 3_000, currency: "TWD", accountID: account.id, category: "Refund")
+        context.insert(account); context.insert(expense); context.insert(refund)
+        RefundService.link(expense: expense, refund: refund, context: context)
+        XCTAssertEqual(account.amountMinor, 10_000)
+        XCTAssertEqual(expense.refundTransactionId, refund.id)
+        XCTAssertEqual(refund.refundedTransactionId, expense.id)
+    }
+
+    func testCreatingRefundChangesBalanceExactlyOnce() {
+        let account = CachedAccount(name: "Card", institution: "Bank", kind: "credit", amountMinor: 10_000, currency: "TWD")
+        let expense = transaction(title: "Returned item", amountMinor: -3_000, currency: "TWD", accountID: account.id, category: "Shopping")
+        context.insert(account); context.insert(expense)
+        let refund = RefundService.create(for: expense, into: account, context: context)
+        XCTAssertEqual(refund.amountMinor, 3_000)
+        XCTAssertEqual(refund.source, "refund")
+        XCTAssertEqual(account.amountMinor, 13_000)
+        XCTAssertEqual(expense.refundTransactionId, refund.id)
+        XCTAssertEqual(refund.refundedTransactionId, expense.id)
+    }
+
+    func testTransactionDTOCarriesRefundLinks() throws {
+        let payload = #"{"id":"refund","accountId":"a1","description":"Refund","amount":{"amountMinor":450,"currency":"USD"},"bookedAt":"2026-09-21T10:00:00.000Z","pending":false,"refundedTransactionId":"purchase","updatedAt":"2026-09-21T10:00:00.000Z"}"#
+        let transaction = try JSONDecoder().decode(TransactionDTO.self, from: Data(payload.utf8))
+        XCTAssertEqual(transaction.refundedTransactionId, "purchase")
+        XCTAssertNil(transaction.refundTransactionId)
+    }
+
     private func transaction(title: String, amountMinor: Int, currency: String, accountID: String, category: String?, source: String? = nil, originalAmount: Money? = nil) -> CachedTransaction {
         let timestamp = ISO8601DateFormatter().string(from: Date())
         return CachedTransaction(dto: TransactionDTO(

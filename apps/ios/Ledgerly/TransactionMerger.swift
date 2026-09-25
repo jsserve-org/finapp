@@ -48,6 +48,8 @@ enum TransactionMerger {
         }
         if imported.recurringPaymentId == nil { imported.recurringPaymentId = manual.recurringPaymentId }
         if imported.reimbursementStatus == nil { imported.reimbursementStatus = manual.reimbursementStatus }
+        if imported.refundTransactionId == nil { imported.refundTransactionId = manual.refundTransactionId }
+        if imported.refundedTransactionId == nil { imported.refundedTransactionId = manual.refundedTransactionId }
         imported.updatedAt = ISO8601DateFormatter().string(from: Date())
         enqueueFullTransaction(context: context, transactionID: imported.id)
         context.insert(PendingMutation(entityId: manual.id, action: "delete", newDescription: nil, newCategory: nil, baseVersion: manual.version))
@@ -62,6 +64,20 @@ enum TransactionMerger {
 }
 
 enum ReimbursementService {
+    @MainActor
+    static func link(_ original: CachedTransaction, to reimbursement: CachedTransaction, context: ModelContext) {
+        guard original.amountMinor < 0, reimbursement.amountMinor > 0, original.currency == reimbursement.currency else { return }
+        let now = ISO8601DateFormatter().string(from: Date())
+        original.reimbursementStatus = "reimbursed"
+        original.reimbursementTransactionId = reimbursement.id
+        reimbursement.reimbursementTransactionId = original.id
+        original.updatedAt = now
+        reimbursement.updatedAt = now
+        enqueueFullTransaction(context: context, transactionID: original.id)
+        enqueueFullTransaction(context: context, transactionID: reimbursement.id)
+        try? context.save()
+    }
+
     @MainActor
     static func reimburse(_ original: CachedTransaction, into account: CachedAccount, context: ModelContext) -> CachedTransaction {
         let now = ISO8601DateFormatter().string(from: Date())
@@ -89,5 +105,42 @@ enum ReimbursementService {
         context.insert(PendingAccountMutation(entityId: account.id))
         try? context.save()
         return reimbursement
+    }
+}
+
+enum RefundService {
+    @MainActor
+    static func link(expense: CachedTransaction, refund: CachedTransaction, context: ModelContext) {
+        guard expense.amountMinor < 0, refund.amountMinor > 0, expense.currency == refund.currency else { return }
+        let now = ISO8601DateFormatter().string(from: Date())
+        expense.refundTransactionId = refund.id
+        refund.refundedTransactionId = expense.id
+        expense.updatedAt = now
+        refund.updatedAt = now
+        enqueueFullTransaction(context: context, transactionID: expense.id)
+        enqueueFullTransaction(context: context, transactionID: refund.id)
+        try? context.save()
+    }
+
+    @MainActor
+    static func create(for expense: CachedTransaction, into account: CachedAccount, context: ModelContext) -> CachedTransaction {
+        let now = ISO8601DateFormatter().string(from: Date())
+        let refund = CachedTransaction(dto: TransactionDTO(
+            id: UUID().uuidString.lowercased(), accountId: account.id,
+            description: "Refund · \(expense.title)",
+            amount: Money(amountMinor: abs(expense.amountMinor), currency: expense.currency),
+            bookedAt: now, pending: false, category: "Refund", source: "refund",
+            refundedTransactionId: expense.id, updatedAt: now
+        ), initialVersion: 0)
+        context.insert(refund)
+        expense.refundTransactionId = refund.id
+        expense.updatedAt = now
+        enqueueFullTransaction(context: context, transactionID: refund.id)
+        enqueueFullTransaction(context: context, transactionID: expense.id)
+        account.amountMinor += refund.amountMinor
+        account.updatedAt = now
+        context.insert(PendingAccountMutation(entityId: account.id))
+        try? context.save()
+        return refund
     }
 }

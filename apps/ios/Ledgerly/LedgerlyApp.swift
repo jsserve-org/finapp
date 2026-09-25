@@ -122,9 +122,11 @@ private struct LoginView: View {
 
 private struct RootTabView: View {
     private enum RootTab: Hashable { case overview, accounts, add, activity, settings }
+    private enum AddFlow: String, Identifiable { case bill, recurring, moneyIn, moneyOut; var id: String { rawValue } }
     @State private var selection = RootTab.overview
     @State private var previousSelection = RootTab.overview
-    @State private var showingAddBill = false
+    @State private var showingAddMenu = false
+    @State private var addFlow: AddFlow?
 
     var body: some View {
         TabView(selection: $selection) {
@@ -152,12 +154,38 @@ private struct RootTabView: View {
         .onChange(of: selection) { oldValue, newValue in
             if newValue == .add {
                 selection = oldValue == .add ? previousSelection : oldValue
-                showingAddBill = true
+                showingAddMenu = true
             } else {
                 previousSelection = newValue
             }
         }
-        .sheet(isPresented: $showingAddBill) { NewBillView() }
+        .confirmationDialog("What would you like to add?", isPresented: $showingAddMenu, titleVisibility: .visible) {
+            Button("Add money", systemImage: "plus.circle.fill") { addFlow = .moneyIn }
+            Button("Spend money", systemImage: "minus.circle.fill") { addFlow = .moneyOut }
+            Button("One-time bill", systemImage: "doc.badge.plus") { addFlow = .bill }
+            Button("Recurring bill", systemImage: "repeat") { addFlow = .recurring }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Choose an action. Ledgerly will ask for the account before the amount.")
+        }
+        .sheet(item: $addFlow) { flow in
+            switch flow {
+            case .bill: NewBillView()
+            case .recurring: NewRecurringPaymentView()
+            case .moneyIn: QuickAccountEntryPicker(direction: .moneyIn)
+            case .moneyOut: QuickAccountEntryPicker(direction: .moneyOut)
+            }
+        }
+        .task { openPendingAddFlow() }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            openPendingAddFlow()
+        }
+    }
+
+    private func openPendingAddFlow() {
+        guard UserDefaults.standard.string(forKey: "ledgerly.pendingAddFlow") == "moneyIn" else { return }
+        UserDefaults.standard.removeObject(forKey: "ledgerly.pendingAddFlow")
+        addFlow = .moneyIn
     }
 }
 
@@ -227,10 +255,14 @@ struct NewRecurringPaymentView: View {
     @State private var accountId = ""
     @State private var category = "Bills"
     private let existingPayment: RecurringPayment?
+    private let transactionID: String?
+    private let onSave: ((RecurringPayment) -> Void)?
     private let frequencies = [("weekly", "Weekly"), ("everyTwoWeeks", "Every 2 weeks"), ("monthly", "Monthly"), ("yearly", "Yearly")]
 
     init(payment: RecurringPayment? = nil) {
         existingPayment = payment
+        transactionID = nil
+        onSave = nil
         if let payment {
             _name = State(initialValue: payment.name)
             _amount = State(initialValue: NSDecimalNumber(value: Double(payment.amountMinor) / 100).stringValue)
@@ -242,6 +274,19 @@ struct NewRecurringPaymentView: View {
         }
     }
 
+    init(transaction: TransactionSnapshot, onSave: ((RecurringPayment) -> Void)? = nil) {
+        existingPayment = nil
+        transactionID = transaction.id
+        self.onSave = onSave
+        let purchaseAmount = transaction.originalAmountMinor ?? transaction.amountMinor
+        _name = State(initialValue: transaction.title)
+        _amount = State(initialValue: NSDecimalNumber(value: Double(abs(purchaseAmount)) / 100).stringValue)
+        _currency = State(initialValue: transaction.originalCurrency ?? transaction.currency)
+        _nextDate = State(initialValue: Calendar.current.date(byAdding: .month, value: 1, to: transaction.bookedDate ?? Date()) ?? Date())
+        _accountId = State(initialValue: transaction.accountID)
+        _category = State(initialValue: transaction.category ?? "Bills")
+    }
+
     private var availableAccounts: [CachedAccount] { accounts }
 
     var body: some View {
@@ -250,16 +295,8 @@ struct NewRecurringPaymentView: View {
                 Section("Bill") {
                     TextField("Name", text: $name)
                         .font(.body)
-                    TextField("Amount", text: $amount)
-                        .font(.body)
-                        .keyboardType(.decimalPad)
-                    Picker("Currency", selection: $currency) {
-                        ForEach(SupportedCurrency.all) { option in
-                            Text("\(option.code) — \(option.name)").tag(option.code)
-                        }
-                    }
-                    TextField("Category", text: $category)
-                        .font(.body)
+                    MoneyEntryRow(label: "Amount", amount: $amount, currency: $currency)
+                    TransactionCategoryPicker(selection: $category)
                 }
                 Section("Repeats") {
                     Picker("Repeats", selection: $frequency) {
@@ -313,10 +350,16 @@ struct NewRecurringPaymentView: View {
         if existingPayment == nil { context.insert(bill) }
         context.insert(PendingRecurringMutation(entityId: bill.id, action: "upsert"))
         let transactions = (try? context.fetch(FetchDescriptor<CachedTransaction>())) ?? []
+        if let transactionID, let transaction = transactions.first(where: { $0.id == transactionID }) {
+            transaction.recurringPaymentId = bill.id
+            transaction.updatedAt = ISO8601DateFormatter().string(from: Date())
+            enqueueFullTransaction(context: context, transactionID: transaction.id)
+        }
         for transaction in transactions where transaction.recurringPaymentId == nil {
             autoLinkRecurringPayment(transaction, payments: [bill], context: context)
         }
         try? context.save()
+        onSave?(bill)
         dismiss()
     }
 
