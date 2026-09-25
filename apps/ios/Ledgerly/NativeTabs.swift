@@ -56,7 +56,7 @@ struct NativeAccountsView: View {
 
 struct NativeActivityView: View {
     @Environment(\.modelContext) private var context
-    @Query(sort: \CachedTransaction.bookedAt, order: .reverse) private var transactions: [CachedTransaction]
+    @Query private var transactions: [CachedTransaction]
     @Query(sort: \CachedAccount.name) private var accounts: [CachedAccount]
     @Query(sort: \RecurringPayment.nextDate) private var recurringPayments: [RecurringPayment]
     @State private var showingNewBill = false
@@ -64,9 +64,32 @@ struct NativeActivityView: View {
     @State private var editingRecurringPayment: RecurringPayment?
     @State private var selectedTransaction: TransactionSnapshot?
     @State private var searchText = ""
+    @State private var dateFilter = ActivityDateFilter.last90Days
+    @State private var showingCustomDates = false
+    @State private var customStartDate = Calendar.current.date(byAdding: .month, value: -3, to: Date()) ?? Date()
+    @State private var customEndDate = Date()
+
+    init() {
+        var descriptor = FetchDescriptor<CachedTransaction>(
+            sortBy: [SortDescriptor(\CachedTransaction.bookedAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = 500
+        _transactions = Query(descriptor)
+    }
+
+    private var dateFilteredTransactions: [CachedTransaction] {
+        transactions.filter {
+            ActivityDateFilter.includes(
+                $0.bookedDate,
+                filter: dateFilter,
+                customStart: customStartDate,
+                customEnd: customEndDate
+            )
+        }
+    }
 
     private var visibleTransactions: [CachedTransaction] {
-        transactions.filter { transaction in
+        dateFilteredTransactions.filter { transaction in
             TransactionSearch.matches(
                 searchText,
                 transaction: transaction,
@@ -136,7 +159,7 @@ struct NativeActivityView: View {
                     Text("These repeat on the frequency and next due date you choose.")
                 }
 
-                Section("Bills & transactions") {
+                Section {
                     ForEach(visibleTransactions) { transaction in
                         let snapshot = TransactionSnapshot(
                             transaction,
@@ -158,8 +181,37 @@ struct NativeActivityView: View {
                     if transactions.isEmpty {
                         ContentUnavailableView("No activity", systemImage: AppIcon.activity, description: Text("Transactions you add or sync will appear here."))
                     } else if visibleTransactions.isEmpty {
-                        ContentUnavailableView.search(text: searchText)
+                        ContentUnavailableView(
+                            searchText.isEmpty ? "No transactions in this range" : "No search results",
+                            systemImage: searchText.isEmpty ? "calendar" : "magnifyingglass",
+                            description: Text(searchText.isEmpty ? "Choose a wider date range to see older activity." : "Try a different search or date range.")
+                        )
                     }
+                } header: {
+                    HStack {
+                        Text("Bills & transactions")
+                        Spacer()
+                        Menu {
+                            ForEach(ActivityDateFilter.presets) { filter in
+                                Button {
+                                    dateFilter = filter
+                                } label: {
+                                    if dateFilter == filter { Label(filter.label, systemImage: "checkmark") }
+                                    else { Text(filter.label) }
+                                }
+                            }
+                            Divider()
+                            Button("Custom range…", systemImage: "calendar.badge.clock") {
+                                showingCustomDates = true
+                            }
+                        } label: {
+                            Label(dateFilter == .custom ? ActivityDateFilter.customLabel(start: customStartDate, end: customEndDate) : dateFilter.label, systemImage: "calendar")
+                                .font(.caption.weight(.semibold))
+                        }
+                        .textCase(nil)
+                    }
+                } footer: {
+                    Text("Showing \(visibleTransactions.count) transactions. Ledgerly loads at most the newest 500 records to keep Activity responsive.")
                 }
             }
             .navigationTitle("Activity")
@@ -170,6 +222,11 @@ struct NativeActivityView: View {
             .sheet(isPresented: $showingNewBill) { NewBillView() }
             .sheet(isPresented: $showingNewRecurringPayment) { NewRecurringPaymentView() }
             .sheet(item: $editingRecurringPayment) { NewRecurringPaymentView(payment: $0) }
+            .sheet(isPresented: $showingCustomDates) {
+                ActivityCustomDateView(startDate: $customStartDate, endDate: $customEndDate) {
+                    dateFilter = .custom
+                }
+            }
         }
     }
 
@@ -225,7 +282,10 @@ struct NativeActivityView: View {
     private func deleteRecurringPayments(at offsets: IndexSet) {
         for index in offsets {
             let payment = recurringPayments[index]
-            for transaction in transactions where transaction.recurringPaymentId == payment.id {
+            let paymentID = payment.id
+            let linkedDescriptor = FetchDescriptor<CachedTransaction>(predicate: #Predicate { $0.recurringPaymentId == paymentID })
+            let linkedTransactions = (try? context.fetch(linkedDescriptor)) ?? []
+            for transaction in linkedTransactions {
                 transaction.recurringPaymentId = nil
                 context.insert(PendingMutation(
                     entityId: transaction.id, action: "upsert", newDescription: nil, newCategory: nil,
@@ -236,6 +296,75 @@ struct NativeActivityView: View {
             context.delete(payment)
         }
         try? context.save()
+    }
+}
+
+enum ActivityDateFilter: String, CaseIterable, Identifiable {
+    case last7Days, last30Days, last90Days, thisYear, all, custom
+
+    static let presets: [ActivityDateFilter] = [.last7Days, .last30Days, .last90Days, .thisYear, .all]
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .last7Days: "Last 7 days"
+        case .last30Days: "Last 30 days"
+        case .last90Days: "Last 90 days"
+        case .thisYear: "This year"
+        case .all: "All loaded"
+        case .custom: "Custom"
+        }
+    }
+
+    static func includes(_ date: Date?, filter: ActivityDateFilter, customStart: Date, customEnd: Date, now: Date = Date(), calendar: Calendar = .current) -> Bool {
+        guard let date else { return false }
+        let start: Date?
+        let end: Date
+        switch filter {
+        case .last7Days: start = calendar.date(byAdding: .day, value: -7, to: now); end = now
+        case .last30Days: start = calendar.date(byAdding: .day, value: -30, to: now); end = now
+        case .last90Days: start = calendar.date(byAdding: .day, value: -90, to: now); end = now
+        case .thisYear: start = calendar.date(from: calendar.dateComponents([.year], from: now)); end = now
+        case .all: return true
+        case .custom:
+            start = calendar.startOfDay(for: min(customStart, customEnd))
+            end = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: max(customStart, customEnd))) ?? max(customStart, customEnd)
+        }
+        guard let start else { return true }
+        return date >= start && date <= end
+    }
+
+    static func customLabel(start: Date, end: Date) -> String {
+        "\(min(start, end).formatted(.dateTime.month(.abbreviated).day()))–\(max(start, end).formatted(.dateTime.month(.abbreviated).day()))"
+    }
+}
+
+private struct ActivityCustomDateView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Binding var startDate: Date
+    @Binding var endDate: Date
+    let apply: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Date range") {
+                    DatePicker("From", selection: $startDate, displayedComponents: .date)
+                    DatePicker("Through", selection: $endDate, displayedComponents: .date)
+                }
+                Section {
+                    Text("Only transactions booked between these dates will appear.")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle("Custom dates")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Apply") { apply(); dismiss() }
+                }
+            }
+        }
     }
 }
 
