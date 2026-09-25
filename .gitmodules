@@ -1,3 +1,6 @@
 [submodule "automations/scsb_ebank"]
 	path = automations/scsb_ebank
 	url = https://github.com/jsserve-org/finapp-scsb-ebank.git
+[submodule "automations/easycard"]
+	path = automations/easycard
+	url = https://github.com/jsserve-org/finapp-easycard.git
