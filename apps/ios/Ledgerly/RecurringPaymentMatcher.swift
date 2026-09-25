@@ -26,10 +26,11 @@ enum RecurringPaymentMatcher {
 
     private static func score(transaction: CachedTransaction, payment: RecurringPayment) -> Int {
         var score = payment.accountId == transaction.accountId ? 2 : 1
-        let transactionAmount = abs(transaction.amountMinor)
-        let difference = abs(transactionAmount - payment.amountMinor)
+        let transactionAmount = Double(transaction.amountMinor).magnitude
+        let paymentAmount = Double(payment.amountMinor).magnitude
+        let difference = abs(transactionAmount - paymentAmount)
         if difference == 0 { score += 4 }
-        else if difference <= max(100, payment.amountMinor / 20) { score += 2 }
+        else if difference <= max(100, paymentAmount / 20) { score += 2 }
 
         let transactionWords = words(in: transaction.title)
         let paymentWords = words(in: payment.name)

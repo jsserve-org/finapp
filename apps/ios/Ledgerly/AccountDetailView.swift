@@ -28,7 +28,7 @@ struct AccountDetailView: View {
                 }
                 Section("Transactions") {
                     ForEach(transactions) { transaction in
-                        NavigationLink { TransactionDetailView(transaction: transaction) } label: {
+                        NavigationLink { TransactionDetailView(transactionID: transaction.id) } label: {
                             LabeledContent {
                                 Text(money(transaction.amountMinor, transaction.currency))
                                     .fontWeight(.semibold)

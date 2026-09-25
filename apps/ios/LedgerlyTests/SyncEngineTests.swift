@@ -182,6 +182,13 @@ final class SyncEngineTests: XCTestCase {
         XCTAssertNil(transaction.recurringPaymentId)
     }
 
+    func testRecurringMatcherHandlesMinimumIntegerAmount() {
+        let transaction = transaction(title: "Imported payment", amountMinor: Int.min, currency: "TWD", accountID: "account-1", category: "Bills")
+        let bill = RecurringPayment(name: "Imported payment", amountMinor: 599_00, currency: "TWD", frequency: "monthly", nextDate: Date(), accountId: "account-1", category: "Bills")
+
+        XCTAssertNotNil(RecurringPaymentMatcher.bestMatch(for: transaction, payments: [bill]))
+    }
+
     // MARK: - Cursor
 
     func testSaveCursorInsertsThenUpdates() throws {
