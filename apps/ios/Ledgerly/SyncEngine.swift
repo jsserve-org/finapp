@@ -29,12 +29,12 @@ struct SyncEngine {
             if mutation.action == "delete" {
                 return SyncOperation(mutationId: mutation.mutationId, entity: "account", action: "delete", entityId: mutation.entityId, value: nil, baseVersion: 0)
             }
-            guard let account = try fetchOne(CachedAccount.self, id: mutation.entityId, context: context) else { return nil }
+            guard let account = try fetchAccount(id: mutation.entityId, context: context) else { return nil }
             let dto = AccountDTO(id: account.id, name: account.name, institution: account.institution, kind: account.kind, balance: Money(amountMinor: account.amountMinor, currency: account.currency), updatedAt: account.updatedAt)
             return SyncOperation(mutationId: mutation.mutationId, entity: "account", action: "upsert", entityId: account.id, value: .init(account: dto), baseVersion: 0)
         }
         let transactionOperations: [SyncOperation] = try pendingTransactions.compactMap { mutation in
-            guard let transaction = try fetchOne(CachedTransaction.self, id: mutation.entityId, context: context) else { return nil }
+            guard let transaction = try fetchTransaction(id: mutation.entityId, context: context) else { return nil }
             let originalAmount = transaction.originalAmountMinor.flatMap { amount in
                 transaction.originalCurrency.map { Money(amountMinor: amount, currency: $0) }
             }
@@ -45,7 +45,7 @@ struct SyncEngine {
             if mutation.action == "delete" {
                 return SyncOperation(mutationId: mutation.mutationId, entity: "recurringPayment", action: "delete", entityId: mutation.entityId, value: nil, baseVersion: 0)
             }
-            guard let payment = try fetchOne(RecurringPayment.self, id: mutation.entityId, context: context) else { return nil }
+            guard let payment = try fetchRecurringPayment(id: mutation.entityId, context: context) else { return nil }
             let dto = RecurringPaymentDTO(id: payment.id, name: payment.name, amountMinor: payment.amountMinor, currency: payment.currency, frequency: payment.frequency, nextDate: payment.nextDate, accountId: payment.accountId, category: payment.category, isActive: payment.isActive)
             return SyncOperation(mutationId: mutation.mutationId, entity: "recurringPayment", action: "upsert", entityId: payment.id, value: .init(recurringPayment: dto), baseVersion: 0)
         }
@@ -53,11 +53,11 @@ struct SyncEngine {
             if mutation.action == "delete" {
                 return SyncOperation(mutationId: mutation.mutationId, entity: mutation.entityKind, action: "delete", entityId: mutation.entityId, value: nil, baseVersion: 0)
             }
-            if mutation.entityKind == "stockHolding", let holding = try fetchOne(StockHolding.self, id: mutation.entityId, context: context) {
+            if mutation.entityKind == "stockHolding", let holding = try fetchStockHolding(id: mutation.entityId, context: context) {
                 let dto = StockHoldingDTO(id: holding.id, symbol: holding.symbol, name: holding.name, currency: holding.currency, quantity: holding.quantity, averageCostMinor: holding.averageCostMinor, currentPriceMinor: holding.currentPriceMinor, linkedAccountId: holding.linkedAccountId, updatedAt: holding.updatedAt)
                 return SyncOperation(mutationId: mutation.mutationId, entity: mutation.entityKind, action: "upsert", entityId: holding.id, value: .init(stockHolding: dto), baseVersion: 0)
             }
-            if mutation.entityKind == "stockTrade", let trade = try fetchOne(StockTrade.self, id: mutation.entityId, context: context) {
+            if mutation.entityKind == "stockTrade", let trade = try fetchStockTrade(id: mutation.entityId, context: context) {
                 let dto = StockTradeDTO(id: trade.id, holdingId: trade.holdingId, symbol: trade.symbol, side: trade.side, currency: trade.currency, quantity: trade.quantity, priceMinor: trade.priceMinor, feesMinor: trade.feesMinor, tradedAt: trade.tradedAt, linkedAccountId: trade.linkedAccountId)
                 return SyncOperation(mutationId: mutation.mutationId, entity: mutation.entityKind, action: "upsert", entityId: trade.id, value: .init(stockTrade: dto), baseVersion: 0)
             }
@@ -104,21 +104,24 @@ struct SyncEngine {
     func apply(_ changes: [SyncChange], context: ModelContext) throws {
         let encoder = JSONEncoder()
         let decoder = JSONDecoder()
+        var transactionsToMatch: [CachedTransaction] = []
+        var recurringPaymentsChanged = false
 
         for change in changes {
             let entityID = change.entityId
             if change.action == "delete" {
                 if change.entity == "account" {
-                    try fetchOne(CachedAccount.self, id: entityID, context: context).map(context.delete)
+                    try fetchAccount(id: entityID, context: context).map(context.delete)
                 }
                 if change.entity == "transaction" {
-                    try fetchOne(CachedTransaction.self, id: entityID, context: context).map(context.delete)
+                    try fetchTransaction(id: entityID, context: context).map(context.delete)
                 }
                 if change.entity == "recurringPayment" {
-                    try fetchOne(RecurringPayment.self, id: entityID, context: context).map(context.delete)
+                    try fetchRecurringPayment(id: entityID, context: context).map(context.delete)
+                    recurringPaymentsChanged = true
                 }
-                if change.entity == "stockHolding" { try fetchOne(StockHolding.self, id: entityID, context: context).map(context.delete) }
-                if change.entity == "stockTrade" { try fetchOne(StockTrade.self, id: entityID, context: context).map(context.delete) }
+                if change.entity == "stockHolding" { try fetchStockHolding(id: entityID, context: context).map(context.delete) }
+                if change.entity == "stockTrade" { try fetchStockTrade(id: entityID, context: context).map(context.delete) }
                 continue
             }
             guard let value = change.value else { continue }
@@ -127,21 +130,25 @@ struct SyncEngine {
             switch change.entity {
             case "account":
                 let dto = try decoder.decode(AccountDTO.self, from: data)
-                if let item = try fetchOne(CachedAccount.self, id: entityID, context: context) {
+                if let item = try fetchAccount(id: entityID, context: context) {
                     item.apply(dto, version: change.sequence)
                 } else {
                     context.insert(CachedAccount(dto: dto, initialVersion: change.sequence))
                 }
             case "transaction":
                 let dto = try decoder.decode(TransactionDTO.self, from: data)
-                if let item = try fetchOne(CachedTransaction.self, id: entityID, context: context) {
+                if let item = try fetchTransaction(id: entityID, context: context) {
                     item.apply(dto, version: change.sequence)
+                    transactionsToMatch.append(item)
                 } else {
-                    context.insert(CachedTransaction(dto: dto, initialVersion: change.sequence))
+                    let item = CachedTransaction(dto: dto, initialVersion: change.sequence)
+                    context.insert(item)
+                    transactionsToMatch.append(item)
                 }
             case "recurringPayment":
+                recurringPaymentsChanged = true
                 let dto = try decoder.decode(RecurringPaymentDTO.self, from: data)
-                if let item = try fetchOne(RecurringPayment.self, id: entityID, context: context) {
+                if let item = try fetchRecurringPayment(id: entityID, context: context) {
                     item.name = dto.name
                     item.amountMinor = dto.amountMinor
                     item.currency = dto.currency
@@ -155,7 +162,7 @@ struct SyncEngine {
                 }
             case "stockHolding":
                 let dto = try decoder.decode(StockHoldingDTO.self, from: data)
-                if let item = try fetchOne(StockHolding.self, id: entityID, context: context) {
+                if let item = try fetchStockHolding(id: entityID, context: context) {
                     item.symbol = dto.symbol; item.name = dto.name; item.quantity = dto.quantity
                     item.averageCostMinor = dto.averageCostMinor; item.currentPriceMinor = dto.currentPriceMinor
                     item.currency = dto.currency; item.linkedAccountId = dto.linkedAccountId; item.updatedAt = dto.updatedAt
@@ -164,7 +171,7 @@ struct SyncEngine {
                 }
             case "stockTrade":
                 let dto = try decoder.decode(StockTradeDTO.self, from: data)
-                if let item = try fetchOne(StockTrade.self, id: entityID, context: context) {
+                if let item = try fetchStockTrade(id: entityID, context: context) {
                     item.holdingId = dto.holdingId; item.symbol = dto.symbol; item.side = dto.side
                     item.quantity = dto.quantity; item.priceMinor = dto.priceMinor; item.feesMinor = dto.feesMinor
                     item.currency = dto.currency; item.tradedAt = dto.tradedAt; item.linkedAccountId = dto.linkedAccountId
@@ -175,9 +182,17 @@ struct SyncEngine {
                 continue
             }
         }
-        let transactions = try context.fetch(FetchDescriptor<CachedTransaction>())
+        if recurringPaymentsChanged {
+            var descriptor = FetchDescriptor<CachedTransaction>(
+                predicate: #Predicate { $0.recurringPaymentId == nil },
+                sortBy: [SortDescriptor(\.bookedAt, order: .reverse)]
+            )
+            descriptor.fetchLimit = 500
+            transactionsToMatch = try context.fetch(descriptor)
+        }
+        guard !transactionsToMatch.isEmpty else { return }
         let recurringPayments = try context.fetch(FetchDescriptor<RecurringPayment>())
-        for transaction in transactions where transaction.recurringPaymentId == nil {
+        for transaction in transactionsToMatch where transaction.recurringPaymentId == nil {
             autoLinkRecurringPayment(transaction, payments: recurringPayments, context: context)
         }
     }
@@ -190,10 +205,34 @@ struct SyncEngine {
         }
     }
 
-    private func fetchOne<T: PersistentModel>(_ type: T.Type, id: String, context: ModelContext) throws -> T? {
-        let modelID = id
-        let descriptor = FetchDescriptor<T>()
-        return try context.fetch(descriptor).first(where: { $0.id as? String == modelID })
+    private func fetchAccount(id: String, context: ModelContext) throws -> CachedAccount? {
+        var descriptor = FetchDescriptor<CachedAccount>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private func fetchTransaction(id: String, context: ModelContext) throws -> CachedTransaction? {
+        var descriptor = FetchDescriptor<CachedTransaction>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private func fetchRecurringPayment(id: String, context: ModelContext) throws -> RecurringPayment? {
+        var descriptor = FetchDescriptor<RecurringPayment>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private func fetchStockHolding(id: String, context: ModelContext) throws -> StockHolding? {
+        var descriptor = FetchDescriptor<StockHolding>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private func fetchStockTrade(id: String, context: ModelContext) throws -> StockTrade? {
+        var descriptor = FetchDescriptor<StockTrade>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
     }
 }
 

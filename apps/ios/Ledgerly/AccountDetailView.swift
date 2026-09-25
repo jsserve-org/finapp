@@ -21,7 +21,12 @@ struct AccountDetailView: View {
         self.accountID = accountID
         let id = accountID
         _accounts = Query(filter: #Predicate<CachedAccount> { $0.id == id })
-        _transactions = Query(filter: #Predicate<CachedTransaction> { $0.accountId == id }, sort: \CachedTransaction.bookedAt, order: .reverse)
+        var transactionDescriptor = FetchDescriptor<CachedTransaction>(
+            predicate: #Predicate { $0.accountId == id },
+            sortBy: [SortDescriptor(\CachedTransaction.bookedAt, order: .reverse)]
+        )
+        transactionDescriptor.fetchLimit = 500
+        _transactions = Query(transactionDescriptor)
         _recurringPayments = Query(filter: #Predicate<RecurringPayment> { $0.accountId == id })
         _linkedHoldings = Query(filter: #Predicate<StockHolding> { $0.linkedAccountId == id })
     }
