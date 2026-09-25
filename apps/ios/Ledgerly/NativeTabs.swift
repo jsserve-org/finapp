@@ -179,7 +179,8 @@ struct NativeActivityView: View {
                         let snapshot = TransactionSnapshot(
                             transaction,
                             account: accounts.first { $0.id == transaction.accountId },
-                            recurringPayment: recurringPayments.first { $0.id == transaction.recurringPaymentId }
+                            recurringPayment: recurringPayments.first { $0.id == transaction.recurringPaymentId },
+                            transferAccount: accounts.first { $0.id == transaction.transferAccountId }
                         )
                         Button { selectedTransaction = snapshot } label: {
                             HStack(spacing: 10) {

@@ -19,8 +19,12 @@ struct TransactionSnapshot: Identifiable, Hashable {
     var expensePurpose: String?
     var reimbursementStatus: String?
     var reimbursementTransactionID: String?
+    var transferID: String?
+    var transferAccountID: String?
+    var transferDirection: String?
+    var transferAccountName: String?
 
-    init(_ transaction: CachedTransaction, account: CachedAccount? = nil, recurringPayment: RecurringPayment? = nil) {
+    init(_ transaction: CachedTransaction, account: CachedAccount? = nil, recurringPayment: RecurringPayment? = nil, transferAccount: CachedAccount? = nil) {
         id = transaction.id
         accountID = transaction.accountId
         title = transaction.title
@@ -38,6 +42,10 @@ struct TransactionSnapshot: Identifiable, Hashable {
         expensePurpose = transaction.expensePurpose
         reimbursementStatus = transaction.reimbursementStatus
         reimbursementTransactionID = transaction.reimbursementTransactionId
+        transferID = transaction.transferId
+        transferAccountID = transaction.transferAccountId
+        transferDirection = transaction.transferDirection
+        transferAccountName = transferAccount?.name
     }
 }
 
@@ -118,6 +126,19 @@ struct TransactionDetailView: View {
                     detailRow("Institution", institution)
                 }
                 detailRow("Currency", transaction.currency)
+            }
+
+            if transaction.source == "transfer" {
+                Section("Transfer") {
+                    if transaction.transferDirection == "outgoing" {
+                        detailRow("From", transaction.accountName ?? "Unknown account")
+                        detailRow("To", transaction.transferAccountName ?? "Unknown account")
+                    } else {
+                        detailRow("From", transaction.transferAccountName ?? "Unknown account")
+                        detailRow("To", transaction.accountName ?? "Unknown account")
+                    }
+                    if let transferID = transaction.transferID { detailRow("Transfer ID", transferID) }
+                }
             }
 
             Section {
@@ -220,6 +241,10 @@ struct TransactionDetailView: View {
         transaction.expensePurpose = model.expensePurpose
         transaction.reimbursementStatus = model.reimbursementStatus
         transaction.reimbursementTransactionID = model.reimbursementTransactionId
+        transaction.transferID = model.transferId
+        transaction.transferAccountID = model.transferAccountId
+        transaction.transferDirection = model.transferDirection
+        transaction.transferAccountName = model.transferAccountId.flatMap { fetchAccount(id: $0)?.name }
     }
 
     private func fetchTransaction() -> CachedTransaction? {
@@ -255,6 +280,8 @@ struct TransactionDetailView: View {
         case "automation": "Automation import"
         case "screenshot": "Screenshot import"
         case "reimbursement": "Reimbursement"
+        case "transfer": "Account transfer"
+        case "stockTrade": "Stock trade"
         default: "Synced"
         }
     }
