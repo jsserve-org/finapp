@@ -74,7 +74,7 @@ struct NativeActivityView: View {
     @Query private var transactions: [CachedTransaction]
     @Query(sort: \CachedAccount.name) private var accounts: [CachedAccount]
     @Query(sort: \RecurringPayment.nextDate) private var recurringPayments: [RecurringPayment]
-    @State private var showingNewBill = false
+    @State private var showingSpendMoney = false
     @State private var showingNewRecurringPayment = false
     @State private var editingRecurringPayment: RecurringPayment?
     @State private var selectedTransaction: TransactionSnapshot?
@@ -121,12 +121,12 @@ struct NativeActivityView: View {
             List {
                 Section {
                     VStack(spacing: 12) {
-                        Button { showingNewBill = true } label: {
+                        Button { showingSpendMoney = true } label: {
                             HStack(spacing: 10) {
                                 Image(systemName: "plus")
                                     .symbolRenderingMode(.monochrome)
                                     .fontWeight(.bold)
-                                Text("Add one-time bill")
+                                Text("Spend money")
                                     .fontWeight(.semibold)
                             }
                                 .frame(maxWidth: .infinity)
@@ -136,7 +136,7 @@ struct NativeActivityView: View {
                         .buttonStyle(.borderedProminent)
                         .tint(Color(red: 0, green: 0.32, blue: 0.68))
                         .controlSize(.large)
-                        .accessibilityLabel("Add one-time bill")
+                        .accessibilityLabel("Spend money")
 
                         Button { showingNewRecurringPayment = true } label: {
                             HStack(spacing: 10) {
@@ -158,7 +158,7 @@ struct NativeActivityView: View {
                     .padding(.vertical, 8)
                     .listRowBackground(Color.clear)
                 } footer: {
-                    Text("One-time bills use a payment date. Recurring bills repeat on a schedule.")
+                    Text("Expenses are one-time transactions. Recurring bills repeat on a schedule.")
                 }
 
                 Section {
@@ -254,7 +254,7 @@ struct NativeActivityView: View {
             .navigationDestination(item: $selectedTransaction) { snapshot in
                 TransactionDetailView(transaction: snapshot)
             }
-            .sheet(isPresented: $showingNewBill) { NewBillView() }
+            .sheet(isPresented: $showingSpendMoney) { AccountEntryView(direction: .moneyOut) }
             .sheet(isPresented: $showingNewRecurringPayment) { NewRecurringPaymentView() }
             .sheet(item: $editingRecurringPayment) { NewRecurringPaymentView(payment: $0) }
             .sheet(isPresented: $showingCustomDates) {
@@ -287,19 +287,20 @@ struct NativeActivityView: View {
 
     private func transactionRow(_ transaction: CachedTransaction) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: PaymentIcon.symbol(title: transaction.title, category: transaction.category, amountMinor: transaction.amountMinor))
-                .ledgerlyIcon(color: PaymentIcon.color(amountMinor: transaction.amountMinor))
+            Image(systemName: PaymentIcon.symbol(title: transaction.title, category: transaction.category, amountMinor: transaction.presentedAmountMinor))
+                .ledgerlyIcon(color: PaymentIcon.color(amountMinor: transaction.presentedAmountMinor))
             VStack(alignment: .leading, spacing: 3) {
                 Text(transaction.title).font(.headline).lineLimit(1)
                 Text(transactionSubtitle(transaction)).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             VStack(alignment: .trailing, spacing: 2) {
-                Text(money(transaction.amountMinor, transaction.currency))
+                Text(money(transaction.presentedAmountMinor, transaction.presentedCurrency))
                     .fontWeight(.semibold)
-                    .foregroundStyle(PaymentIcon.color(amountMinor: transaction.amountMinor))
+                    .foregroundStyle(PaymentIcon.color(amountMinor: transaction.presentedAmountMinor))
                 if let originalAmountMinor = transaction.originalAmountMinor,
-                   let originalCurrency = transaction.originalCurrency {
+                   let originalCurrency = transaction.originalCurrency,
+                   !transaction.isAwaitingSettlement {
                     Text("Originally \(money(originalAmountMinor, originalCurrency))")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
@@ -312,7 +313,8 @@ struct NativeActivityView: View {
     }
 
     private func transactionSubtitle(_ transaction: CachedTransaction) -> String {
-        let category = "\(PaymentIcon.directionLabel(amountMinor: transaction.amountMinor)) · \(transaction.category ?? "Uncategorized")"
+        let settlement = transaction.isAwaitingSettlement ? " · bank charge pending" : ""
+        let category = "\(PaymentIcon.directionLabel(amountMinor: transaction.presentedAmountMinor)) · \(transaction.category ?? "Uncategorized")\(settlement)"
         guard let id = transaction.recurringPaymentId,
               let payment = recurringPayments.first(where: { $0.id == id }) else { return category }
         return "\(category) · \(payment.name)"

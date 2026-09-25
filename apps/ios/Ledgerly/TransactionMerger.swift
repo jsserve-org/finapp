@@ -18,8 +18,6 @@ enum TransactionMerger {
 
     static func pair(_ lhs: CachedTransaction, _ rhs: CachedTransaction) -> TransactionMergeCandidate? {
         guard lhs.accountId == rhs.accountId,
-              lhs.currency == rhs.currency,
-              lhs.amountMinor == rhs.amountMinor,
               let lhsDate = lhs.bookedDate,
               let rhsDate = rhs.bookedDate,
               abs(lhsDate.timeIntervalSince(rhsDate)) <= 3 * 24 * 60 * 60 else { return nil }
@@ -33,7 +31,22 @@ enum TransactionMerger {
         } else {
             return nil
         }
+        guard amountsMatch(manual: manual, imported: imported) else { return nil }
         return TransactionMergeCandidate(manual: manual, imported: imported)
+    }
+
+    private static func amountsMatch(manual: CachedTransaction, imported: CachedTransaction) -> Bool {
+        if manual.currency == imported.currency && manual.amountMinor == imported.amountMinor {
+            return true
+        }
+        guard manual.isAwaitingSettlement,
+              imported.currency == manual.currency,
+              imported.amountMinor < 0,
+              let purchaseAmount = manual.originalAmountMinor,
+              let purchaseCurrency = manual.originalCurrency,
+              imported.originalAmountMinor == purchaseAmount,
+              imported.originalCurrency == purchaseCurrency else { return false }
+        return true
     }
 
     @MainActor
@@ -66,16 +79,7 @@ enum TransactionMerger {
 enum ReimbursementService {
     @MainActor
     static func link(_ original: CachedTransaction, to reimbursement: CachedTransaction, context: ModelContext) {
-        guard original.amountMinor < 0, reimbursement.amountMinor > 0, original.currency == reimbursement.currency else { return }
-        let now = ISO8601DateFormatter().string(from: Date())
-        original.reimbursementStatus = "reimbursed"
-        original.reimbursementTransactionId = reimbursement.id
-        reimbursement.reimbursementTransactionId = original.id
-        original.updatedAt = now
-        reimbursement.updatedAt = now
-        enqueueFullTransaction(context: context, transactionID: original.id)
-        enqueueFullTransaction(context: context, transactionID: reimbursement.id)
-        try? context.save()
+        link([original], to: reimbursement, context: context)
     }
 
     @MainActor
@@ -83,11 +87,16 @@ enum ReimbursementService {
         let eligible = originals.filter {
             $0.amountMinor < 0 &&
             $0.currency == reimbursement.currency &&
-            $0.reimbursementStatus == "pending"
+            $0.reimbursementTransactionId == nil
         }
+        let reimbursementID = reimbursement.id
+        let alreadyLinked = (try? context.fetch(FetchDescriptor<CachedTransaction>(
+            predicate: #Predicate { $0.reimbursementTransactionId == reimbursementID && $0.amountMinor < 0 }
+        ))) ?? []
+        let usedAmount = alreadyLinked.reduce(0) { $0 + abs($1.amountMinor) }
         guard reimbursement.amountMinor > 0,
               !eligible.isEmpty,
-              eligible.reduce(0, { $0 + abs($1.amountMinor) }) <= reimbursement.amountMinor else { return }
+              usedAmount + eligible.reduce(0, { $0 + abs($1.amountMinor) }) <= reimbursement.amountMinor else { return }
 
         let now = ISO8601DateFormatter().string(from: Date())
         for original in eligible {
@@ -98,7 +107,7 @@ enum ReimbursementService {
         }
         // Keep the first expense in the legacy reverse-link field. Every expense
         // stores the reimbursement ID, so one payment can cover any number of them.
-        reimbursement.reimbursementTransactionId = eligible.first?.id
+        reimbursement.reimbursementTransactionId = reimbursement.reimbursementTransactionId ?? eligible.first?.id
         reimbursement.updatedAt = now
         enqueueFullTransaction(context: context, transactionID: reimbursement.id)
         try? context.save()

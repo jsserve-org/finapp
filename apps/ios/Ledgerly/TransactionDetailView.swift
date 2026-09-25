@@ -28,6 +28,16 @@ struct TransactionSnapshot: Identifiable, Hashable {
     var transferDirection: String?
     var transferAccountName: String?
 
+    var presentedAmountMinor: Int {
+        isAwaitingSettlement ? (originalAmountMinor ?? 0) : amountMinor
+    }
+    var presentedCurrency: String {
+        isAwaitingSettlement ? (originalCurrency ?? currency) : currency
+    }
+    var isAwaitingSettlement: Bool {
+        pending && amountMinor == 0 && originalAmountMinor != nil && originalCurrency != nil
+    }
+
     init(_ transaction: CachedTransaction, account: CachedAccount? = nil, recurringPayment: RecurringPayment? = nil, transferAccount: CachedAccount? = nil) {
         id = transaction.id
         accountID = transaction.accountId
@@ -69,10 +79,10 @@ struct TransactionDetailView: View {
     @State private var showRefundPicker = false
     @State private var showRefundAccounts = false
     @State private var showMergeReview = false
-    @State private var linkedCandidates: [LinkedTransactionCandidate] = []
     @State private var moneyInCandidates: [LinkedTransactionCandidate] = []
     @State private var moneyOutCandidates: [LinkedTransactionCandidate] = []
     @State private var reimbursableExpenseCandidates: [LinkedTransactionCandidate] = []
+    @State private var candidatesLoaded = false
     @State private var mergeCandidate: TransactionMergeCandidate?
     @Query(sort: \CachedAccount.name) private var accounts: [CachedAccount]
 
@@ -88,15 +98,15 @@ struct TransactionDetailView: View {
         Form {
             Section {
                 VStack(spacing: 10) {
-                    Image(systemName: PaymentIcon.symbol(title: transaction.title, category: transaction.category, amountMinor: transaction.amountMinor))
+                    Image(systemName: PaymentIcon.symbol(title: transaction.title, category: transaction.category, amountMinor: transaction.presentedAmountMinor))
                         .font(.system(size: 38, weight: .semibold))
-                        .foregroundStyle(PaymentIcon.color(amountMinor: transaction.amountMinor))
-                    Text(PaymentIcon.directionLabel(amountMinor: transaction.amountMinor))
+                        .foregroundStyle(PaymentIcon.color(amountMinor: transaction.presentedAmountMinor))
+                    Text(PaymentIcon.directionLabel(amountMinor: transaction.presentedAmountMinor))
                         .font(.headline)
-                        .foregroundStyle(PaymentIcon.color(amountMinor: transaction.amountMinor))
-                    Text(absoluteMoney(transaction.amountMinor, transaction.currency))
+                        .foregroundStyle(PaymentIcon.color(amountMinor: transaction.presentedAmountMinor))
+                    Text(absoluteMoney(transaction.presentedAmountMinor, transaction.presentedCurrency))
                         .font(.system(size: 34, weight: .bold, design: .rounded))
-                        .foregroundStyle(PaymentIcon.color(amountMinor: transaction.amountMinor))
+                        .foregroundStyle(PaymentIcon.color(amountMinor: transaction.presentedAmountMinor))
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
@@ -107,11 +117,11 @@ struct TransactionDetailView: View {
                 if let originalAmountMinor = transaction.originalAmountMinor,
                    let originalCurrency = transaction.originalCurrency {
                     detailRow("Original purchase", absoluteMoney(originalAmountMinor, originalCurrency))
-                    detailRow("Bank settlement", absoluteMoney(transaction.amountMinor, transaction.currency))
+                    detailRow("Bank settlement", transaction.isAwaitingSettlement ? "Waiting for bank" : absoluteMoney(transaction.amountMinor, transaction.currency))
                 }
                 detailRow("Category", transaction.category ?? "Uncategorized")
                 detailRow("Purpose", purposeLabel(transaction.expensePurpose))
-                detailRow("Direction", transaction.amountMinor < 0 ? "Money out" : "Money in")
+                detailRow("Direction", transaction.presentedAmountMinor < 0 ? "Money out" : "Money in")
                 HStack(spacing: 12) {
                     Text("Status")
                     Spacer(minLength: 16)
@@ -124,12 +134,18 @@ struct TransactionDetailView: View {
                 }
             }
 
-            if transaction.reimbursementStatus != nil {
+            if transaction.presentedAmountMinor < 0 {
                 Section("Reimbursement") {
-                    detailRow("Status", transaction.reimbursementStatus == "reimbursed" ? "Reimbursed" : "Waiting for repayment")
-                    if transaction.reimbursementStatus == "pending" {
+                    if transaction.reimbursementStatus == "reimbursed" {
+                        detailRow("Status", "Reimbursed")
+                    } else if transaction.isAwaitingSettlement {
+                        Label("Link after the bank charge arrives", systemImage: "clock")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        if transaction.reimbursementStatus == "pending" {
+                            detailRow("Status", "Waiting for repayment")
+                        }
                         Button("Link existing reimbursement", systemImage: "link") {
-                            linkedCandidates = moneyInCandidates
                             showReimbursementPicker = true
                         }
                         Button("Add reimbursement", systemImage: "plus.circle.fill") {
@@ -159,7 +175,6 @@ struct TransactionDetailView: View {
                         Label("Refunded", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
                     } else {
                         Button("Link existing refund", systemImage: "link") {
-                            linkedCandidates = moneyInCandidates
                             showRefundPicker = true
                         }
                         Button("Add refund", systemImage: "plus.circle.fill") { showRefundAccounts = true }
@@ -168,7 +183,6 @@ struct TransactionDetailView: View {
                     Label("Marked as refund", systemImage: "arrow.uturn.backward.circle.fill").foregroundStyle(.green)
                 } else {
                     Button("Mark as refund", systemImage: "arrow.uturn.backward.circle") {
-                        linkedCandidates = moneyOutCandidates
                         showRefundPicker = true
                     }
                 }
@@ -229,16 +243,17 @@ struct TransactionDetailView: View {
         .navigationTitle("Transaction")
         .navigationBarTitleDisplayMode(.inline)
         .task {
-            loadMergeCandidate()
             moneyInCandidates = loadLinkedCandidates(moneyIn: true)
             moneyOutCandidates = loadLinkedCandidates(moneyIn: false)
             reimbursableExpenseCandidates = loadReimbursableExpenseCandidates()
+            candidatesLoaded = true
+            loadMergeCandidate()
         }
         .sheet(isPresented: $showingEditor, onDismiss: refreshTransaction) {
             EditTransactionView(transaction: transaction)
         }
         .sheet(isPresented: $showReimbursementPicker) {
-            LinkedTransactionPicker(title: "Select reimbursement", candidates: linkedCandidates) { candidate in
+            LinkedTransactionPicker(title: "Select reimbursement", candidates: moneyInCandidates, isLoading: !candidatesLoaded) { candidate in
                 linkReimbursement(candidate.id)
                 showReimbursementPicker = false
             }
@@ -247,7 +262,8 @@ struct TransactionDetailView: View {
             ReimbursedExpensesPicker(
                 candidates: reimbursableExpenseCandidates,
                 availableAmountMinor: transaction.amountMinor,
-                currency: transaction.currency
+                currency: transaction.currency,
+                isLoading: !candidatesLoaded
             ) { candidateIDs in
                 linkReimbursedExpenses(candidateIDs)
                 showExpenseReimbursementPicker = false
@@ -256,7 +272,8 @@ struct TransactionDetailView: View {
         .sheet(isPresented: $showRefundPicker) {
             LinkedTransactionPicker(
                 title: transaction.amountMinor < 0 ? "Select refund" : "Select purchase",
-                candidates: linkedCandidates
+                candidates: transaction.amountMinor < 0 ? moneyInCandidates : moneyOutCandidates,
+                isLoading: !candidatesLoaded
             ) { candidate in
                 linkRefund(candidate.id)
                 showRefundPicker = false
@@ -346,6 +363,7 @@ struct TransactionDetailView: View {
         moneyInCandidates = loadLinkedCandidates(moneyIn: true)
         moneyOutCandidates = loadLinkedCandidates(moneyIn: false)
         reimbursableExpenseCandidates = loadReimbursableExpenseCandidates()
+        candidatesLoaded = true
     }
 
     private func loadReimbursableExpenseCandidates() -> [LinkedTransactionCandidate] {
@@ -357,7 +375,7 @@ struct TransactionDetailView: View {
                 $0.id != currentID &&
                 $0.currency == currency &&
                 $0.amountMinor < 0 &&
-                $0.reimbursementStatus == "pending"
+                $0.reimbursementTransactionId == nil
             },
             sortBy: [SortDescriptor(\CachedTransaction.bookedAt, order: .reverse)]
         )
@@ -387,7 +405,7 @@ struct TransactionDetailView: View {
         let candidates = (try? context.fetch(descriptor)) ?? []
         return candidates.filter {
             moneyIn
-                ? $0.reimbursementTransactionId == nil && $0.refundedTransactionId == nil
+                ? $0.refundedTransactionId == nil
                 : $0.refundTransactionId == nil
         }.map { LinkedTransactionCandidate($0, account: accountsByID[$0.accountId]) }
     }
@@ -425,7 +443,7 @@ struct TransactionDetailView: View {
     }
 
     private func markReimbursed(into account: CachedAccount) {
-        guard let model = fetchTransaction(), model.reimbursementStatus == "pending" else { return }
+        guard let model = fetchTransaction(), model.amountMinor < 0, model.reimbursementTransactionId == nil else { return }
         _ = ReimbursementService.reimburse(model, into: account, context: context)
         refreshTransaction()
     }
@@ -543,6 +561,7 @@ private struct LinkedTransactionPicker: View {
     @Environment(\.dismiss) private var dismiss
     let title: String
     let candidates: [LinkedTransactionCandidate]
+    let isLoading: Bool
     let select: (LinkedTransactionCandidate) -> Void
 
     var body: some View {
@@ -565,7 +584,13 @@ private struct LinkedTransactionPicker: View {
                     }
                     .buttonStyle(.plain)
                 }
-                if candidates.isEmpty {
+                if isLoading {
+                    HStack {
+                        Spacer()
+                        ProgressView("Loading transactions…")
+                        Spacer()
+                    }
+                } else if candidates.isEmpty {
                     ContentUnavailableView("No matching transactions", systemImage: "link", description: Text("Add or import the transaction first, then return here to link it."))
                 }
             }
@@ -581,6 +606,7 @@ private struct ReimbursedExpensesPicker: View {
     let candidates: [LinkedTransactionCandidate]
     let availableAmountMinor: Int
     let currency: String
+    let isLoading: Bool
     let link: (Set<String>) -> Void
     @State private var selection: Set<String> = []
 
@@ -617,7 +643,13 @@ private struct ReimbursedExpensesPicker: View {
                         }
                         .buttonStyle(.plain)
                     }
-                    if candidates.isEmpty {
+                    if isLoading {
+                        HStack {
+                            Spacer()
+                            ProgressView("Loading expenses…")
+                            Spacer()
+                        }
+                    } else if candidates.isEmpty {
                         ContentUnavailableView("No expenses waiting", systemImage: "checkmark.circle", description: Text("Mark an expense as expecting reimbursement first."))
                     }
                 }

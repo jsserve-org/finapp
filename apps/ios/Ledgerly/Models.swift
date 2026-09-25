@@ -369,6 +369,18 @@ enum JSONValue: Codable, Equatable {
     var updatedDate: Date? {
         LedgerlyISODate.parse(updatedAt)
     }
+
+    var presentedAmountMinor: Int {
+        isAwaitingSettlement ? (originalAmountMinor ?? 0) : amountMinor
+    }
+
+    var presentedCurrency: String {
+        isAwaitingSettlement ? (originalCurrency ?? currency) : currency
+    }
+
+    var isAwaitingSettlement: Bool {
+        pending && amountMinor == 0 && originalAmountMinor != nil && originalCurrency != nil
+    }
 }
 
 @Model final class SyncSetting {

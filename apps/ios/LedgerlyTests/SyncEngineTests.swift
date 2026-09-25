@@ -245,6 +245,63 @@ final class SyncEngineTests: XCTestCase {
         XCTAssertEqual(transaction.source, "manual")
     }
 
+    func testForeignCardPurchaseWaitsForBankSettlementWithoutChangingBalance() throws {
+        let account = CachedAccount(name: "Debit card", institution: "Bank", kind: "checking", amountMinor: 10_000_00, currency: "TWD")
+        context.insert(account)
+
+        AccountActionService.record(
+            amountMinor: 1_500_00,
+            description: "Japan purchase",
+            category: "Shopping",
+            date: Date(),
+            direction: .moneyOut,
+            account: account,
+            context: context,
+            purchaseCurrency: "JPY"
+        )
+
+        let recorded = try XCTUnwrap(context.fetch(FetchDescriptor<CachedTransaction>()).first)
+        XCTAssertEqual(account.amountMinor, 10_000_00)
+        XCTAssertEqual(recorded.amountMinor, 0)
+        XCTAssertEqual(recorded.currency, "TWD")
+        XCTAssertEqual(recorded.originalAmountMinor, -1_500_00)
+        XCTAssertEqual(recorded.originalCurrency, "JPY")
+        XCTAssertTrue(recorded.pending)
+        XCTAssertTrue(recorded.isAwaitingSettlement)
+    }
+
+    func testForeignCardPurchaseMatchesItsLaterBankSettlement() throws {
+        let account = CachedAccount(name: "Debit card", institution: "Bank", kind: "checking", amountMinor: 10_000_00, currency: "TWD")
+        context.insert(account)
+
+        AccountActionService.record(
+            amountMinor: 1_500_00,
+            description: "Japan purchase",
+            category: "Shopping",
+            date: Date(),
+            direction: .moneyOut,
+            account: account,
+            context: context,
+            purchaseCurrency: "JPY"
+        )
+        let manual = try XCTUnwrap(context.fetch(FetchDescriptor<CachedTransaction>()).first)
+        let imported = transaction(
+            title: "JAPAN STORE",
+            amountMinor: -315_00,
+            currency: "TWD",
+            accountID: account.id,
+            category: "Shopping",
+            source: "automation",
+            originalAmount: Money(amountMinor: -1_500_00, currency: "JPY")
+        )
+
+        let candidate = TransactionMerger.pair(manual, imported)
+
+        XCTAssertNotNil(candidate)
+        XCTAssertEqual(candidate?.manual.id, manual.id)
+        XCTAssertEqual(candidate?.imported.id, imported.id)
+    }
+
     func testTransferMovesMoneyAndCreatesBothSides() throws {
         let source = CachedAccount(name: "Cash", institution: "Wallet", kind: "cash", amountMinor: 500_00, currency: "TWD")
         let destination = CachedAccount(name: "Checking", institution: "Bank", kind: "checking", amountMinor: 1_000_00, currency: "TWD")
@@ -522,6 +579,22 @@ final class SyncEngineTests: XCTestCase {
         XCTAssertEqual(supplies.reimbursementStatus, "reimbursed")
         XCTAssertEqual(lunch.reimbursementTransactionId, payment.id)
         XCTAssertEqual(supplies.reimbursementTransactionId, payment.id)
+    }
+
+    func testOneReimbursementCanBeLinkedFromTwoExpenseScreens() throws {
+        let account = CachedAccount(name: "Checking", institution: "Bank", kind: "checking", amountMinor: 50_000, currency: "TWD")
+        let lunch = transaction(title: "School lunch", amountMinor: -1_200, currency: "TWD", accountID: account.id, category: "School")
+        let supplies = transaction(title: "School supplies", amountMinor: -2_000, currency: "TWD", accountID: account.id, category: "School")
+        let payment = transaction(title: "Dad paid me", amountMinor: 4_000, currency: "TWD", accountID: account.id, category: "Transfer")
+        context.insert(account); context.insert(lunch); context.insert(supplies); context.insert(payment)
+
+        ReimbursementService.link(lunch, to: payment, context: context)
+        ReimbursementService.link(supplies, to: payment, context: context)
+
+        XCTAssertEqual(lunch.reimbursementTransactionId, payment.id)
+        XCTAssertEqual(supplies.reimbursementTransactionId, payment.id)
+        XCTAssertEqual(lunch.reimbursementStatus, "reimbursed")
+        XCTAssertEqual(supplies.reimbursementStatus, "reimbursed")
     }
 
     func testLinkingExistingRefundDoesNotChangeBalance() {
