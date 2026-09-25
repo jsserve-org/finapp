@@ -6,8 +6,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { cachedRecurringPayments, cachedTransactions, createRecurringPayment, type RecurringPayment } from "../src/db";
 
 const money = (minor: number, currency: string) => new Intl.NumberFormat(undefined, { style: "currency", currency }).format(minor / 100);
-const frequencyLabel: Record<RecurringPayment["frequency"], string> = { weekly: "Weekly", everyTwoWeeks: "Every 2 weeks", monthly: "Monthly", yearly: "Yearly" };
-const frequencies: RecurringPayment["frequency"][] = ["weekly", "everyTwoWeeks", "monthly", "yearly"];
+const frequencyLabel: Record<RecurringPayment["frequency"], string> = { weekly: "Weekly", everyTwoWeeks: "Every 2 weeks", monthly: "Monthly", yearly: "Yearly", everyTwoYears: "Every 2 years" };
+const frequencies: RecurringPayment["frequency"][] = ["weekly", "everyTwoWeeks", "monthly", "yearly", "everyTwoYears"];
 
 export default function Activity() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);

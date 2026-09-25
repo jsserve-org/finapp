@@ -37,7 +37,7 @@ const bill = z.discriminatedUnion("type", [
   }),
   z.object({
     id: z.string().uuid().optional(), type: z.literal("recurring"), name: z.string().trim().min(1).max(120),
-    amountMinor: z.number().int().positive(), currency, frequency: z.enum(["weekly", "everyTwoWeeks", "monthly", "yearly"]),
+    amountMinor: z.number().int().positive(), currency, frequency: z.enum(["weekly", "everyTwoWeeks", "monthly", "yearly", "everyTwoYears"]),
     nextDate: z.string().datetime(), accountId: z.string().min(1).optional(), category: z.string().trim().min(1).max(80).default("Bills"),
   }),
 ]);

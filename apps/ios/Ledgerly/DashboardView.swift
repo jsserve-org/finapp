@@ -9,6 +9,7 @@ struct DashboardView: View {
     @Query(sort: \StockHolding.symbol) private var holdings: [StockHolding]
     @State private var sync = SyncController()
     @State private var selectedMonth = Date()
+    @AppStorage("ledgerly.hideFinancialAmounts") private var hidesFinancialAmounts = false
 
     init() {
         var descriptor = FetchDescriptor<CachedTransaction>(
@@ -26,6 +27,7 @@ struct DashboardView: View {
         let displayedCurrencies = currencies
         let displayedCategoryTotals = categoryTotals
         let displayedMonths = availableMonths
+        let displayedNetWorth = NetWorthCalculator.totals(accounts: accounts, holdings: holdings)
         NavigationStack {
             List {
                 if let error = sync.lastError {
@@ -41,7 +43,7 @@ struct DashboardView: View {
                         ContentUnavailableView("No insights yet", systemImage: AppIcon.insights, description: Text("Add an account or transaction to start seeing your financial summary."))
                     } else {
                         ForEach(displayedCurrencies, id: \.self) { currency in
-                            insightSummary(currency: currency)
+                            insightSummary(currency: currency, netWorth: displayedNetWorth[currency, default: 0])
                         }
                     }
                 }
@@ -60,7 +62,7 @@ struct DashboardView: View {
                                 HStack {
                                     Label(item.category, systemImage: PaymentIcon.symbol(title: "", category: item.category, amountMinor: -1))
                                     Spacer()
-                                    Text(money(item.amount, item.currency)).fontWeight(.semibold)
+                                    Text(hidesFinancialAmounts ? "••••" : money(item.amount, item.currency)).fontWeight(.semibold)
                                 }
                             }
                         }
@@ -94,18 +96,28 @@ struct DashboardView: View {
             .refreshable { if session.isAuthenticated { await sync.refresh(context: context) } }
             .navigationTitle("Insights")
             .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        hidesFinancialAmounts.toggle()
+                    } label: {
+                        Label(
+                            hidesFinancialAmounts ? "Show financial amounts" : "Hide financial amounts",
+                            systemImage: hidesFinancialAmounts ? "eye.slash" : "eye"
+                        )
+                    }
+                }
+            }
             .task { if session.isAuthenticated { await sync.refresh(context: context) } }
         }
     }
 
-    private func insightSummary(currency: String) -> some View {
-        let accountWorth = accounts.filter { $0.currency == currency && $0.isIncludedInNetWorth }.reduce(0) { $0 + $1.amountMinor }
-        let investmentWorth = holdings.filter { $0.currency == currency }.reduce(0) { $0 + $1.marketValueMinor }
+    private func insightSummary(currency: String, netWorth: Int) -> some View {
         let inflow = transactions.filter { $0.currency == currency && $0.amountMinor > 0 }.reduce(0) { $0 + $1.amountMinor }
         let outflow = abs(transactions.filter { $0.currency == currency && $0.amountMinor < 0 }.reduce(0) { $0 + $1.amountMinor })
         return VStack(alignment: .leading, spacing: 10) {
             Text(currency).font(.headline)
-            insightRow("Net worth", accountWorth + investmentWorth, currency, color: .primary)
+            insightRow("Net worth", netWorth, currency, color: .primary)
             insightRow("Money in", inflow, currency, color: .green)
             insightRow("Money out", outflow, currency, color: .red)
         }
@@ -116,7 +128,10 @@ struct DashboardView: View {
         HStack {
             Text(label).foregroundStyle(.secondary)
             Spacer()
-            Text(money(amount, currency)).fontWeight(.semibold).foregroundStyle(color)
+            Text(hidesFinancialAmounts ? "••••" : money(amount, currency))
+                .fontWeight(.semibold)
+                .foregroundStyle(color)
+                .accessibilityLabel(hidesFinancialAmounts ? "Hidden" : money(amount, currency))
         }
     }
 
@@ -135,7 +150,7 @@ struct DashboardView: View {
                             HStack {
                                 Text(currency).foregroundStyle(.secondary)
                                 Spacer()
-                                Text(money(amount, currency)).fontWeight(.semibold)
+                                Text(hidesFinancialAmounts ? "••••" : money(amount, currency)).fontWeight(.semibold)
                             }
                         }
                     }

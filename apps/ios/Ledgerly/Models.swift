@@ -409,6 +409,7 @@ enum JSONValue: Codable, Equatable {
         case "weekly": "Weekly"
         case "everyTwoWeeks": "Every 2 weeks"
         case "yearly": "Yearly"
+        case "everyTwoYears": "Every 2 years"
         default: "Monthly"
         }
     }
@@ -434,6 +435,17 @@ enum JSONValue: Codable, Equatable {
     var marketValueMinor: Int { Int((quantity * Double(currentPriceMinor)).rounded()) }
     var costBasisMinor: Int { Int((quantity * Double(averageCostMinor)).rounded()) }
     var gainLossMinor: Int { marketValueMinor - costBasisMinor }
+}
+
+enum NetWorthCalculator {
+    static func totals(accounts: [CachedAccount], holdings: [StockHolding]) -> [String: Int] {
+        var result = Dictionary(grouping: accounts.filter(\.isIncludedInNetWorth), by: \.currency)
+            .mapValues { $0.reduce(0) { $0 + $1.amountMinor } }
+        for holding in holdings {
+            result[holding.currency, default: 0] += holding.marketValueMinor
+        }
+        return result
+    }
 }
 
 @Model final class StockTrade {
