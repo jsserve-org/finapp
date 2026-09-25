@@ -173,6 +173,9 @@ struct LedgerlyPrivacyRoot<Content: View>: View {
             @unknown default: security.resignedActive()
             }
         }
+        .task { updateSecurityWindow() }
+        .onChange(of: security.isLocked) { _, _ in updateSecurityWindow() }
+        .onChange(of: security.privacyShieldVisible) { _, _ in updateSecurityWindow() }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in security.resignedActive() }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in security.enteredBackground() }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in security.becameActive() }
@@ -184,6 +187,61 @@ struct LedgerlyPrivacyRoot<Content: View>: View {
         } message: {
             Text("Ledgerly detected a screenshot. You can import banking screenshots from Settings → Screenshot Sync.")
         }
+    }
+
+    private func updateSecurityWindow() {
+        if security.privacyShieldVisible || security.isLocked {
+            SecurityOverlayPresenter.shared.show(security: security, privacyShield: security.privacyShieldVisible)
+        } else {
+            SecurityOverlayPresenter.shared.hide()
+        }
+    }
+}
+
+@MainActor
+private final class SecurityOverlayPresenter {
+    static let shared = SecurityOverlayPresenter()
+    private var window: UIWindow?
+    private weak var previousKeyWindow: UIWindow?
+
+    func show(security: AppSecurityController, privacyShield: Bool) {
+        guard let windowScene = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .first(where: { $0.activationState == .foregroundActive })
+            ?? UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first
+        else { return }
+
+        if window == nil || window?.windowScene !== windowScene {
+            previousKeyWindow = windowScene.windows.first(where: \.isKeyWindow)
+            let overlayWindow = UIWindow(windowScene: windowScene)
+            overlayWindow.windowLevel = UIWindow.Level(rawValue: UIWindow.Level.alert.rawValue + 1)
+            overlayWindow.backgroundColor = .clear
+            window = overlayWindow
+        }
+
+        window?.rootViewController = UIHostingController(
+            rootView: SecurityWindowRoot(privacyShield: privacyShield).environment(security)
+        )
+        window?.isHidden = false
+        window?.makeKeyAndVisible()
+    }
+
+    func hide() {
+        guard let window else { return }
+        window.isHidden = true
+        window.rootViewController = nil
+        self.window = nil
+        previousKeyWindow?.makeKey()
+        previousKeyWindow = nil
+    }
+}
+
+private struct SecurityWindowRoot: View {
+    let privacyShield: Bool
+
+    var body: some View {
+        if privacyShield { PrivacyShieldView() }
+        else { AppLockView() }
     }
 }
 

@@ -69,6 +69,7 @@ struct MoneyAmountHeader: View {
     @Binding var amount: String
     @Binding var currency: String
     var tint: Color = .primary
+    var currencyLocked = false
     @FocusState private var amountIsFocused: Bool
 
     var body: some View {
@@ -83,30 +84,40 @@ struct MoneyAmountHeader: View {
                 .keyboardType(.decimalPad)
                 .focused($amountIsFocused)
                 .minimumScaleFactor(0.55)
-            Menu {
-                ForEach(SupportedCurrency.all) { option in
-                    Button {
-                        currency = option.code
-                    } label: {
-                        if currency == option.code {
-                            Label("\(option.code) — \(option.name)", systemImage: "checkmark")
-                        } else {
-                            Text("\(option.code) — \(option.name)")
+            if currencyLocked {
+                Text(currency)
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.horizontal, 13)
+                    .padding(.vertical, 6)
+                    .background(.tertiary, in: Capsule())
+                    .accessibilityLabel("Currency")
+                    .accessibilityValue(currency)
+            } else {
+                Menu {
+                    ForEach(SupportedCurrency.all) { option in
+                        Button {
+                            currency = option.code
+                        } label: {
+                            if currency == option.code {
+                                Label("\(option.code) — \(option.name)", systemImage: "checkmark")
+                            } else {
+                                Text("\(option.code) — \(option.name)")
+                            }
                         }
                     }
+                } label: {
+                    HStack(spacing: 5) {
+                        Text(currency)
+                        Image(systemName: "chevron.up.chevron.down").font(.caption2)
+                    }
                 }
-            } label: {
-                HStack(spacing: 5) {
-                    Text(currency)
-                    Image(systemName: "chevron.up.chevron.down").font(.caption2)
-                }
+                .font(.subheadline.weight(.semibold))
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .tint(.secondary)
+                .accessibilityLabel("Currency")
+                .accessibilityValue(currency)
             }
-            .font(.subheadline.weight(.semibold))
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .tint(.secondary)
-            .accessibilityLabel("Currency")
-            .accessibilityValue(currency)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
