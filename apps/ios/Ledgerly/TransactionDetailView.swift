@@ -99,6 +99,11 @@ struct TransactionDetailView: View {
 
     init(transaction: TransactionSnapshot) {
         _transaction = State(initialValue: transaction)
+        var descriptor = FetchDescriptor<CachedTransaction>(
+            sortBy: [SortDescriptor(\CachedTransaction.bookedAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = 500
+        _allTransactions = Query(descriptor)
     }
 
     var body: some View {

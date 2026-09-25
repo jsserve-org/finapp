@@ -9,6 +9,14 @@ struct DashboardView: View {
     @Query(sort: \StockHolding.symbol) private var holdings: [StockHolding]
     @State private var sync = SyncController()
 
+    init() {
+        var descriptor = FetchDescriptor<CachedTransaction>(
+            sortBy: [SortDescriptor(\CachedTransaction.bookedAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = 1_000
+        _transactions = Query(descriptor)
+    }
+
     private var currencies: [String] {
         Array(Set(accounts.map(\.currency) + transactions.map(\.currency) + holdings.map(\.currency))).sorted()
     }
@@ -34,7 +42,7 @@ struct DashboardView: View {
                     }
                 }
                 if !categoryTotals.isEmpty {
-                    Section("Spending by category") {
+                    Section("Recent spending by category") {
                         ForEach(Array(categoryTotals.enumerated()), id: \.offset) { _, item in
                             HStack {
                                 Label(item.category, systemImage: PaymentIcon.symbol(title: "", category: item.category, amountMinor: -1))
