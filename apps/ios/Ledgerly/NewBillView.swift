@@ -28,9 +28,12 @@ struct NewBillView: View {
                         description: Text("A one-time bill needs an account to pay from.")
                     )
                 } else {
+                    Section {
+                        MoneyAmountHeader(title: "Purchase amount", amount: $amount, currency: $currency)
+                    }
+
                     Section("Bill") {
                         TextField("Name", text: $name)
-                        MoneyEntryRow(label: "Purchase amount", amount: $amount, currency: $currency)
                         TransactionCategoryPicker(selection: $category)
                     }
 

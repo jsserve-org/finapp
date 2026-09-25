@@ -122,7 +122,7 @@ private struct LoginView: View {
 
 private struct RootTabView: View {
     private enum RootTab: Hashable { case overview, accounts, add, activity, settings }
-    private enum AddFlow: String, Identifiable { case bill, recurring, moneyIn, moneyOut; var id: String { rawValue } }
+    private enum AddFlow: String, Identifiable { case bill, recurring, moneyIn, moneyOut, transfer; var id: String { rawValue } }
     @State private var selection = RootTab.overview
     @State private var previousSelection = RootTab.overview
     @State private var addFlow: AddFlow?
@@ -140,7 +140,7 @@ private struct RootTabView: View {
             Tab(value: RootTab.add) {
                 Color.clear
             } label: {
-                EmptyView()
+                Label("Add", systemImage: "plus.circle.fill")
             }
 
             Tab("Activity", systemImage: AppIcon.activity, value: RootTab.activity) {
@@ -163,20 +163,15 @@ private struct RootTabView: View {
             Menu {
                 Button("Add money", systemImage: "plus.circle.fill") { addFlow = .moneyIn }
                 Button("Spend money", systemImage: "minus.circle.fill") { addFlow = .moneyOut }
+                Button("Transfer money", systemImage: "arrow.left.arrow.right.circle.fill") { addFlow = .transfer }
                 Divider()
                 Button("One-time bill", systemImage: "doc.badge.plus") { addFlow = .bill }
                 Button("Recurring bill", systemImage: "repeat") { addFlow = .recurring }
             } label: {
-                VStack(spacing: 2) {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 23, weight: .semibold))
-                    Text("Add")
-                        .font(.caption2)
-                }
+                Color.clear
                 .frame(width: 74, height: 50)
                 .contentShape(Rectangle())
             }
-            .tint(.blue)
             .accessibilityLabel("Add")
             .accessibilityHint("Opens quick actions")
             .padding(.bottom, 1)
@@ -185,8 +180,9 @@ private struct RootTabView: View {
             switch flow {
             case .bill: NewBillView()
             case .recurring: NewRecurringPaymentView()
-            case .moneyIn: QuickAccountEntryPicker(direction: .moneyIn)
-            case .moneyOut: QuickAccountEntryPicker(direction: .moneyOut)
+            case .moneyIn: AccountEntryView(direction: .moneyIn)
+            case .moneyOut: AccountEntryView(direction: .moneyOut)
+            case .transfer: AccountTransferView()
             }
         }
         .task { openPendingAddFlow() }
@@ -305,10 +301,12 @@ struct NewRecurringPaymentView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    MoneyAmountHeader(title: "Amount", amount: $amount, currency: $currency)
+                }
                 Section("Bill") {
                     TextField("Name", text: $name)
                         .font(.body)
-                    MoneyEntryRow(label: "Amount", amount: $amount, currency: $currency)
                     TransactionCategoryPicker(selection: $category)
                 }
                 Section("Repeats") {
