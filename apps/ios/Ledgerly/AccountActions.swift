@@ -14,19 +14,41 @@ enum AccountEntryDirection: Equatable {
 
 enum AccountActionService {
     @MainActor
-    static func record(amountMinor: Int, description: String, category: String, date: Date, direction: AccountEntryDirection, account: CachedAccount, context: ModelContext) {
+    static func record(
+        amountMinor: Int,
+        description: String,
+        category: String,
+        date: Date,
+        direction: AccountEntryDirection,
+        account: CachedAccount,
+        context: ModelContext,
+        purchaseCurrency: String? = nil,
+        expensePurpose: String? = nil,
+        expectsReimbursement: Bool = false
+    ) {
         let signedAmount = direction == .moneyIn ? amountMinor : -amountMinor
+        let enteredCurrency = purchaseCurrency ?? account.currency
+        let settlementPending = direction == .moneyOut && enteredCurrency != account.currency
+        let recordedAmount = settlementPending ? 0 : signedAmount
+        let originalAmount = settlementPending ? Money(amountMinor: signedAmount, currency: enteredCurrency) : nil
         let timestamp = ISO8601DateFormatter().string(from: date)
         let transaction = CachedTransaction(dto: TransactionDTO(
             id: UUID().uuidString.lowercased(), accountId: account.id,
-            description: description, amount: Money(amountMinor: signedAmount, currency: account.currency), bookedAt: timestamp,
-            pending: false, category: category, source: "manual", updatedAt: timestamp
+            description: description, amount: Money(amountMinor: recordedAmount, currency: account.currency),
+            originalAmount: originalAmount, bookedAt: timestamp,
+            pending: settlementPending, category: category, source: "manual", expensePurpose: expensePurpose,
+            reimbursementStatus: expectsReimbursement && direction == .moneyOut ? "pending" : nil,
+            updatedAt: timestamp
         ), initialVersion: 0)
         context.insert(transaction)
         context.insert(PendingTransactionCreate(entityId: transaction.id))
-        account.amountMinor += signedAmount
-        account.updatedAt = ISO8601DateFormatter().string(from: Date())
-        context.insert(PendingAccountMutation(entityId: account.id))
+        let recurringPayments = (try? context.fetch(FetchDescriptor<RecurringPayment>())) ?? []
+        autoLinkRecurringPayment(transaction, payments: recurringPayments, context: context)
+        if !settlementPending {
+            account.amountMinor += signedAmount
+            account.updatedAt = ISO8601DateFormatter().string(from: Date())
+            context.insert(PendingAccountMutation(entityId: account.id))
+        }
         try? context.save()
     }
 
@@ -83,6 +105,8 @@ struct AccountEntryView: View {
     @State private var currency: String
     @State private var category = ""
     @State private var date = Date()
+    @State private var expensePurpose = "personal"
+    @State private var expectsReimbursement = false
     @State private var step: Step = .account
     @State private var movesForward = true
 
@@ -160,7 +184,13 @@ struct AccountEntryView: View {
         Form {
             Section {
                 FlowStepHeader(current: 2, total: 3, instruction: selectedAccount?.name ?? "Amount")
-                MoneyAmountHeader(title: direction == .moneyIn ? "Money in" : "Money out", amount: $amount, currency: $currency, tint: direction.color, currencyLocked: true)
+                MoneyAmountHeader(
+                    title: direction == .moneyIn ? "Money in" : "Purchase amount",
+                    amount: $amount,
+                    currency: $currency,
+                    tint: direction.color,
+                    currencyLocked: direction == .moneyIn
+                )
             }
             .listRowBackground(Color.clear)
         }
@@ -180,15 +210,41 @@ struct AccountEntryView: View {
             Section("Summary") {
                 LabeledContent("Account", value: selectedAccount?.name ?? "")
                 LabeledContent("Amount", value: money(parsedAmount, currency))
+                if settlementPending {
+                    LabeledContent("Bank charge", value: "Waiting for bank")
+                }
             }
             Section("Optional details") {
                 TextField("Description", text: $description)
                 TransactionCategoryPicker(selection: $category)
                 DatePicker("Date", selection: $date)
             }
+            if direction == .moneyOut {
+                if settlementPending {
+                    Section {
+                        Label("The account balance will not change yet.", systemImage: "clock")
+                    } footer: {
+                        Text("Ledgerly records the purchase now. Your later bank import can provide the final \(selectedAccount?.currency ?? "account") charge.")
+                    }
+                }
+                Section("For") {
+                    Picker("Purpose", selection: $expensePurpose) {
+                        Text("Personal").tag("personal")
+                        Text("School").tag("school")
+                        Text("Someone else").tag("someoneElse")
+                    }
+                    Toggle("I expect reimbursement", isOn: $expectsReimbursement)
+                }
+            }
         }
         .safeAreaInset(edge: .bottom) {
-            FlowButton(title: direction.title, systemImage: direction.symbol, tint: direction.color, disabled: parsedAmount <= 0 || selectedAccount == nil, action: save)
+            FlowButton(
+                title: direction.title,
+                systemImage: direction.symbol,
+                tint: direction.color,
+                disabled: parsedAmount <= 0 || selectedAccount == nil,
+                action: save
+            )
         }
     }
 
@@ -248,6 +304,10 @@ struct AccountEntryView: View {
         return NSDecimalNumber(decimal: decimal * 100).intValue
     }
 
+    private var settlementPending: Bool {
+        direction == .moneyOut && selectedAccount?.currency != currency
+    }
+
     private func save() {
         guard let account = selectedAccount else { return }
         let cleanDescription = description.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -256,7 +316,10 @@ struct AccountEntryView: View {
             amountMinor: parsedAmount,
             description: cleanDescription.isEmpty ? direction.defaultDescription : cleanDescription,
             category: cleanCategory.isEmpty ? direction.defaultCategory : cleanCategory,
-            date: date, direction: direction, account: account, context: context
+            date: date, direction: direction, account: account, context: context,
+            purchaseCurrency: currency,
+            expensePurpose: direction == .moneyOut ? expensePurpose : nil,
+            expectsReimbursement: expectsReimbursement
         )
         dismiss()
     }

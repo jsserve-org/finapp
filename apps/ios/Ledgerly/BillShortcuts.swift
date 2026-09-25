@@ -54,8 +54,8 @@ enum BillFrequency: String, AppEnum {
 }
 
 struct AddOneTimeBillIntent: AppIntent {
-    static let title: LocalizedStringResource = "Add One-Time Bill"
-    static let description = IntentDescription("Create a one-time bill in Ledgerly and subtract it from an account.")
+    static let title: LocalizedStringResource = "Spend Money"
+    static let description = IntentDescription("Record a one-time expense in Ledgerly and subtract it from an account.")
 
     @Parameter(title: "Name") var name: String
     @Parameter(title: "Amount") var amount: Double
@@ -73,7 +73,7 @@ struct AddOneTimeBillIntent: AppIntent {
             frequency: nil, nextDate: nil
         )
         _ = try await APIClient.shared.createBill(request)
-        return .result(dialog: "Created \(name) in Ledgerly.")
+        return .result(dialog: "Recorded \(name) in Ledgerly.")
     }
 }
 
@@ -122,9 +122,9 @@ struct LedgerlyShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
             intent: AddOneTimeBillIntent(),
-            phrases: ["Add a bill in \(.applicationName)", "Create a bill in \(.applicationName)"],
-            shortTitle: "Add Bill",
-            systemImageName: "plus.circle.fill"
+            phrases: ["Spend money in \(.applicationName)", "Record an expense in \(.applicationName)"],
+            shortTitle: "Spend Money",
+            systemImageName: "minus.circle.fill"
         )
         AppShortcut(
             intent: AddRecurringBillIntent(),
