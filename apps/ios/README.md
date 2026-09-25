@@ -10,8 +10,8 @@ Settings → Screenshot Sync imports only a screenshot explicitly selected with 
 
 ## Screenshot Sync
 
-Open **Settings → Screenshot Sync**, choose the Ledgerly account that represents the banking or payment app, and enable automatic import. After taking a payment screenshot, return to Ledgerly: on-device Vision OCR reads the newest screenshot, creates a transaction, adjusts the selected balance, and queues the usual server sync. The Photos asset identifier is stored locally so the same screenshot is not imported twice.
+Open **Settings → Screenshot Sync**, choose the Ledgerly account that represents the banking or payment app, then explicitly pick the screenshot you want to import. On-device Vision OCR reads that image, creates a transaction, adjusts the selected balance, and queues the usual server sync. The Photos asset identifier is stored locally so the same screenshot is not imported twice.
 
-Ledgerly requires full Photos access because iOS does not let an app continuously monitor another app or reliably discover the newest screenshot with limited access. OCR is performed on the iPhone and the image itself is never uploaded. iOS also prevents Ledgerly from running while the banking app is foregrounded, so import happens when Ledgerly becomes active rather than at the instant the screenshot is taken.
+OCR is performed on the iPhone and the image itself is never uploaded. Ledgerly does not scan the photo library in the background.
 
 Run the unit tests with `xcodebuild test -scheme Ledgerly -destination 'platform=iOS Simulator,name=iPhone 17 Pro'`.

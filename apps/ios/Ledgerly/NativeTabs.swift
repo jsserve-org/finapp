@@ -5,7 +5,7 @@ struct NativeAccountsView: View {
     @Query(sort: \CachedAccount.name) private var accounts: [CachedAccount]
     @State private var showingNewAccount = false
     private var balances: [(currency: String, amount: Int)] {
-        let grouped = Dictionary(grouping: accounts, by: \.currency)
+        let grouped = Dictionary(grouping: accounts.filter(\.isIncludedInNetWorth), by: \.currency)
         return grouped.map { (currency: $0.key, amount: $0.value.reduce(0) { $0 + $1.amountMinor }) }
             .sorted { $0.currency < $1.currency }
     }
@@ -56,7 +56,7 @@ struct NativeAccountsView: View {
         switch account.kind {
         case "checking": "creditcard.fill"
         case "savings": "banknote.fill"
-        case "credit": "creditcard.trianglebadge.exclamationmark"
+        case "credit", "sharedCredit": "creditcard.trianglebadge.exclamationmark"
         case "investment": "chart.line.uptrend.xyaxis"
         default: AppIcon.cash
         }
@@ -75,20 +75,28 @@ struct NativeInsightsView: View {
             List {
                 Section("Summary") {
                     ForEach(currencies.isEmpty ? [SupportedCurrency.defaultCode] : currencies, id: \.self) { currency in
-                        let netWorth = accounts.filter { $0.currency == currency }.reduce(0) { $0 + $1.amountMinor }
+                        let netWorth = accounts.filter { $0.currency == currency && $0.isIncludedInNetWorth }.reduce(0) { $0 + $1.amountMinor }
                         let inflow = transactions.filter { $0.currency == currency && $0.amountMinor > 0 }.reduce(0) { $0 + $1.amountMinor }
                         let outflow = abs(transactions.filter { $0.currency == currency && $0.amountMinor < 0 }.reduce(0) { $0 + $1.amountMinor })
-                        LabeledContent("\(currency) net worth", value: money(netWorth, currency))
-                        LabeledContent("\(currency) money in", value: money(inflow, currency))
-                        LabeledContent("\(currency) money out", value: money(outflow, currency))
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text(currency).font(.headline)
+                            insightRow("Net worth", netWorth, currency, color: .primary)
+                            insightRow("Money in", inflow, currency, color: .green)
+                            insightRow("Money out", outflow, currency, color: .red)
+                        }
+                        .padding(.vertical, 4)
                     }
-                }
-                Section("Snapshot") {
-                    Label(transactions.isEmpty ? "Add transactions to see spending patterns." : "Based on \(transactions.count) saved transaction\(transactions.count == 1 ? "" : "s").", systemImage: "chart.pie")
-                        .foregroundStyle(.secondary)
                 }
             }
             .navigationTitle("Insights")
+        }
+    }
+
+    private func insightRow(_ label: String, _ amount: Int, _ currency: String, color: Color) -> some View {
+        HStack {
+            Text(label).foregroundStyle(.secondary)
+            Spacer()
+            Text(money(amount, currency)).fontWeight(.semibold).foregroundStyle(color)
         }
     }
 }
@@ -100,6 +108,7 @@ struct NativeActivityView: View {
     @Query(sort: \RecurringPayment.nextDate) private var recurringPayments: [RecurringPayment]
     @State private var showingNewBill = false
     @State private var showingNewRecurringPayment = false
+    @State private var editingRecurringPayment: RecurringPayment?
     @State private var selectedTransaction: TransactionSnapshot?
 
     var body: some View {
@@ -148,7 +157,10 @@ struct NativeActivityView: View {
                 }
 
                 Section {
-                    ForEach(recurringPayments) { payment in recurringRow(payment) }
+                    ForEach(recurringPayments) { payment in
+                        Button { editingRecurringPayment = payment } label: { recurringRow(payment) }
+                            .buttonStyle(.plain)
+                    }
                         .onDelete(perform: deleteRecurringPayments)
                     if recurringPayments.isEmpty {
                         Text("No recurring bills yet.").foregroundStyle(.secondary)
@@ -188,39 +200,41 @@ struct NativeActivityView: View {
             }
             .sheet(isPresented: $showingNewBill) { NewBillView() }
             .sheet(isPresented: $showingNewRecurringPayment) { NewRecurringPaymentView() }
+            .sheet(item: $editingRecurringPayment) { NewRecurringPaymentView(payment: $0) }
         }
     }
 
     private func recurringRow(_ payment: RecurringPayment) -> some View {
-        LabeledContent {
-            Text(money(-payment.amountMinor, payment.currency)).fontWeight(.semibold)
-        } label: {
-            Label {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(payment.name).font(.headline)
-                    Text("\(payment.frequencyLabel) · next due \(payment.nextDate.formatted(date: .abbreviated, time: .omitted))").font(.subheadline).foregroundStyle(.secondary)
-                }
-            } icon: {
-                Image(systemName: PaymentIcon.symbol(title: payment.name, category: payment.category, amountMinor: -payment.amountMinor)).ledgerlyIcon()
+        HStack(spacing: 12) {
+            Image(systemName: PaymentIcon.symbol(title: payment.name, category: payment.category, amountMinor: -payment.amountMinor))
+                .ledgerlyIcon()
+            VStack(alignment: .leading, spacing: 3) {
+                Text(payment.name).font(.headline).lineLimit(1)
+                Text("\(payment.frequencyLabel) · next due \(payment.nextDate.formatted(date: .abbreviated, time: .omitted))")
+                    .font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Text(money(-payment.amountMinor, payment.currency))
+                .fontWeight(.semibold).lineLimit(1).minimumScaleFactor(0.7).layoutPriority(1)
+            Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
         }
     }
 
     private func transactionRow(_ transaction: CachedTransaction) -> some View {
-        LabeledContent {
+        HStack(spacing: 12) {
+            Image(systemName: PaymentIcon.symbol(title: transaction.title, category: transaction.category, amountMinor: transaction.amountMinor))
+                .ledgerlyIcon(color: PaymentIcon.color(amountMinor: transaction.amountMinor))
+            VStack(alignment: .leading, spacing: 3) {
+                Text(transaction.title).font(.headline).lineLimit(1)
+                Text(transactionSubtitle(transaction)).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
             Text(money(transaction.amountMinor, transaction.currency))
                 .fontWeight(.semibold)
                 .foregroundStyle(PaymentIcon.color(amountMinor: transaction.amountMinor))
-        } label: {
-            Label {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(transaction.title).font(.headline)
-                    Text(transactionSubtitle(transaction)).font(.subheadline).foregroundStyle(.secondary)
-                }
-            } icon: {
-                Image(systemName: PaymentIcon.symbol(title: transaction.title, category: transaction.category, amountMinor: transaction.amountMinor))
-                    .ledgerlyIcon(color: PaymentIcon.color(amountMinor: transaction.amountMinor))
-            }
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .layoutPriority(1)
         }
     }
 
