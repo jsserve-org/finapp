@@ -96,9 +96,11 @@ struct NativeInsightsView: View {
 struct NativeActivityView: View {
     @Environment(\.modelContext) private var context
     @Query(sort: \CachedTransaction.bookedAt, order: .reverse) private var transactions: [CachedTransaction]
+    @Query(sort: \CachedAccount.name) private var accounts: [CachedAccount]
     @Query(sort: \RecurringPayment.nextDate) private var recurringPayments: [RecurringPayment]
     @State private var showingNewBill = false
     @State private var showingNewRecurringPayment = false
+    @State private var selectedTransaction: TransactionSnapshot?
 
     var body: some View {
         NavigationStack {
@@ -159,7 +161,21 @@ struct NativeActivityView: View {
 
                 Section("Bills & transactions") {
                     ForEach(transactions) { transaction in
-                        NavigationLink { TransactionDetailView(transactionID: transaction.id) } label: { transactionRow(transaction) }
+                        let snapshot = TransactionSnapshot(
+                            transaction,
+                            account: accounts.first { $0.id == transaction.accountId },
+                            recurringPayment: recurringPayments.first { $0.id == transaction.recurringPaymentId }
+                        )
+                        Button { selectedTransaction = snapshot } label: {
+                            HStack(spacing: 10) {
+                                transactionRow(transaction)
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.tertiary)
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
                     }
                     if transactions.isEmpty {
                         ContentUnavailableView("No activity", systemImage: AppIcon.activity, description: Text("Transactions you add or sync will appear here."))
@@ -167,6 +183,9 @@ struct NativeActivityView: View {
                 }
             }
             .navigationTitle("Activity")
+            .navigationDestination(item: $selectedTransaction) { snapshot in
+                TransactionDetailView(transaction: snapshot)
+            }
             .sheet(isPresented: $showingNewBill) { NewBillView() }
             .sheet(isPresented: $showingNewRecurringPayment) { NewRecurringPaymentView() }
         }
