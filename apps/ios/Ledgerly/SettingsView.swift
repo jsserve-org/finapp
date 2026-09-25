@@ -7,7 +7,6 @@ struct SettingsView: View {
     @Environment(SessionController.self) private var session
     @State private var healthState: String?
     @State private var isChecking = false
-    @State private var demoMessage: String?
     @State private var backupDocument: LedgerlyBackupDocument?
     @State private var showingExporter = false
     @State private var showingImporter = false
@@ -33,7 +32,6 @@ struct SettingsView: View {
                         } label: {
                             Label("API keys", systemImage: "key.fill")
                         }
-                        NavigationLink { ConnectionHealthView() } label: { Label("Server status", systemImage: "network") }
                         LabeledContent("Status", value: healthState ?? "—")
                         LabeledContent("App version", value: LedgerlyCompatibility.appVersion)
                         LabeledContent("Server version", value: serverVersion ?? "—")
@@ -71,25 +69,10 @@ struct SettingsView: View {
                     Text("Import a payment screenshot into the account you choose.")
                         .foregroundStyle(.secondary)
                 }
-                #if DEBUG
-                Section("Demo") {
-                    Button("Load sample data", systemImage: "sparkles") { loadDemo() }
-                    Text("Adds sample TWD accounts, transactions, and recurring payments when the app is empty.")
-                        .foregroundStyle(.secondary)
-                }
-                #endif
                 if !session.localOnly { Section { Button("Log out", role: .destructive) { session.logout() } } }
         }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.large)
-        .alert("Demo", isPresented: Binding(
-            get: { demoMessage != nil },
-            set: { if !$0 { demoMessage = nil } }
-        )) {
-            Button("OK") { demoMessage = nil }
-        } message: {
-            Text(demoMessage ?? "")
-        }
         .alert("Backup", isPresented: Binding(
             get: { backupMessage != nil },
             set: { if !$0 { backupMessage = nil } }
@@ -148,17 +131,6 @@ struct SettingsView: View {
         }
     }
 
-    #if DEBUG
-    private func loadDemo() {
-        do {
-            demoMessage = try DemoData.load(into: context)
-                ? "Sample data is ready."
-                : "Sample data can only be loaded when there are no accounts."
-        } catch {
-            demoMessage = "Could not load sample data."
-        }
-    }
-    #endif
 }
 
 private struct ServerSettingsView: View {

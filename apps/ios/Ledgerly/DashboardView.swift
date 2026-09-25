@@ -1,6 +1,13 @@
 import SwiftData
 import SwiftUI
 
+private struct SpendingCategoryTotal: Identifiable {
+    let category: String
+    let currency: String
+    let amount: Int
+    var id: String { "\(currency)|\(category)" }
+}
+
 struct DashboardView: View {
     @Environment(\.modelContext) private var context
     @Environment(SessionController.self) private var session
@@ -55,7 +62,7 @@ struct DashboardView: View {
                             description: Text("Choose another month to see its expenses.")
                         )
                     } else {
-                        ForEach(Array(displayedCategoryTotals.enumerated()), id: \.offset) { _, item in
+                        ForEach(displayedCategoryTotals) { item in
                             NavigationLink {
                                 CategoryTransactionsView(category: item.category, currency: item.currency, month: selectedMonth)
                             } label: {
@@ -166,14 +173,18 @@ struct DashboardView: View {
             .sorted { $0.0 < $1.0 }
     }
 
-    private var categoryTotals: [(category: String, currency: String, amount: Int)] {
+    private var categoryTotals: [SpendingCategoryTotal] {
         let expenses = transactions.filter {
             $0.amountMinor < 0 && $0.bookedDate.map { Calendar.current.isDate($0, equalTo: selectedMonth, toGranularity: .month) } == true
         }
         let grouped = Dictionary(grouping: expenses) { "\($0.currency)|\($0.category ?? "Uncategorized")" }
         return grouped.map { key, values in
             let parts = key.split(separator: "|", maxSplits: 1).map(String.init)
-            return (parts.count > 1 ? parts[1] : "Uncategorized", parts[0], abs(values.reduce(0) { $0 + $1.amountMinor }))
+            return SpendingCategoryTotal(
+                category: parts.count > 1 ? parts[1] : "Uncategorized",
+                currency: parts[0],
+                amount: abs(values.reduce(0) { $0 + $1.amountMinor })
+            )
         }
         .sorted { $0.amount > $1.amount }
         .prefix(8)
@@ -229,9 +240,10 @@ private struct CategoryTransactionsView: View {
     var body: some View {
         let accountsByID = Dictionary(uniqueKeysWithValues: accounts.map { ($0.id, $0) })
         let paymentsByID = Dictionary(uniqueKeysWithValues: recurringPayments.map { ($0.id, $0) })
+        let displayedTransactions = visibleTransactions
         List {
             Section {
-                ForEach(visibleTransactions) { transaction in
+                ForEach(displayedTransactions) { transaction in
                     Button {
                         selectedTransaction = TransactionSnapshot(
                             transaction,
@@ -244,11 +256,11 @@ private struct CategoryTransactionsView: View {
                     }
                     .buttonStyle(.plain)
                 }
-                if visibleTransactions.isEmpty {
+                if displayedTransactions.isEmpty {
                     ContentUnavailableView("No transactions", systemImage: "calendar", description: Text("No \(category) expenses were recorded in this month."))
                 }
             } header: {
-                Text("\(visibleTransactions.count) transactions")
+                Text("\(displayedTransactions.count) transactions")
             }
         }
         .navigationTitle(category)

@@ -7,7 +7,7 @@ The iOS client is a native SwiftUI/SwiftData app in `apps/ios/Ledgerly`. The bac
 - Dashboard with account balances, recent transactions, offline banner, and pending-edit counter.
 - SwiftData cache (`CachedAccount`, `CachedTransaction`, `SyncSetting`) for offline launch.
 - Cursor-based calls to `POST /v1/sync` via the `@MainActor` `SyncEngine`, which also drains a `PendingMutation` outbox (offline edits/deletes queue locally, flush on next sync, deduped by `mutationId`).
-- Transaction detail with edit/delete (outbox-backed), account detail with filtered history, connection-health screen (`GET /v1/automations/status` + demo import), and settings screen (Keychain token management, API health check).
+- Transaction detail with edit/delete (outbox-backed), account detail with filtered history, and settings screen (Keychain token management and API health check).
 - Keychain-backed bearer token (`KeychainStore`) with build-config fallback.
 - Users choose the API and Convex URLs at login. The opaque session token is stored in Keychain; use HTTPS on a physical device.
 - Stock SwiftUI navigation, forms, lists, toolbars, and tab bar. iOS 26 supplies its native Liquid Glass treatment automatically, while earlier supported versions retain their system appearance.
@@ -44,8 +44,6 @@ From the repository root:
 cp .env.example .env
 docker compose up --build -d
 curl http://localhost:3000/health/ready
-curl -X POST http://localhost:3000/v1/automations/demo/run \
-  -H 'Authorization: Bearer local-development-token'
 ```
 
 The iOS Simulator can reach `http://localhost:3000` (set via `LEDGERLY_BASE_URL`). A physical iPhone needs a reachable HTTPS hostname and a matching base URL. If port 3000 is occupied by another dev server, start the stack with `API_PORT=3100 docker compose up --build -d` and change `LEDGERLY_BASE_URL` in `project.yml` to match.

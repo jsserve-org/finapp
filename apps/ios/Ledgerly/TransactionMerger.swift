@@ -79,6 +79,32 @@ enum ReimbursementService {
     }
 
     @MainActor
+    static func link(_ originals: [CachedTransaction], to reimbursement: CachedTransaction, context: ModelContext) {
+        let eligible = originals.filter {
+            $0.amountMinor < 0 &&
+            $0.currency == reimbursement.currency &&
+            $0.reimbursementStatus == "pending"
+        }
+        guard reimbursement.amountMinor > 0,
+              !eligible.isEmpty,
+              eligible.reduce(0, { $0 + abs($1.amountMinor) }) <= reimbursement.amountMinor else { return }
+
+        let now = ISO8601DateFormatter().string(from: Date())
+        for original in eligible {
+            original.reimbursementStatus = "reimbursed"
+            original.reimbursementTransactionId = reimbursement.id
+            original.updatedAt = now
+            enqueueFullTransaction(context: context, transactionID: original.id)
+        }
+        // Keep the first expense in the legacy reverse-link field. Every expense
+        // stores the reimbursement ID, so one payment can cover any number of them.
+        reimbursement.reimbursementTransactionId = eligible.first?.id
+        reimbursement.updatedAt = now
+        enqueueFullTransaction(context: context, transactionID: reimbursement.id)
+        try? context.save()
+    }
+
+    @MainActor
     static func reimburse(_ original: CachedTransaction, into account: CachedAccount, context: ModelContext) -> CachedTransaction {
         let now = ISO8601DateFormatter().string(from: Date())
         let reimbursement = CachedTransaction(dto: TransactionDTO(

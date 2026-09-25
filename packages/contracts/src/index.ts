@@ -49,11 +49,3 @@ export type SyncChange = {
   value: Account | Transaction | null;
 };
 export type SyncResponse = { cursor: string; changes: SyncChange[]; acceptedMutationIds: string[] };
-
-export type AutomationStatus = {
-  connectionId: string;
-  state: "healthy" | "degraded" | "action_required" | "running";
-  lastSuccessAt?: string;
-  lastError?: string;
-  nextCheckAt: string;
-};

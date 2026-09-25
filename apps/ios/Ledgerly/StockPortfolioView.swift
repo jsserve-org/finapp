@@ -22,7 +22,6 @@ enum StockTradeMath {
 struct StockPortfolioView: View {
     @Query(sort: \StockHolding.symbol) private var holdings: [StockHolding]
     @Query(sort: \StockTrade.tradedAt, order: .reverse) private var trades: [StockTrade]
-    @State private var showingNewTrade = false
 
     private var totals: [(String, Int)] {
         Dictionary(grouping: holdings, by: \.currency)
@@ -38,18 +37,12 @@ struct StockPortfolioView: View {
                         Image(systemName: "chart.line.uptrend.xyaxis")
                             .font(.system(size: 34, weight: .semibold))
                             .foregroundStyle(.secondary)
-                        Text("No investments yet")
+                        Text(trades.isEmpty ? "No investments synced" : "No positions synced")
                             .font(.headline)
-                        Text("Record your first buy or sell. Linking a cash account is optional.")
+                        Text(trades.isEmpty ? "Your investment automation will add holdings and trades here." : "Your imported trades appear below. Run a full history backfill so the automation can calculate positions.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
-                        Button { showingNewTrade = true } label: {
-                            Label("Add trade", systemImage: "plus")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 18)
@@ -63,14 +56,14 @@ struct StockPortfolioView: View {
                 Section("Positions") {
                     ForEach(holdings) { holding in holdingRow(holding) }
                 }
+            }
+            if !trades.isEmpty {
                 Section("Recent trades") {
                     ForEach(trades.prefix(20)) { trade in tradeRow(trade) }
                 }
             }
         }
         .navigationTitle("Investments")
-        .toolbar { Button("Add trade", systemImage: "plus") { showingNewTrade = true } }
-        .sheet(isPresented: $showingNewTrade) { NewStockTradeView() }
     }
 
     private func holdingRow(_ holding: StockHolding) -> some View {
@@ -101,118 +94,6 @@ struct StockPortfolioView: View {
             Text("\(trade.quantity.formatted()) × \(stockMoney(trade.priceMinor, trade.currency))")
                 .foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.75)
         }
-    }
-}
-
-private struct NewStockTradeView: View {
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var context
-    @Query(sort: \CachedAccount.name) private var accounts: [CachedAccount]
-    @Query private var holdings: [StockHolding]
-    @State private var symbol = ""
-    @State private var companyName = ""
-    @State private var side = "buy"
-    @State private var quantity = ""
-    @State private var price = ""
-    @State private var fees = "0"
-    @State private var currency = SupportedCurrency.defaultCode
-    @State private var tradedAt = Date()
-    @State private var accountID = ""
-    @State private var validationMessage: String?
-
-    private var compatibleAccounts: [CachedAccount] { accounts.filter { $0.currency == currency && $0.kind != "sharedCredit" } }
-    private var parsedQuantity: Double { Double(quantity.replacingOccurrences(of: ",", with: ".")) ?? 0 }
-    private var parsedPrice: Int { minorUnits(price) }
-    private var parsedFees: Int { minorUnits(fees) }
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("Trade") {
-                    Picker("Side", selection: $side) {
-                        Text("Buy").tag("buy"); Text("Sell").tag("sell")
-                    }.pickerStyle(.segmented)
-                    TextField("Ticker, e.g. AAPL", text: $symbol).textInputAutocapitalization(.characters).autocorrectionDisabled()
-                    TextField("Company name", text: $companyName)
-                    TextField("Shares", text: $quantity).keyboardType(.decimalPad)
-                    TextField("Price per share", text: $price).keyboardType(.decimalPad)
-                    TextField("Fees", text: $fees).keyboardType(.decimalPad)
-                    Picker("Currency", selection: $currency) {
-                        ForEach(SupportedCurrency.all) { Text($0.code).tag($0.code) }
-                    }
-                    DatePicker("Trade date", selection: $tradedAt)
-                }
-                Section {
-                    Picker("Cash account", selection: $accountID) {
-                        Text("Do not change an account").tag("")
-                        ForEach(compatibleAccounts) { Text($0.name).tag($0.id) }
-                    }
-                } header: { Text("Bank link") } footer: {
-                    Text("A buy subtracts cash; a sell returns cash. Ledgerly also adds the matching account transaction.")
-                }
-                if let validationMessage { Section { Text(validationMessage).foregroundStyle(.red) } }
-            }
-            .navigationTitle("Add stock trade")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) { Button("Save") { save() }.disabled(!canSave) }
-            }
-            .onChange(of: currency) { _, _ in if !compatibleAccounts.contains(where: { $0.id == accountID }) { accountID = "" } }
-        }
-    }
-
-    private var canSave: Bool {
-        !symbol.trimmingCharacters(in: .whitespaces).isEmpty && parsedQuantity > 0 && parsedPrice > 0
-    }
-
-    private func minorUnits(_ value: String) -> Int {
-        let decimal = Decimal(string: value.replacingOccurrences(of: ",", with: ".")) ?? 0
-        return NSDecimalNumber(decimal: decimal * 100).intValue
-    }
-
-    private func save() {
-        let ticker = symbol.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-        let existing = holdings.first { $0.symbol.uppercased() == ticker && $0.currency == currency }
-        if side == "sell", (existing?.quantity ?? 0) < parsedQuantity {
-            validationMessage = "You only have \((existing?.quantity ?? 0).formatted()) shares available."
-            return
-        }
-        let now = ISO8601DateFormatter().string(from: tradedAt)
-        let holding = existing ?? StockHolding(symbol: ticker, name: companyName.isEmpty ? ticker : companyName, quantity: 0, averageCostMinor: parsedPrice, currentPriceMinor: parsedPrice, currency: currency, linkedAccountId: accountID.isEmpty ? nil : accountID)
-        if existing == nil { context.insert(holding) }
-        if side == "buy" {
-            let newQuantity = holding.quantity + parsedQuantity
-            holding.averageCostMinor = StockTradeMath.averageCost(oldQuantity: holding.quantity, oldAverageMinor: holding.averageCostMinor, boughtQuantity: parsedQuantity, priceMinor: parsedPrice, feesMinor: parsedFees)
-            holding.quantity = newQuantity
-        } else {
-            holding.quantity -= parsedQuantity
-        }
-        holding.name = companyName.trimmingCharacters(in: .whitespaces).isEmpty ? holding.name : companyName.trimmingCharacters(in: .whitespaces)
-        holding.currentPriceMinor = parsedPrice
-        holding.linkedAccountId = accountID.isEmpty ? holding.linkedAccountId : accountID
-        holding.updatedAt = ISO8601DateFormatter().string(from: Date())
-        context.insert(PendingStockMutation(entityId: holding.id, entity: "stockHolding"))
-
-        let trade = StockTrade(holdingId: holding.id, symbol: ticker, side: side, quantity: parsedQuantity, priceMinor: parsedPrice, feesMinor: parsedFees, currency: currency, tradedAt: now, linkedAccountId: accountID.isEmpty ? nil : accountID)
-        context.insert(trade)
-        context.insert(PendingStockMutation(entityId: trade.id, entity: "stockTrade"))
-        if let account = accounts.first(where: { $0.id == accountID }) {
-            let cashChange = StockTradeMath.cashChange(side: side, quantity: parsedQuantity, priceMinor: parsedPrice, feesMinor: parsedFees)
-            account.amountMinor += cashChange
-            account.updatedAt = ISO8601DateFormatter().string(from: Date())
-            context.insert(PendingAccountMutation(entityId: account.id))
-            let transaction = CachedTransaction(dto: TransactionDTO(
-                id: UUID().uuidString.lowercased(), accountId: account.id,
-                description: "\(side == "buy" ? "Buy" : "Sell") \(ticker)",
-                amount: Money(amountMinor: cashChange, currency: currency), bookedAt: now,
-                pending: false, category: "Investments", source: "stockTrade", updatedAt: now
-            ), initialVersion: 0)
-            context.insert(transaction)
-            context.insert(PendingTransactionCreate(entityId: transaction.id))
-        }
-        try? context.save()
-        dismiss()
     }
 }
 
