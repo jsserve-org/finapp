@@ -56,90 +56,94 @@ enum AccountActionService {
     }
 }
 
-struct QuickAccountEntryPicker: View {
-    @Environment(\.dismiss) private var dismiss
-    @Query(sort: \CachedAccount.name) private var accounts: [CachedAccount]
-    let direction: AccountEntryDirection
-    @State private var selectedAccount: CachedAccount?
-
-    var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    ForEach(accounts) { account in
-                        Button { selectedAccount = account } label: {
-                            HStack(spacing: 12) {
-                                Image(systemName: AppIcon.account(kind: account.kind)).ledgerlyIcon()
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(account.name).font(.headline).foregroundStyle(.primary)
-                                    Text("\(account.institution) · \(account.currency)").font(.subheadline).foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
-                            }
-                        }
-                        .buttonStyle(.plain)
-                    }
-                } header: {
-                    Text("Select an account")
-                } footer: {
-                    Text("After choosing the account, enter the amount and details.")
-                }
-                if accounts.isEmpty {
-                    ContentUnavailableView("No accounts", systemImage: AppIcon.accounts, description: Text("Create an account before adding money."))
-                }
-            }
-            .navigationTitle(direction.title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
-            .sheet(item: $selectedAccount) { account in
-                AccountEntryView(account: account, direction: direction)
-            }
-        }
-    }
-}
-
 struct AccountEntryView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
-    let account: CachedAccount
+    @Query(sort: \CachedAccount.name) private var accounts: [CachedAccount]
     let direction: AccountEntryDirection
+    private let preferredAccountID: String?
+    @State private var selectedAccountID: String
     @State private var description = ""
     @State private var amount = ""
+    @State private var currency: String
     @State private var category = ""
     @State private var date = Date()
+
+    init(account: CachedAccount? = nil, direction: AccountEntryDirection) {
+        self.direction = direction
+        preferredAccountID = account?.id
+        _selectedAccountID = State(initialValue: account?.id ?? "")
+        _currency = State(initialValue: account?.currency ?? SupportedCurrency.defaultCode)
+    }
+
+    private var compatibleAccounts: [CachedAccount] { accounts.filter { $0.currency == currency } }
+    private var selectedAccount: CachedAccount? { accounts.first { $0.id == selectedAccountID } }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    LabeledContent("Account", value: account.name)
-                    LabeledContent("Currency", value: account.currency)
-                    TextField("Amount", text: $amount).keyboardType(.decimalPad)
-                } header: { Text(direction.title) }
+                    MoneyAmountHeader(title: direction.title, amount: $amount, currency: $currency, tint: direction.color)
+                }
+                Section("Account") {
+                    ForEach(compatibleAccounts) { account in
+                        Button { selectedAccountID = account.id } label: { accountRow(account, selected: account.id == selectedAccountID) }
+                            .buttonStyle(.plain)
+                    }
+                    if compatibleAccounts.isEmpty {
+                        Text("No \(currency) accounts available.").foregroundStyle(.secondary)
+                    }
+                }
                 Section("Details") {
                     TextField("Description", text: $description)
                     TransactionCategoryPicker(selection: $category)
                     DatePicker("Date", selection: $date)
                 }
                 Section {
-                    Text(direction == .moneyIn
-                         ? "This increases the account balance and appears as green money in."
-                         : "This decreases the account balance and appears as red money out.")
-                        .font(.subheadline).foregroundStyle(.secondary)
+                    Button(direction.title, systemImage: direction.symbol, action: save)
+                        .frame(maxWidth: .infinity)
+                        .fontWeight(.semibold)
+                        .buttonStyle(.borderedProminent)
+                        .tint(direction.color)
+                        .controlSize(.large)
+                        .disabled(parsedAmount <= 0 || selectedAccount == nil)
                 }
+                .listRowBackground(Color.clear)
             }
             .navigationTitle(direction.title)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) { Button("Save") { save() }.disabled(parsedAmount <= 0) }
-            }
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
             .task {
                 if description.isEmpty { description = direction.defaultDescription }
                 if category.isEmpty { category = direction.defaultCategory }
+                selectDefaultAccount()
             }
+            .onChange(of: currency) { _, _ in selectDefaultAccount() }
         }
+    }
+
+    private func accountRow(_ account: CachedAccount, selected: Bool) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: AppIcon.account(kind: account.kind)).ledgerlyIcon()
+            VStack(alignment: .leading, spacing: 2) {
+                Text(account.name).font(.headline).foregroundStyle(.primary)
+                Text("\(account.institution) · \(money(account.amountMinor, account.currency))")
+                    .font(.subheadline).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                .foregroundStyle(selected ? direction.color : Color.secondary.opacity(0.45))
+        }
+        .contentShape(Rectangle())
+    }
+
+    private func selectDefaultAccount() {
+        if compatibleAccounts.contains(where: { $0.id == selectedAccountID }) { return }
+        selectedAccountID = compatibleAccounts.first(where: { $0.id == preferredAccountID })?.id ?? compatibleAccounts.first?.id ?? ""
+    }
+
+    private func money(_ amount: Int, _ code: String) -> String {
+        (Double(amount) / 100).formatted(.currency(code: code).presentation(.isoCode))
     }
 
     private var parsedAmount: Int {
@@ -148,6 +152,7 @@ struct AccountEntryView: View {
     }
 
     private func save() {
+        guard let account = selectedAccount else { return }
         let cleanDescription = description.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanCategory = category.trimmingCharacters(in: .whitespacesAndNewlines)
         AccountActionService.record(
@@ -163,44 +168,101 @@ struct AccountEntryView: View {
 struct AccountTransferView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
-    let source: CachedAccount
     @Query(sort: \CachedAccount.name) private var accounts: [CachedAccount]
+    private let preferredSourceID: String?
+    @State private var sourceID: String
     @State private var destinationID = ""
     @State private var amount = ""
+    @State private var currency: String
     @State private var note = "Transfer"
     @State private var date = Date()
 
-    private var destinations: [CachedAccount] {
-        accounts.filter { $0.id != source.id && $0.currency == source.currency }
+    init(source: CachedAccount? = nil) {
+        preferredSourceID = source?.id
+        _sourceID = State(initialValue: source?.id ?? "")
+        _currency = State(initialValue: source?.currency ?? SupportedCurrency.defaultCode)
     }
+
+    private var compatibleAccounts: [CachedAccount] { accounts.filter { $0.currency == currency } }
+    private var source: CachedAccount? { accounts.first { $0.id == sourceID } }
+    private var destination: CachedAccount? { accounts.first { $0.id == destinationID } }
+    private var destinations: [CachedAccount] { compatibleAccounts.filter { $0.id != sourceID } }
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("Transfer") {
-                    LabeledContent("From", value: source.name)
-                    Picker("To", selection: $destinationID) {
-                        ForEach(destinations) { Text($0.name).tag($0.id) }
+                Section {
+                    MoneyAmountHeader(title: "Transfer amount", amount: $amount, currency: $currency, tint: .blue)
+                }
+                Section("From") {
+                    ForEach(compatibleAccounts) { account in
+                        Button {
+                            sourceID = account.id
+                            selectDefaultDestination()
+                        } label: {
+                            accountRow(account, selected: account.id == sourceID)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    TextField("Amount", text: $amount).keyboardType(.decimalPad)
-                    LabeledContent("Currency", value: source.currency)
+                }
+                Section("To") {
+                    ForEach(destinations) { account in
+                        Button { destinationID = account.id } label: { accountRow(account, selected: account.id == destinationID) }
+                            .buttonStyle(.plain)
+                    }
+                    if destinations.isEmpty { Text("Add another \(currency) account to transfer money.").foregroundStyle(.secondary) }
                 }
                 Section("Details") {
                     TextField("Description", text: $note)
                     DatePicker("Date", selection: $date)
                 }
-                if destinations.isEmpty {
-                    Section { Text("Create another \(source.currency) account before transferring money.").foregroundStyle(.secondary) }
+                Section {
+                    Button("Transfer money", systemImage: "arrow.left.arrow.right.circle.fill", action: transfer)
+                        .frame(maxWidth: .infinity)
+                        .fontWeight(.semibold)
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+                        .disabled(parsedAmount <= 0 || source == nil || destination == nil)
                 }
+                .listRowBackground(Color.clear)
             }
             .navigationTitle("Transfer money")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) { Button("Transfer") { transfer() }.disabled(parsedAmount <= 0 || destinationID.isEmpty) }
-            }
-            .task { if destinationID.isEmpty { destinationID = destinations.first?.id ?? "" } }
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
+            .task { selectDefaults() }
+            .onChange(of: currency) { _, _ in selectDefaults() }
         }
+    }
+
+    private func accountRow(_ account: CachedAccount, selected: Bool) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: AppIcon.account(kind: account.kind)).ledgerlyIcon()
+            VStack(alignment: .leading, spacing: 2) {
+                Text(account.name).font(.headline).foregroundStyle(.primary)
+                Text("\(account.institution) · \(money(account.amountMinor, account.currency))")
+                    .font(.subheadline).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                .foregroundStyle(selected ? Color.blue : Color.secondary.opacity(0.45))
+        }
+        .contentShape(Rectangle())
+    }
+
+    private func selectDefaults() {
+        if !compatibleAccounts.contains(where: { $0.id == sourceID }) {
+            sourceID = compatibleAccounts.first(where: { $0.id == preferredSourceID })?.id ?? compatibleAccounts.first?.id ?? ""
+        }
+        selectDefaultDestination()
+    }
+
+    private func selectDefaultDestination() {
+        if destinations.contains(where: { $0.id == destinationID }) { return }
+        destinationID = destinations.first?.id ?? ""
+    }
+
+    private func money(_ amount: Int, _ code: String) -> String {
+        (Double(amount) / 100).formatted(.currency(code: code).presentation(.isoCode))
     }
 
     private var parsedAmount: Int {
@@ -209,7 +271,7 @@ struct AccountTransferView: View {
     }
 
     private func transfer() {
-        guard let destination = accounts.first(where: { $0.id == destinationID }) else { return }
+        guard let source, let destination else { return }
         let title = note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Transfer" : note.trimmingCharacters(in: .whitespacesAndNewlines)
         AccountActionService.transfer(amountMinor: parsedAmount, description: title, date: date, source: source, destination: destination, context: context)
         dismiss()
