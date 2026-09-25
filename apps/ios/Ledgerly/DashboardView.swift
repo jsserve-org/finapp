@@ -54,7 +54,7 @@ struct DashboardView: View {
                 if let account = accounts.first(where: { $0.id == id }) {
                     AccountDetailView(accountID: account.id)
                 } else if let transaction = transactions.first(where: { $0.id == id }) {
-                    TransactionDetailView(transactionID: transaction.id)
+                    TransactionDetailView(transaction: transaction)
                 } else {
                     ContentUnavailableView("Not found", systemImage: "questionmark.circle")
                 }
@@ -126,11 +126,14 @@ struct DashboardView: View {
                 .frame(width: 32)
             VStack(alignment: .leading, spacing: 3) {
                 Text(item.title).fontWeight(.semibold)
-                Text(item.category ?? "Uncategorized").font(.subheadline).foregroundStyle(.secondary)
+                Text("\(PaymentIcon.directionLabel(amountMinor: item.amountMinor)) · \(item.category ?? "Uncategorized")")
+                    .font(.subheadline).foregroundStyle(.secondary)
             }
             Spacer()
             VStack(alignment: .trailing) {
-                Text(money(item.amountMinor, item.currency)).foregroundStyle(item.amountMinor > 0 ? .blue : .primary)
+                Text(money(item.amountMinor, item.currency))
+                    .fontWeight(.semibold)
+                    .foregroundStyle(PaymentIcon.color(amountMinor: item.amountMinor))
                 if item.pending { Text("Pending").font(.footnote).foregroundStyle(.orange) }
             }
         }

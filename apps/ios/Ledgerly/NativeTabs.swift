@@ -159,7 +159,7 @@ struct NativeActivityView: View {
 
                 Section("Bills & transactions") {
                     ForEach(transactions) { transaction in
-                        NavigationLink { TransactionDetailView(transactionID: transaction.id) } label: { transactionRow(transaction) }
+                        NavigationLink { TransactionDetailView(transaction: transaction) } label: { transactionRow(transaction) }
                     }
                     if transactions.isEmpty {
                         ContentUnavailableView("No activity", systemImage: AppIcon.activity, description: Text("Transactions you add or sync will appear here."))
@@ -189,7 +189,9 @@ struct NativeActivityView: View {
 
     private func transactionRow(_ transaction: CachedTransaction) -> some View {
         LabeledContent {
-            Text(money(transaction.amountMinor, transaction.currency)).foregroundStyle(transaction.amountMinor > 0 ? .blue : .primary)
+            Text(money(transaction.amountMinor, transaction.currency))
+                .fontWeight(.semibold)
+                .foregroundStyle(PaymentIcon.color(amountMinor: transaction.amountMinor))
         } label: {
             Label {
                 VStack(alignment: .leading, spacing: 3) {
@@ -204,7 +206,7 @@ struct NativeActivityView: View {
     }
 
     private func transactionSubtitle(_ transaction: CachedTransaction) -> String {
-        let category = transaction.category ?? "Uncategorized"
+        let category = "\(PaymentIcon.directionLabel(amountMinor: transaction.amountMinor)) · \(transaction.category ?? "Uncategorized")"
         guard let id = transaction.recurringPaymentId,
               let payment = recurringPayments.first(where: { $0.id == id }) else { return category }
         return "\(category) · \(payment.name)"

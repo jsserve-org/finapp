@@ -28,14 +28,17 @@ struct AccountDetailView: View {
                 }
                 Section("Transactions") {
                     ForEach(transactions) { transaction in
-                        NavigationLink { TransactionDetailView(transactionID: transaction.id) } label: {
+                        NavigationLink { TransactionDetailView(transaction: transaction) } label: {
                             LabeledContent {
                                 Text(money(transaction.amountMinor, transaction.currency))
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(PaymentIcon.color(amountMinor: transaction.amountMinor))
                             } label: {
                                 Label {
                                     VStack(alignment: .leading, spacing: 3) {
                                         Text(transaction.title).font(.headline)
-                                        Text(transaction.category ?? "Uncategorized").font(.subheadline).foregroundStyle(.secondary)
+                                        Text("\(PaymentIcon.directionLabel(amountMinor: transaction.amountMinor)) · \(transaction.category ?? "Uncategorized")")
+                                            .font(.subheadline).foregroundStyle(.secondary)
                                     }
                                 } icon: {
                                     Image(systemName: PaymentIcon.symbol(title: transaction.title, category: transaction.category, amountMinor: transaction.amountMinor))

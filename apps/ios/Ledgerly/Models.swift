@@ -264,6 +264,12 @@ enum JSONValue: Codable, Equatable {
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter.date(from: bookedAt) ?? ISO8601DateFormatter().date(from: bookedAt)
     }
+
+    var updatedDate: Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.date(from: updatedAt) ?? ISO8601DateFormatter().date(from: updatedAt)
+    }
 }
 
 @Model final class SyncSetting {

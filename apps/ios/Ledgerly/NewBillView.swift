@@ -85,6 +85,8 @@ struct NewBillView: View {
         ), initialVersion: 0)
         context.insert(transaction)
         context.insert(PendingTransactionCreate(entityId: transaction.id))
+        let recurringPayments = (try? context.fetch(FetchDescriptor<RecurringPayment>())) ?? []
+        autoLinkRecurringPayment(transaction, payments: recurringPayments, context: context)
         account.amountMinor -= parsedAmount
         account.updatedAt = ISO8601DateFormatter().string(from: Date())
         context.insert(PendingAccountMutation(entityId: account.id))

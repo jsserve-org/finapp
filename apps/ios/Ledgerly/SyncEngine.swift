@@ -130,6 +130,11 @@ struct SyncEngine {
                 continue
             }
         }
+        let transactions = try context.fetch(FetchDescriptor<CachedTransaction>())
+        let recurringPayments = try context.fetch(FetchDescriptor<RecurringPayment>())
+        for transaction in transactions where transaction.recurringPaymentId == nil {
+            autoLinkRecurringPayment(transaction, payments: recurringPayments, context: context)
+        }
     }
 
     func saveCursor(_ cursor: String, settings: [SyncSetting], context: ModelContext) {

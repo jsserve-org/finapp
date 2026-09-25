@@ -21,6 +21,10 @@ enum PaymentIcon {
     }
 
     static func color(amountMinor: Int) -> Color {
-        amountMinor > 0 ? .green : .blue
+        amountMinor >= 0 ? .green : .red
+    }
+
+    static func directionLabel(amountMinor: Int) -> String {
+        amountMinor >= 0 ? "Received" : "Spent"
     }
 }

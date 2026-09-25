@@ -264,6 +264,10 @@ struct NewRecurringPaymentView: View {
         )
         context.insert(bill)
         context.insert(PendingRecurringMutation(entityId: bill.id, action: "upsert"))
+        let transactions = (try? context.fetch(FetchDescriptor<CachedTransaction>())) ?? []
+        for transaction in transactions where transaction.recurringPaymentId == nil {
+            autoLinkRecurringPayment(transaction, payments: [bill], context: context)
+        }
         try? context.save()
         dismiss()
     }
