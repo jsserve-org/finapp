@@ -32,6 +32,8 @@ struct AccountDetailView: View {
     }
 
     var body: some View {
+        let paymentsByID = Dictionary(uniqueKeysWithValues: recurringPayments.map { ($0.id, $0) })
+        let accountsByID = Dictionary(uniqueKeysWithValues: allAccounts.map { ($0.id, $0) })
         List {
             if let account = accounts.first {
                 Section("Account") {
@@ -50,10 +52,10 @@ struct AccountDetailView: View {
                 }
                 Section("Transactions") {
                     ForEach(transactions) { transaction in
-                        let recurringPayment = recurringPayments.first { $0.id == transaction.recurringPaymentId }
+                        let recurringPayment = transaction.recurringPaymentId.flatMap { paymentsByID[$0] }
                         let snapshot = TransactionSnapshot(
                             transaction, account: account, recurringPayment: recurringPayment,
-                            transferAccount: allAccounts.first { $0.id == transaction.transferAccountId }
+                            transferAccount: transaction.transferAccountId.flatMap { accountsByID[$0] }
                         )
                         Button { selectedTransaction = snapshot } label: {
                             HStack(spacing: 12) {

@@ -145,6 +145,27 @@ final class SyncEngineTests: XCTestCase {
         XCTAssertEqual(transactions[0].bookedDate?.timeIntervalSince1970 ?? 0, 1_789_994_400, accuracy: 86_400)
     }
 
+    func testApplyHandlesFullSyncPageInOneBatch() throws {
+        let changes = (1...500).map { index in
+            change(
+                index,
+                entity: "transaction",
+                id: "batch-\(index)",
+                value: #"{"id":"batch-\#(index)","accountId":"account-1","description":"Transaction \#(index)","amount":{"amountMinor":-450,"currency":"USD"},"bookedAt":"2026-09-21T10:00:00.000Z","pending":false,"updatedAt":"2026-09-21T10:00:00.000Z"}"#
+            )
+        }
+
+        try engine.apply(changes, context: context)
+
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<CachedTransaction>()), 500)
+    }
+
+    func testISODateParserSupportsFractionalAndWholeSeconds() {
+        XCTAssertNotNil(LedgerlyISODate.parse("2026-09-21T10:00:00.000Z"))
+        XCTAssertNotNil(LedgerlyISODate.parse("2026-09-21T10:00:00Z"))
+        XCTAssertNil(LedgerlyISODate.parse("not-a-date"))
+    }
+
     func testApplyUpdateMergesIntoExistingRow() throws {
         try testApplyUpsertsAccountAndTransaction()
         try engine.apply([change(7, entity: "transaction", id: "txn-1", value: #"{"id":"txn-1","accountId":"acc-1","description":"Coffee grande","amount":{"amountMinor":-450,"currency":"USD"},"bookedAt":"2026-09-21T10:00:00.000Z","pending":false,"category":"Food","updatedAt":"2026-09-21T11:00:00.000Z"}"#)], context: context)

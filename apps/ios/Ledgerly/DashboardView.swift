@@ -23,6 +23,9 @@ struct DashboardView: View {
     }
 
     var body: some View {
+        let displayedCurrencies = currencies
+        let displayedCategoryTotals = categoryTotals
+        let displayedMonths = availableMonths
         NavigationStack {
             List {
                 if let error = sync.lastError {
@@ -34,23 +37,23 @@ struct DashboardView: View {
                     }
                 }
                 Section("Summary") {
-                    if currencies.isEmpty {
+                    if displayedCurrencies.isEmpty {
                         ContentUnavailableView("No insights yet", systemImage: AppIcon.insights, description: Text("Add an account or transaction to start seeing your financial summary."))
                     } else {
-                        ForEach(currencies, id: \.self) { currency in
+                        ForEach(displayedCurrencies, id: \.self) { currency in
                             insightSummary(currency: currency)
                         }
                     }
                 }
                 Section {
-                    if categoryTotals.isEmpty {
+                    if displayedCategoryTotals.isEmpty {
                         ContentUnavailableView(
                             "No spending this month",
                             systemImage: "calendar",
                             description: Text("Choose another month to see its expenses.")
                         )
                     } else {
-                        ForEach(Array(categoryTotals.enumerated()), id: \.offset) { _, item in
+                        ForEach(Array(displayedCategoryTotals.enumerated()), id: \.offset) { _, item in
                             NavigationLink {
                                 CategoryTransactionsView(category: item.category, currency: item.currency, month: selectedMonth)
                             } label: {
@@ -67,7 +70,7 @@ struct DashboardView: View {
                         Text("Spending by category")
                         Spacer()
                         Menu {
-                            ForEach(availableMonths, id: \.self) { month in
+                            ForEach(displayedMonths, id: \.self) { month in
                                 Button {
                                     selectedMonth = month
                                 } label: {
@@ -209,15 +212,17 @@ private struct CategoryTransactionsView: View {
     }
 
     var body: some View {
+        let accountsByID = Dictionary(uniqueKeysWithValues: accounts.map { ($0.id, $0) })
+        let paymentsByID = Dictionary(uniqueKeysWithValues: recurringPayments.map { ($0.id, $0) })
         List {
             Section {
                 ForEach(visibleTransactions) { transaction in
                     Button {
                         selectedTransaction = TransactionSnapshot(
                             transaction,
-                            account: accounts.first { $0.id == transaction.accountId },
-                            recurringPayment: recurringPayments.first { $0.id == transaction.recurringPaymentId },
-                            transferAccount: accounts.first { $0.id == transaction.transferAccountId }
+                            account: accountsByID[transaction.accountId],
+                            recurringPayment: transaction.recurringPaymentId.flatMap { paymentsByID[$0] },
+                            transferAccount: transaction.transferAccountId.flatMap { accountsByID[$0] }
                         )
                     } label: {
                         transactionRow(transaction)

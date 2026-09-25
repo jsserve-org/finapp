@@ -107,21 +107,43 @@ struct SyncEngine {
         var transactionsToMatch: [CachedTransaction] = []
         var recurringPaymentsChanged = false
 
+        let accountIDs = Array(Set(changes.lazy.filter { $0.entity == "account" }.map(\.entityId)))
+        let transactionIDs = Array(Set(changes.lazy.filter { $0.entity == "transaction" }.map(\.entityId)))
+        let recurringIDs = Array(Set(changes.lazy.filter { $0.entity == "recurringPayment" }.map(\.entityId)))
+        let holdingIDs = Array(Set(changes.lazy.filter { $0.entity == "stockHolding" }.map(\.entityId)))
+        let tradeIDs = Array(Set(changes.lazy.filter { $0.entity == "stockTrade" }.map(\.entityId)))
+
+        var accountsByID = Dictionary(uniqueKeysWithValues: try context.fetch(
+            FetchDescriptor<CachedAccount>(predicate: #Predicate { accountIDs.contains($0.id) })
+        ).map { ($0.id, $0) })
+        var transactionsByID = Dictionary(uniqueKeysWithValues: try context.fetch(
+            FetchDescriptor<CachedTransaction>(predicate: #Predicate { transactionIDs.contains($0.id) })
+        ).map { ($0.id, $0) })
+        var recurringByID = Dictionary(uniqueKeysWithValues: try context.fetch(
+            FetchDescriptor<RecurringPayment>(predicate: #Predicate { recurringIDs.contains($0.id) })
+        ).map { ($0.id, $0) })
+        var holdingsByID = Dictionary(uniqueKeysWithValues: try context.fetch(
+            FetchDescriptor<StockHolding>(predicate: #Predicate { holdingIDs.contains($0.id) })
+        ).map { ($0.id, $0) })
+        var tradesByID = Dictionary(uniqueKeysWithValues: try context.fetch(
+            FetchDescriptor<StockTrade>(predicate: #Predicate { tradeIDs.contains($0.id) })
+        ).map { ($0.id, $0) })
+
         for change in changes {
             let entityID = change.entityId
             if change.action == "delete" {
                 if change.entity == "account" {
-                    try fetchAccount(id: entityID, context: context).map(context.delete)
+                    accountsByID.removeValue(forKey: entityID).map(context.delete)
                 }
                 if change.entity == "transaction" {
-                    try fetchTransaction(id: entityID, context: context).map(context.delete)
+                    transactionsByID.removeValue(forKey: entityID).map(context.delete)
                 }
                 if change.entity == "recurringPayment" {
-                    try fetchRecurringPayment(id: entityID, context: context).map(context.delete)
+                    recurringByID.removeValue(forKey: entityID).map(context.delete)
                     recurringPaymentsChanged = true
                 }
-                if change.entity == "stockHolding" { try fetchStockHolding(id: entityID, context: context).map(context.delete) }
-                if change.entity == "stockTrade" { try fetchStockTrade(id: entityID, context: context).map(context.delete) }
+                if change.entity == "stockHolding" { holdingsByID.removeValue(forKey: entityID).map(context.delete) }
+                if change.entity == "stockTrade" { tradesByID.removeValue(forKey: entityID).map(context.delete) }
                 continue
             }
             guard let value = change.value else { continue }
@@ -130,25 +152,28 @@ struct SyncEngine {
             switch change.entity {
             case "account":
                 let dto = try decoder.decode(AccountDTO.self, from: data)
-                if let item = try fetchAccount(id: entityID, context: context) {
+                if let item = accountsByID[entityID] {
                     item.apply(dto, version: change.sequence)
                 } else {
-                    context.insert(CachedAccount(dto: dto, initialVersion: change.sequence))
+                    let item = CachedAccount(dto: dto, initialVersion: change.sequence)
+                    context.insert(item)
+                    accountsByID[entityID] = item
                 }
             case "transaction":
                 let dto = try decoder.decode(TransactionDTO.self, from: data)
-                if let item = try fetchTransaction(id: entityID, context: context) {
+                if let item = transactionsByID[entityID] {
                     item.apply(dto, version: change.sequence)
                     transactionsToMatch.append(item)
                 } else {
                     let item = CachedTransaction(dto: dto, initialVersion: change.sequence)
                     context.insert(item)
+                    transactionsByID[entityID] = item
                     transactionsToMatch.append(item)
                 }
             case "recurringPayment":
                 recurringPaymentsChanged = true
                 let dto = try decoder.decode(RecurringPaymentDTO.self, from: data)
-                if let item = try fetchRecurringPayment(id: entityID, context: context) {
+                if let item = recurringByID[entityID] {
                     item.name = dto.name
                     item.amountMinor = dto.amountMinor
                     item.currency = dto.currency
@@ -158,25 +183,31 @@ struct SyncEngine {
                     item.category = dto.category
                     item.isActive = dto.isActive
                 } else {
-                    context.insert(RecurringPayment(id: dto.id, name: dto.name, amountMinor: dto.amountMinor, currency: dto.currency, frequency: dto.frequency, nextDate: dto.nextDate, accountId: dto.accountId, category: dto.category, isActive: dto.isActive))
+                    let item = RecurringPayment(id: dto.id, name: dto.name, amountMinor: dto.amountMinor, currency: dto.currency, frequency: dto.frequency, nextDate: dto.nextDate, accountId: dto.accountId, category: dto.category, isActive: dto.isActive)
+                    context.insert(item)
+                    recurringByID[entityID] = item
                 }
             case "stockHolding":
                 let dto = try decoder.decode(StockHoldingDTO.self, from: data)
-                if let item = try fetchStockHolding(id: entityID, context: context) {
+                if let item = holdingsByID[entityID] {
                     item.symbol = dto.symbol; item.name = dto.name; item.quantity = dto.quantity
                     item.averageCostMinor = dto.averageCostMinor; item.currentPriceMinor = dto.currentPriceMinor
                     item.currency = dto.currency; item.linkedAccountId = dto.linkedAccountId; item.updatedAt = dto.updatedAt
                 } else {
-                    context.insert(StockHolding(id: dto.id, symbol: dto.symbol, name: dto.name, quantity: dto.quantity, averageCostMinor: dto.averageCostMinor, currentPriceMinor: dto.currentPriceMinor, currency: dto.currency, linkedAccountId: dto.linkedAccountId, updatedAt: dto.updatedAt))
+                    let item = StockHolding(id: dto.id, symbol: dto.symbol, name: dto.name, quantity: dto.quantity, averageCostMinor: dto.averageCostMinor, currentPriceMinor: dto.currentPriceMinor, currency: dto.currency, linkedAccountId: dto.linkedAccountId, updatedAt: dto.updatedAt)
+                    context.insert(item)
+                    holdingsByID[entityID] = item
                 }
             case "stockTrade":
                 let dto = try decoder.decode(StockTradeDTO.self, from: data)
-                if let item = try fetchStockTrade(id: entityID, context: context) {
+                if let item = tradesByID[entityID] {
                     item.holdingId = dto.holdingId; item.symbol = dto.symbol; item.side = dto.side
                     item.quantity = dto.quantity; item.priceMinor = dto.priceMinor; item.feesMinor = dto.feesMinor
                     item.currency = dto.currency; item.tradedAt = dto.tradedAt; item.linkedAccountId = dto.linkedAccountId
                 } else {
-                    context.insert(StockTrade(id: dto.id, holdingId: dto.holdingId, symbol: dto.symbol, side: dto.side, quantity: dto.quantity, priceMinor: dto.priceMinor, feesMinor: dto.feesMinor, currency: dto.currency, tradedAt: dto.tradedAt, linkedAccountId: dto.linkedAccountId))
+                    let item = StockTrade(id: dto.id, holdingId: dto.holdingId, symbol: dto.symbol, side: dto.side, quantity: dto.quantity, priceMinor: dto.priceMinor, feesMinor: dto.feesMinor, currency: dto.currency, tradedAt: dto.tradedAt, linkedAccountId: dto.linkedAccountId)
+                    context.insert(item)
+                    tradesByID[entityID] = item
                 }
             default:
                 continue
