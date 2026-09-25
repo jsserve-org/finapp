@@ -2,24 +2,27 @@ import SwiftData
 import SwiftUI
 
 struct TransactionDetailView: View {
-    let transaction: CachedTransaction
+    let transactionID: String
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
+    @Query private var transactions: [CachedTransaction]
     @Query(sort: \CachedAccount.name) private var accounts: [CachedAccount]
     @Query(sort: \RecurringPayment.name) private var recurringPayments: [RecurringPayment]
     @State private var showingEditor = false
     @State private var showDeleteConfirm = false
 
-    private var account: CachedAccount? { accounts.first { $0.id == transaction.accountId } }
-    private var recurringPayment: RecurringPayment? { recurringPayments.first { $0.id == transaction.recurringPaymentId } }
+    private var transaction: CachedTransaction? { transactions.first { $0.id == transactionID } }
+    private var account: CachedAccount? { transaction.flatMap { selected in accounts.first { $0.id == selected.accountId } } }
+    private var recurringPayment: RecurringPayment? { transaction.flatMap { selected in recurringPayments.first { $0.id == selected.recurringPaymentId } } }
     private var suggestedPayment: RecurringPayment? {
-        guard transaction.recurringPaymentId == nil else { return nil }
+        guard let transaction, transaction.recurringPaymentId == nil else { return nil }
         return RecurringPaymentMatcher.bestMatch(for: transaction, payments: recurringPayments)?.payment
     }
 
     var body: some View {
         Form {
-            Section {
+            if let transaction {
+                Section {
                 VStack(spacing: 10) {
                     Image(systemName: PaymentIcon.symbol(title: transaction.title, category: transaction.category, amountMinor: transaction.amountMinor))
                         .font(.system(size: 38, weight: .semibold))
@@ -27,7 +30,7 @@ struct TransactionDetailView: View {
                     Text(PaymentIcon.directionLabel(amountMinor: transaction.amountMinor))
                         .font(.headline)
                         .foregroundStyle(PaymentIcon.color(amountMinor: transaction.amountMinor))
-                    Text(money(abs(transaction.amountMinor), transaction.currency))
+                    Text(absoluteMoney(transaction.amountMinor, transaction.currency))
                         .font(.system(size: 34, weight: .bold, design: .rounded))
                         .foregroundStyle(PaymentIcon.color(amountMinor: transaction.amountMinor))
                 }
@@ -58,7 +61,7 @@ struct TransactionDetailView: View {
 
             Section {
                 NavigationLink {
-                    RecurringPaymentLinkView(transaction: transaction)
+                    RecurringPaymentLinkView(transactionID: transaction.id)
                 } label: {
                     LabeledContent("Recurring bill", value: recurringPayment?.name ?? "Not linked")
                 }
@@ -90,10 +93,19 @@ struct TransactionDetailView: View {
                 Button("Edit transaction", systemImage: "pencil") { showingEditor = true }
                 Button("Delete transaction", systemImage: "trash", role: .destructive) { showDeleteConfirm = true }
             }
+            } else {
+                ContentUnavailableView(
+                    "Transaction unavailable",
+                    systemImage: "exclamationmark.triangle",
+                    description: Text("This transaction may have been removed during sync.")
+                )
+            }
         }
         .navigationTitle("Transaction")
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showingEditor) { EditTransactionView(transaction: transaction) }
+        .sheet(isPresented: $showingEditor) {
+            if let transaction { EditTransactionView(transaction: transaction) }
+        }
         .confirmationDialog("Delete this transaction?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
             Button("Delete", role: .destructive) { delete() }
         } message: {
@@ -102,6 +114,7 @@ struct TransactionDetailView: View {
     }
 
     private func link(to paymentID: String?) {
+        guard let transaction else { return }
         transaction.recurringPaymentId = paymentID
         transaction.updatedAt = ISO8601DateFormatter().string(from: Date())
         enqueueFullTransaction(context: context, transactionID: transaction.id)
@@ -109,6 +122,7 @@ struct TransactionDetailView: View {
     }
 
     private func delete() {
+        guard let transaction else { return }
         if let account {
             account.amountMinor -= transaction.amountMinor
             account.updatedAt = ISO8601DateFormatter().string(from: Date())
@@ -139,7 +153,7 @@ private struct EditTransactionView: View {
         self.transaction = transaction
         _title = State(initialValue: transaction.title)
         _category = State(initialValue: transaction.category ?? "")
-        _amount = State(initialValue: NSDecimalNumber(value: abs(transaction.amountMinor)).dividing(by: 100).stringValue)
+        _amount = State(initialValue: NSDecimalNumber(value: Double(transaction.amountMinor).magnitude / 100).stringValue)
         _isMoneyOut = State(initialValue: transaction.amountMinor < 0)
         _date = State(initialValue: transaction.bookedDate ?? Date())
         _accountID = State(initialValue: transaction.accountId)
@@ -218,46 +232,83 @@ private struct EditTransactionView: View {
 }
 
 private struct RecurringPaymentLinkView: View {
-    let transaction: CachedTransaction
+    let transactionID: String
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
+    @Query private var transactions: [CachedTransaction]
     @Query(sort: \RecurringPayment.name) private var recurringPayments: [RecurringPayment]
 
+    private var transaction: CachedTransaction? { transactions.first { $0.id == transactionID } }
     private var compatiblePayments: [RecurringPayment] {
-        RecurringPaymentMatcher.compatiblePayments(for: transaction, payments: recurringPayments)
+        guard let transaction else { return [] }
+        return RecurringPaymentMatcher.compatiblePayments(for: transaction, payments: recurringPayments)
     }
 
     var body: some View {
         List {
             Section {
                 Button { select(nil) } label: {
-                    selectionRow(title: "Not linked", subtitle: "Remove the recurring bill link", selected: transaction.recurringPaymentId == nil)
+                    selectionRow(
+                        title: "No recurring bill",
+                        subtitle: "Keep this as a one-time transaction",
+                        symbol: "minus",
+                        selected: transaction?.recurringPaymentId == nil
+                    )
                 }
+                .buttonStyle(.plain)
+            }
+
+            Section {
                 ForEach(compatiblePayments) { payment in
                     Button { select(payment.id) } label: {
-                        selectionRow(title: payment.name, subtitle: "\(payment.frequencyLabel) · \(money(payment.amountMinor, payment.currency))", selected: transaction.recurringPaymentId == payment.id)
+                        selectionRow(
+                            title: payment.name,
+                            subtitle: "\(payment.frequencyLabel) · \(money(payment.amountMinor, payment.currency))",
+                            symbol: PaymentIcon.symbol(title: payment.name, category: payment.category, amountMinor: -1),
+                            selected: transaction?.recurringPaymentId == payment.id
+                        )
                     }
+                    .buttonStyle(.plain)
                 }
+            } header: {
+                Text("Recurring bills")
             } footer: {
-                Text("Only recurring bills with the same currency and a compatible account are shown.")
+                Text(transaction.map { "Showing bills that use \($0.currency) and this account." } ?? "This transaction is no longer available.")
             }
         }
+        .listSectionSpacing(.compact)
         .navigationTitle("Link recurring bill")
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    private func selectionRow(title: String, subtitle: String, selected: Bool) -> some View {
-        HStack {
+    private func selectionRow(title: String, subtitle: String, symbol: String, selected: Bool) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: symbol)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(selected ? Color.accentColor : .secondary)
+                .frame(width: 34, height: 34)
+                .background(.quaternary, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
             VStack(alignment: .leading, spacing: 3) {
-                Text(title).foregroundStyle(.primary)
-                Text(subtitle).font(.subheadline).foregroundStyle(.secondary)
+                Text(title)
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(.primary)
+                Text(subtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
             }
             Spacer()
-            if selected { Image(systemName: "checkmark").foregroundStyle(.blue) }
+            if selected {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(.tint)
+            }
         }
+        .contentShape(Rectangle())
+        .padding(.vertical, 3)
     }
 
     private func select(_ paymentID: String?) {
+        guard let transaction else { return }
         transaction.recurringPaymentId = paymentID
         transaction.updatedAt = ISO8601DateFormatter().string(from: Date())
         enqueueFullTransaction(context: context, transactionID: transaction.id)
@@ -276,4 +327,8 @@ func enqueueFullTransaction(context: ModelContext, transactionID: String) {
 
 private func money(_ amount: Int, _ currency: String) -> String {
     (Double(amount) / 100).formatted(.currency(code: currency).presentation(.isoCode))
+}
+
+private func absoluteMoney(_ amount: Int, _ currency: String) -> String {
+    (Double(amount).magnitude / 100).formatted(.currency(code: currency).presentation(.isoCode))
 }

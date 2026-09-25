@@ -159,7 +159,7 @@ struct NativeActivityView: View {
 
                 Section("Bills & transactions") {
                     ForEach(transactions) { transaction in
-                        NavigationLink { TransactionDetailView(transaction: transaction) } label: { transactionRow(transaction) }
+                        NavigationLink { TransactionDetailView(transactionID: transaction.id) } label: { transactionRow(transaction) }
                     }
                     if transactions.isEmpty {
                         ContentUnavailableView("No activity", systemImage: AppIcon.activity, description: Text("Transactions you add or sync will appear here."))

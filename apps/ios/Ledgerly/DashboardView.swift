@@ -54,7 +54,7 @@ struct DashboardView: View {
                 if let account = accounts.first(where: { $0.id == id }) {
                     AccountDetailView(accountID: account.id)
                 } else if let transaction = transactions.first(where: { $0.id == id }) {
-                    TransactionDetailView(transaction: transaction)
+                    TransactionDetailView(transactionID: transaction.id)
                 } else {
                     ContentUnavailableView("Not found", systemImage: "questionmark.circle")
                 }
