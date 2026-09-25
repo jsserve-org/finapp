@@ -86,6 +86,15 @@ final class SyncEngineTests: XCTestCase {
         let transaction = try JSONDecoder().decode(TransactionDTO.self, from: Data(transactionJSON.utf8))
         XCTAssertNil(transaction.category)
         XCTAssertNil(transaction.recurringPaymentId)
+        XCTAssertNil(transaction.source)
+    }
+
+    func testTransactionDTOCarriesPurposeAndReimbursementMetadata() throws {
+        let payload = #"{"id":"t1","accountId":"a1","description":"School supplies","amount":{"amountMinor":-450,"currency":"USD"},"bookedAt":"2026-09-21T10:00:00.000Z","pending":false,"category":"School","source":"manual","expensePurpose":"school","reimbursementStatus":"pending","updatedAt":"2026-09-21T10:00:00.000Z"}"#
+        let transaction = try JSONDecoder().decode(TransactionDTO.self, from: Data(payload.utf8))
+        XCTAssertEqual(transaction.source, "manual")
+        XCTAssertEqual(transaction.expensePurpose, "school")
+        XCTAssertEqual(transaction.reimbursementStatus, "pending")
     }
 
     // MARK: - Cache application
@@ -189,6 +198,56 @@ final class SyncEngineTests: XCTestCase {
         XCTAssertNotNil(RecurringPaymentMatcher.bestMatch(for: transaction, payments: [bill]))
     }
 
+    // MARK: - Reviewed merging and reimbursements
+
+    func testMergeMatcherFindsManualAndImportedDuplicate() {
+        let manual = transaction(title: "Cloud subscription", amountMinor: -499_00, currency: "TWD", accountID: "account-1", category: "Subscriptions", source: "manual")
+        let imported = transaction(title: "CLOUD AUTOMATION", amountMinor: -499_00, currency: "TWD", accountID: "account-1", category: nil, source: "automation")
+        let candidate = TransactionMerger.pair(manual, imported)
+        XCTAssertEqual(candidate?.manual.id, manual.id)
+        XCTAssertEqual(candidate?.imported.id, imported.id)
+    }
+
+    func testMergeMatcherRejectsWrongAccountAndDistantDate() {
+        let manual = transaction(title: "Cloud", amountMinor: -499_00, currency: "TWD", accountID: "account-1", category: nil, source: "manual")
+        let wrongAccount = transaction(title: "Cloud", amountMinor: -499_00, currency: "TWD", accountID: "account-2", category: nil, source: "automation")
+        XCTAssertNil(TransactionMerger.pair(manual, wrongAccount))
+
+        let distant = transaction(title: "Cloud", amountMinor: -499_00, currency: "TWD", accountID: "account-1", category: nil, source: "automation")
+        distant.bookedAt = ISO8601DateFormatter().string(from: Date().addingTimeInterval(-5 * 24 * 60 * 60))
+        XCTAssertNil(TransactionMerger.pair(manual, distant))
+    }
+
+    func testReviewedMergePreservesImportedRecordAndManualMetadata() throws {
+        let manual = transaction(title: "Cloud", amountMinor: -499_00, currency: "TWD", accountID: "account-1", category: "Subscriptions", source: "manual")
+        manual.expensePurpose = "school"
+        let imported = transaction(title: "Cloud provider detail", amountMinor: -499_00, currency: "TWD", accountID: "account-1", category: nil, source: "automation")
+        context.insert(manual); context.insert(imported)
+        let candidate = try XCTUnwrap(TransactionMerger.pair(manual, imported))
+        TransactionMerger.merge(candidate, context: context)
+
+        let remaining = try context.fetch(FetchDescriptor<CachedTransaction>())
+        XCTAssertEqual(remaining.map(\.id), [imported.id])
+        XCTAssertEqual(remaining.first?.category, "Subscriptions")
+        XCTAssertEqual(remaining.first?.expensePurpose, "school")
+    }
+
+    func testReimbursementCreatesGreenLinkedIncomeAndUpdatesBalance() throws {
+        let account = CachedAccount(name: "Checking", institution: "Bank", kind: "checking", amountMinor: 1_000_00, currency: "TWD")
+        let expense = transaction(title: "School supplies", amountMinor: -500_00, currency: "TWD", accountID: account.id, category: "School", source: "manual")
+        expense.expensePurpose = "school"
+        expense.reimbursementStatus = "pending"
+        context.insert(account); context.insert(expense)
+
+        let reimbursement = ReimbursementService.reimburse(expense, into: account, context: context)
+        XCTAssertEqual(reimbursement.amountMinor, 500_00)
+        XCTAssertEqual(reimbursement.source, "reimbursement")
+        XCTAssertEqual(reimbursement.reimbursementTransactionId, expense.id)
+        XCTAssertEqual(expense.reimbursementStatus, "reimbursed")
+        XCTAssertEqual(expense.reimbursementTransactionId, reimbursement.id)
+        XCTAssertEqual(account.amountMinor, 1_500_00)
+    }
+
     // MARK: - Cursor
 
     func testSaveCursorInsertsThenUpdates() throws {
@@ -271,12 +330,12 @@ final class SyncEngineTests: XCTestCase {
         XCTAssertEqual(try destination.fetch(FetchDescriptor<CachedTransaction>()).first?.recurringPaymentId, "recurring-1")
     }
 
-    private func transaction(title: String, amountMinor: Int, currency: String, accountID: String, category: String?) -> CachedTransaction {
+    private func transaction(title: String, amountMinor: Int, currency: String, accountID: String, category: String?, source: String? = nil) -> CachedTransaction {
         let timestamp = ISO8601DateFormatter().string(from: Date())
         return CachedTransaction(dto: TransactionDTO(
             id: UUID().uuidString.lowercased(), accountId: accountID, description: title,
             amount: Money(amountMinor: amountMinor, currency: currency), bookedAt: timestamp,
-            pending: false, category: category, updatedAt: timestamp
+            pending: false, category: category, source: source, updatedAt: timestamp
         ))
     }
 }

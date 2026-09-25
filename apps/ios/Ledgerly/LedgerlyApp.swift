@@ -115,29 +115,43 @@ private struct LoginView: View {
 }
 
 private struct RootTabView: View {
+    private enum RootTab: Hashable { case overview, accounts, add, activity, settings }
+    @State private var selection = RootTab.overview
+    @State private var previousSelection = RootTab.overview
+    @State private var showingAddBill = false
+
     var body: some View {
-        TabView {
-            Tab("Overview", systemImage: AppIcon.overview) {
+        TabView(selection: $selection) {
+            Tab("Overview", systemImage: AppIcon.overview, value: RootTab.overview) {
                 DashboardView()
             }
 
-            Tab("Accounts", systemImage: AppIcon.accounts) {
+            Tab("Accounts", systemImage: AppIcon.accounts, value: RootTab.accounts) {
                 NativeAccountsView()
             }
 
-            Tab("Insights", systemImage: AppIcon.insights) {
-                NativeInsightsView()
+            Tab("Add", systemImage: "plus.circle.fill", value: RootTab.add) {
+                Color.clear
             }
 
-            Tab("Activity", systemImage: AppIcon.activity) {
+            Tab("Activity", systemImage: AppIcon.activity, value: RootTab.activity) {
                 NativeActivityView()
             }
 
-            Tab("Settings", systemImage: AppIcon.settings) {
+            Tab("Settings", systemImage: AppIcon.settings, value: RootTab.settings) {
                 NavigationStack { SettingsView() }
             }
         }
         .tint(.blue)
+        .onChange(of: selection) { oldValue, newValue in
+            if newValue == .add {
+                selection = oldValue == .add ? previousSelection : oldValue
+                showingAddBill = true
+            } else {
+                previousSelection = newValue
+            }
+        }
+        .sheet(isPresented: $showingAddBill) { NewBillView() }
     }
 }
 
@@ -149,7 +163,7 @@ struct NewAccountView: View {
     @State private var kind = "checking"
     @State private var balance = ""
     @State private var currency = SupportedCurrency.defaultCode
-    private let kinds = [("checking", "Checking"), ("savings", "Savings"), ("credit", "Credit card"), ("investment", "Investment"), ("cash", "Cash")]
+    private let kinds = [("checking", "Checking"), ("savings", "Savings"), ("credit", "Credit card"), ("sharedCredit", "Someone else's card"), ("investment", "Investment"), ("cash", "Cash")]
 
     var body: some View {
         NavigationStack {
@@ -165,6 +179,13 @@ struct NewAccountView: View {
                         ForEach(SupportedCurrency.all) { option in
                             Text("\(option.code) — \(option.name)").tag(option.code)
                         }
+                    }
+                }
+                if kind == "sharedCredit" {
+                    Section {
+                        Text("Use this for a parent’s or someone else’s card. It stays visible in Overview but is excluded from your own net worth.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
                     }
                 }
                 Section { Text("This account is saved locally. You can enable sync later in Settings.").font(.subheadline).foregroundStyle(.secondary) }
@@ -199,7 +220,23 @@ struct NewRecurringPaymentView: View {
     @State private var nextDate = Date()
     @State private var accountId = ""
     @State private var category = "Bills"
+    private let existingPayment: RecurringPayment?
     private let frequencies = [("weekly", "Weekly"), ("everyTwoWeeks", "Every 2 weeks"), ("monthly", "Monthly"), ("yearly", "Yearly")]
+
+    init(payment: RecurringPayment? = nil) {
+        existingPayment = payment
+        if let payment {
+            _name = State(initialValue: payment.name)
+            _amount = State(initialValue: NSDecimalNumber(value: Double(payment.amountMinor) / 100).stringValue)
+            _currency = State(initialValue: payment.currency)
+            _frequency = State(initialValue: payment.frequency)
+            _nextDate = State(initialValue: payment.nextDate)
+            _accountId = State(initialValue: payment.accountId ?? "")
+            _category = State(initialValue: payment.category)
+        }
+    }
+
+    private var availableAccounts: [CachedAccount] { accounts.filter { $0.currency == currency } }
 
     var body: some View {
         NavigationStack {
@@ -228,7 +265,7 @@ struct NewRecurringPaymentView: View {
                     Section("Account") {
                         Picker("Pay from", selection: $accountId) {
                             Text("Not selected").tag("")
-                            ForEach(accounts) { Text($0.name).tag($0.id) }
+                            ForEach(availableAccounts) { Text($0.name).tag($0.id) }
                         }
                     }
                 }
@@ -238,12 +275,14 @@ struct NewRecurringPaymentView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            .navigationTitle("Add recurring bill")
+            .navigationTitle(existingPayment == nil ? "Add recurring bill" : "Edit recurring bill")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) { Button("Save") { save() }.disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || parsedAmount <= 0) }
             }
+            .task { selectDefaultAccount() }
+            .onChange(of: currency) { _, _ in selectDefaultAccount(force: true) }
         }
     }
 
@@ -253,16 +292,18 @@ struct NewRecurringPaymentView: View {
     }
 
     private func save() {
-        let bill = RecurringPayment(
-            name: name.trimmingCharacters(in: .whitespaces),
-            amountMinor: parsedAmount,
-            currency: currency,
-            frequency: frequency,
-            nextDate: nextDate,
-            accountId: accountId.isEmpty ? nil : accountId,
-            category: category.trimmingCharacters(in: .whitespaces).isEmpty ? "Bills" : category.trimmingCharacters(in: .whitespaces)
+        let bill = existingPayment ?? RecurringPayment(
+            name: name, amountMinor: parsedAmount, currency: currency, frequency: frequency,
+            nextDate: nextDate, accountId: nil, category: category
         )
-        context.insert(bill)
+        bill.name = name.trimmingCharacters(in: .whitespaces)
+        bill.amountMinor = parsedAmount
+        bill.currency = currency
+        bill.frequency = frequency
+        bill.nextDate = nextDate
+        bill.accountId = accountId.isEmpty ? nil : accountId
+        bill.category = category.trimmingCharacters(in: .whitespaces).isEmpty ? "Bills" : category.trimmingCharacters(in: .whitespaces)
+        if existingPayment == nil { context.insert(bill) }
         context.insert(PendingRecurringMutation(entityId: bill.id, action: "upsert"))
         let transactions = (try? context.fetch(FetchDescriptor<CachedTransaction>())) ?? []
         for transaction in transactions where transaction.recurringPaymentId == nil {
@@ -270,5 +311,10 @@ struct NewRecurringPaymentView: View {
         }
         try? context.save()
         dismiss()
+    }
+
+    private func selectDefaultAccount(force: Bool = false) {
+        if !force, availableAccounts.contains(where: { $0.id == accountId }) { return }
+        accountId = availableAccounts.first?.id ?? ""
     }
 }

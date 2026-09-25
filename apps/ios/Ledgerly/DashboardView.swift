@@ -5,63 +5,29 @@ struct DashboardView: View {
     @Environment(\.modelContext) private var context
     @Environment(SessionController.self) private var session
     @Query(sort: \CachedAccount.name) private var accounts: [CachedAccount]
-    @Query(sort: \CachedTransaction.bookedAt, order: .reverse) private var transactions: [CachedTransaction]
     @State private var sync = SyncController()
-    @State private var path = NavigationPath()
     @State private var showingNewAccount = false
 
-    private var balances: [(currency: String, amount: Int)] {
-        let grouped = Dictionary(grouping: accounts, by: \.currency)
-        return grouped.map { (currency: $0.key, amount: $0.value.reduce(0) { $0 + $1.amountMinor }) }
-            .sorted { $0.currency < $1.currency }
-    }
-    private var pendingCount: Int {
-        ((try? context.fetchCount(FetchDescriptor<PendingMutation>())) ?? 0)
-            + ((try? context.fetchCount(FetchDescriptor<PendingAccountMutation>())) ?? 0)
-            + ((try? context.fetchCount(FetchDescriptor<PendingTransactionCreate>())) ?? 0)
-            + ((try? context.fetchCount(FetchDescriptor<PendingRecurringMutation>())) ?? 0)
-    }
+    private var ownedAccounts: [CachedAccount] { accounts.filter(\.isIncludedInNetWorth) }
+    private var trackedCards: [CachedAccount] { accounts.filter { !$0.isIncludedInNetWorth } }
 
     var body: some View {
-        NavigationStack(path: $path) {
+        NavigationStack {
             List {
-                Section("Balance") { balanceSummary }
-                Section {
-                    ForEach(accounts) { account in
-                        NavigationLink(value: account.id) { accountRow(account) }
-                    }
-                    if accounts.isEmpty { emptyState }
-                } header: {
-                    HStack {
-                        Text("Accounts")
-                        Spacer()
-                        Button("Add", systemImage: "plus") { showingNewAccount = true }
-                    }
-                }
-                if !transactions.isEmpty {
-                    Section("Recent activity") {
-                        ForEach(transactions.prefix(8)) { transaction in
-                            NavigationLink(value: transaction.id) { transactionRow(transaction) }
-                        }
-                    }
-                }
+                accountSection("Your accounts", accounts: ownedAccounts)
+                if !trackedCards.isEmpty { accountSection("Cards you track", accounts: trackedCards) }
+                if accounts.isEmpty { emptyState }
             }
             .listStyle(.insetGrouped)
             .refreshable { if session.isAuthenticated { await sync.refresh(context: context) } }
             .navigationTitle("Overview")
             .navigationBarTitleDisplayMode(.large)
-            .navigationDestination(for: String.self) { id in
-                if let account = accounts.first(where: { $0.id == id }) {
-                    AccountDetailView(accountID: account.id)
-                } else if let transaction = transactions.first(where: { $0.id == id }) {
-                    TransactionDetailView(
-                        transaction: TransactionSnapshot(
-                            transaction,
-                            account: accounts.first { $0.id == transaction.accountId }
-                        )
-                    )
-                } else {
-                    ContentUnavailableView("Not found", systemImage: "questionmark.circle")
+            .toolbar {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    NavigationLink { NativeInsightsView() } label: {
+                        Label("Insights", systemImage: AppIcon.insights)
+                    }
+                    Button("Add account", systemImage: "plus") { showingNewAccount = true }
                 }
             }
             .sheet(isPresented: $showingNewAccount) { NewAccountView() }
@@ -69,80 +35,50 @@ struct DashboardView: View {
         }
     }
 
-    private var balanceSummary: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            if balances.isEmpty {
-                Text(money(0, SupportedCurrency.defaultCode))
-                    .font(.system(size: 40, weight: .semibold, design: .rounded))
-            } else {
-                ForEach(balances, id: \.currency) { balance in
-                    Text(money(balance.amount, balance.currency))
-                        .font(.system(size: 40, weight: .semibold, design: .rounded))
+    @ViewBuilder
+    private func accountSection(_ title: String, accounts: [CachedAccount]) -> some View {
+        if !accounts.isEmpty {
+            Section(title) {
+                ForEach(accounts) { account in
+                    NavigationLink { AccountDetailView(accountID: account.id) } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: accountSymbol(account)).ledgerlyIcon().frame(width: 28)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(account.name).font(.headline)
+                                Text("\(account.institution) · \(account.displayKind)")
+                                    .font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+                            }
+                            Spacer(minLength: 8)
+                            Text(money(account.amountMinor, account.currency))
+                                .font(.body.weight(.semibold)).lineLimit(1).minimumScaleFactor(0.72)
+                        }
+                        .padding(.vertical, 4)
+                    }
                 }
-            }
-            HStack(spacing: 8) {
-                Image(systemName: session.localOnly ? "iphone" : (sync.isOffline ? "wifi.slash" : AppIcon.synced))
-                Text(session.localOnly ? "Saved on this iPhone" : (sync.isOffline ? "Offline" : "Up to date"))
-                if sync.isSyncing { ProgressView().controlSize(.small) }
-                if let syncedAt = sync.lastSyncedAt {
-                    Text("· synced \(syncedAt.formatted(.relative(presentation: .named)))")
-                }
-            }
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
-            if pendingCount > 0 {
-                Text("\(pendingCount) change\(pendingCount == 1 ? "" : "s") waiting to sync")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 8)
     }
 
     private var emptyState: some View {
-        VStack(spacing: 14) {
-            Image(systemName: AppIcon.cash).ledgerlyIcon().font(.system(size: 34))
-            Text("Start with an account").font(.headline)
-            Text("Add a bank, card, cash, or savings account. It stays on this device until you enable sync.")
-                .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
-            Button("Create account") { showingNewAccount = true }.buttonStyle(.borderedProminent)
+        ContentUnavailableView {
+            Label("No accounts yet", systemImage: AppIcon.account)
+        } description: {
+            Text("Add your bank account, cash, or a card you use for someone else.")
+        } actions: {
+            Button("Add account", systemImage: "plus") { showingNewAccount = true }
+                .buttonStyle(.borderedProminent)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 22)
     }
 
-    private func accountRow(_ item: CachedAccount) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(item.name).font(.headline)
-                Text("\(item.institution) · \(item.displayKind)").font(.subheadline).foregroundStyle(.secondary)
-            }
-            Spacer()
-            Text(money(item.amountMinor, item.currency)).fontWeight(.semibold)
+    private func accountSymbol(_ account: CachedAccount) -> String {
+        switch account.kind {
+        case "checking": "creditcard.fill"
+        case "savings": "banknote.fill"
+        case "credit": "creditcard.trianglebadge.exclamationmark"
+        case "sharedCredit": "person.crop.circle.badge.checkmark"
+        case "investment": "chart.line.uptrend.xyaxis"
+        default: AppIcon.cash
         }
-        .padding(.vertical, 4)
-    }
-
-    private func transactionRow(_ item: CachedTransaction) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: PaymentIcon.symbol(title: item.title, category: item.category, amountMinor: item.amountMinor))
-                .ledgerlyIcon(color: PaymentIcon.color(amountMinor: item.amountMinor))
-                .frame(width: 32)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(item.title).fontWeight(.semibold)
-                Text("\(PaymentIcon.directionLabel(amountMinor: item.amountMinor)) · \(item.category ?? "Uncategorized")")
-                    .font(.subheadline).foregroundStyle(.secondary)
-            }
-            Spacer()
-            VStack(alignment: .trailing) {
-                Text(money(item.amountMinor, item.currency))
-                    .fontWeight(.semibold)
-                    .foregroundStyle(PaymentIcon.color(amountMinor: item.amountMinor))
-                if item.pending { Text("Pending").font(.footnote).foregroundStyle(.orange) }
-            }
-        }
-        .padding(.vertical, 4)
     }
 
     private func money(_ amount: Int, _ currency: String) -> String {

@@ -25,6 +25,7 @@
 		94C5C68291719188F29E5088 /* BillShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB1942F6224E96F374C2E985 /* BillShortcuts.swift */; };
 		9678D187994E841D6BB06EE9 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E37E7C942B2B07B38BB6D62 /* AppConfig.swift */; };
 		994C6023DF322D75578FE0C9 /* PaymentIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4A67EB3AC66E32417CA61DF /* PaymentIcon.swift */; };
+		9BD09FDC16B249ED78FAEE90 /* TransactionMerger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CCD3A7A954A526A4532154C /* TransactionMerger.swift */; };
 		A30BD357A21EB8542ED4DE30 /* ScreenshotSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFBC8BFF6BBF45BAC50DD36B /* ScreenshotSync.swift */; };
 		B80071EC414C2C333DAF9623 /* NativeTabs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66E1969D51CF787D24A489A0 /* NativeTabs.swift */; };
 		CA97A2EF1F499AC7C00B1EC7 /* AccountDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0106C64BF0BF3AFFB28671 /* AccountDetailView.swift */; };
@@ -49,6 +50,7 @@
 		1E37E7C942B2B07B38BB6D62 /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
 		2038E261E85443DB57B2511E /* DemoData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoData.swift; sourceTree = "<group>"; };
 		276C5023F83277240143C5AE /* LedgerlyTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = LedgerlyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		2CCD3A7A954A526A4532154C /* TransactionMerger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionMerger.swift; sourceTree = "<group>"; };
 		3CCADD99C2A14619B1236027 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		4884CB17F759342E9DB1556E /* SupportedCurrency.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportedCurrency.swift; sourceTree = "<group>"; };
 		4C47DE8DA5D1977EEE8DB432 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
@@ -122,6 +124,7 @@
 				4884CB17F759342E9DB1556E /* SupportedCurrency.swift */,
 				55C65570FEA7E03FA70CD303 /* SyncEngine.swift */,
 				5CD186720D2E69A2B06E6E6D /* TransactionDetailView.swift */,
+				2CCD3A7A954A526A4532154C /* TransactionMerger.swift */,
 			);
 			path = Ledgerly;
 			sourceTree = "<group>";
@@ -249,6 +252,7 @@
 				471693F283B52650E8D6405E /* SupportedCurrency.swift in Sources */,
 				5762EC5917970812C489302E /* SyncEngine.swift in Sources */,
 				46881E480234BB5D846D1AC1 /* TransactionDetailView.swift in Sources */,
+				9BD09FDC16B249ED78FAEE90 /* TransactionMerger.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -421,7 +425,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 15;
+				CURRENT_PROJECT_VERSION = 16;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Ledgerly/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -429,7 +433,7 @@
 					"@executable_path/Frameworks",
 				);
 				LEDGERLY_BASE_URL = "http://localhost:3000";
-				MARKETING_VERSION = 0.2.4;
+				MARKETING_VERSION = 0.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ledgerly.app;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -441,7 +445,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 15;
+				CURRENT_PROJECT_VERSION = 16;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Ledgerly/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -449,7 +453,7 @@
 					"@executable_path/Frameworks",
 				);
 				LEDGERLY_BASE_URL = "http://localhost:3000";
-				MARKETING_VERSION = 0.2.4;
+				MARKETING_VERSION = 0.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ledgerly.app;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";

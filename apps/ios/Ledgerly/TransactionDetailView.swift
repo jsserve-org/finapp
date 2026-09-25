@@ -15,6 +15,10 @@ struct TransactionSnapshot: Identifiable, Hashable {
     var accountName: String?
     var institution: String?
     var recurringPaymentName: String?
+    var source: String?
+    var expensePurpose: String?
+    var reimbursementStatus: String?
+    var reimbursementTransactionID: String?
 
     init(_ transaction: CachedTransaction, account: CachedAccount? = nil, recurringPayment: RecurringPayment? = nil) {
         id = transaction.id
@@ -30,6 +34,10 @@ struct TransactionSnapshot: Identifiable, Hashable {
         accountName = account?.name
         institution = account?.institution
         recurringPaymentName = recurringPayment?.name
+        source = transaction.source
+        expensePurpose = transaction.expensePurpose
+        reimbursementStatus = transaction.reimbursementStatus
+        reimbursementTransactionID = transaction.reimbursementTransactionId
     }
 }
 
@@ -39,6 +47,19 @@ struct TransactionDetailView: View {
     @State private var transaction: TransactionSnapshot
     @State private var showingEditor = false
     @State private var showDeleteConfirm = false
+    @State private var showReimbursementAccounts = false
+    @State private var showMergeReview = false
+    @Query(sort: \CachedAccount.name) private var accounts: [CachedAccount]
+    @Query(sort: \CachedTransaction.bookedAt, order: .reverse) private var allTransactions: [CachedTransaction]
+
+    private var reimbursementAccounts: [CachedAccount] {
+        accounts.filter { $0.currency == transaction.currency && $0.kind != "sharedCredit" }
+    }
+
+    private var mergeCandidate: TransactionMergeCandidate? {
+        guard let model = fetchTransaction() else { return nil }
+        return TransactionMerger.candidate(for: model, among: allTransactions)
+    }
 
     init(transaction: TransactionSnapshot) {
         _transaction = State(initialValue: transaction)
@@ -65,6 +86,7 @@ struct TransactionDetailView: View {
             Section("Payment details") {
                 detailRow("Description", transaction.title)
                 detailRow("Category", transaction.category ?? "Uncategorized")
+                detailRow("Purpose", purposeLabel(transaction.expensePurpose))
                 detailRow("Direction", transaction.amountMinor < 0 ? "Money out" : "Money in")
                 HStack(spacing: 12) {
                     Text("Status")
@@ -75,6 +97,18 @@ struct TransactionDetailView: View {
                 .frame(minHeight: 24)
                 if let date = transaction.bookedDate {
                     detailRow("Date", date.formatted(date: .long, time: .shortened))
+                }
+            }
+
+            if transaction.reimbursementStatus != nil {
+                Section("Reimbursement") {
+                    detailRow("Status", transaction.reimbursementStatus == "reimbursed" ? "Reimbursed" : "Waiting for repayment")
+                    if transaction.reimbursementStatus == "pending" {
+                        Button("Mark as reimbursed", systemImage: "arrow.uturn.backward.circle.fill") {
+                            showReimbursementAccounts = true
+                        }
+                        .foregroundStyle(.green)
+                    }
                 }
             }
 
@@ -99,7 +133,7 @@ struct TransactionDetailView: View {
             }
 
             Section("Record information") {
-                detailRow("Source", transaction.category == "Screenshot Sync" ? "Screenshot import" : "Manual or synced")
+                detailRow("Source", sourceLabel(transaction.source))
                 if let updated = transaction.updatedDate {
                     detailRow("Last updated", updated.formatted(date: .abbreviated, time: .shortened))
                 }
@@ -110,6 +144,9 @@ struct TransactionDetailView: View {
             }
 
             Section {
+                if mergeCandidate != nil {
+                    Button("Review possible duplicate", systemImage: "arrow.triangle.merge") { showMergeReview = true }
+                }
                 Button("Edit transaction", systemImage: "pencil") { showingEditor = true }
                 Button("Delete transaction", systemImage: "trash", role: .destructive) { showDeleteConfirm = true }
             }
@@ -123,6 +160,23 @@ struct TransactionDetailView: View {
             Button("Delete", role: .destructive) { delete() }
         } message: {
             Text("The account balance will be adjusted to remove this transaction.")
+        }
+        .confirmationDialog("Where was the reimbursement paid?", isPresented: $showReimbursementAccounts, titleVisibility: .visible) {
+            ForEach(reimbursementAccounts) { account in
+                Button(account.name) { markReimbursed(into: account) }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Ledgerly will add a green money-in transaction and link it to this expense.")
+        }
+        .sheet(isPresented: $showMergeReview) {
+            if let candidate = mergeCandidate {
+                MergeReviewView(candidate: candidate) {
+                    TransactionMerger.merge(candidate, context: context)
+                    showMergeReview = false
+                    dismiss()
+                }
+            }
         }
     }
 
@@ -162,6 +216,10 @@ struct TransactionDetailView: View {
         transaction.category = model.category
         transaction.recurringPaymentID = model.recurringPaymentId
         transaction.updatedDate = model.updatedDate
+        transaction.source = model.source
+        transaction.expensePurpose = model.expensePurpose
+        transaction.reimbursementStatus = model.reimbursementStatus
+        transaction.reimbursementTransactionID = model.reimbursementTransactionId
     }
 
     private func fetchTransaction() -> CachedTransaction? {
@@ -175,6 +233,66 @@ struct TransactionDetailView: View {
         var descriptor = FetchDescriptor<CachedAccount>(predicate: #Predicate { $0.id == id })
         descriptor.fetchLimit = 1
         return try? context.fetch(descriptor).first
+    }
+
+    private func markReimbursed(into account: CachedAccount) {
+        guard let model = fetchTransaction(), model.reimbursementStatus == "pending" else { return }
+        _ = ReimbursementService.reimburse(model, into: account, context: context)
+        refreshTransaction()
+    }
+
+    private func purposeLabel(_ purpose: String?) -> String {
+        switch purpose {
+        case "school": "School"
+        case "someoneElse": "Someone else"
+        default: "Personal"
+        }
+    }
+
+    private func sourceLabel(_ source: String?) -> String {
+        switch source {
+        case "manual": "Added manually"
+        case "automation": "Automation import"
+        case "screenshot": "Screenshot import"
+        case "reimbursement": "Reimbursement"
+        default: "Synced"
+        }
+    }
+}
+
+private struct MergeReviewView: View {
+    @Environment(\.dismiss) private var dismiss
+    let candidate: TransactionMergeCandidate
+    let merge: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Keep imported details") { transactionRow(candidate.imported, label: "Imported") }
+                Section("Remove duplicate") { transactionRow(candidate.manual, label: "Manual") }
+                Section {
+                    Button("Merge transactions", systemImage: "arrow.triangle.merge", action: merge)
+                        .fontWeight(.semibold)
+                } footer: {
+                    Text("The imported record is kept. Missing category, purpose, recurring-bill link, and reimbursement details are copied from the manual record. Your balance is not changed.")
+                }
+            }
+            .navigationTitle("Possible duplicate")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
+        }
+    }
+
+    private func transactionRow(_ item: CachedTransaction, label: String) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack {
+                Text(item.title).font(.headline).lineLimit(1)
+                Spacer()
+                Text(money(item.amountMinor, item.currency)).fontWeight(.semibold).lineLimit(1)
+            }
+            Text("\(label) · \(item.bookedDate?.formatted(date: .abbreviated, time: .omitted) ?? "Unknown date")")
+                .font(.subheadline).foregroundStyle(.secondary)
+        }
     }
 }
 
@@ -191,6 +309,8 @@ private struct EditTransactionView: View {
     @State private var date: Date
     @State private var accountID: String
     @State private var pending: Bool
+    @State private var expensePurpose: String
+    @State private var reimbursable: Bool
 
     init(transaction: TransactionSnapshot) {
         self.transaction = transaction
@@ -201,6 +321,8 @@ private struct EditTransactionView: View {
         _date = State(initialValue: transaction.bookedDate ?? Date())
         _accountID = State(initialValue: transaction.accountID)
         _pending = State(initialValue: transaction.pending)
+        _expensePurpose = State(initialValue: transaction.expensePurpose ?? "personal")
+        _reimbursable = State(initialValue: transaction.reimbursementStatus == "pending")
     }
 
     private var compatibleAccounts: [CachedAccount] { accounts.filter { $0.currency == transaction.currency } }
@@ -228,6 +350,14 @@ private struct EditTransactionView: View {
                     DatePicker("Date and time", selection: $date)
                     Picker("Account", selection: $accountID) {
                         ForEach(compatibleAccounts) { account in Text(account.name).tag(account.id) }
+                    }
+                    Picker("Purpose", selection: $expensePurpose) {
+                        Text("Personal").tag("personal")
+                        Text("School").tag("school")
+                        Text("Someone else").tag("someoneElse")
+                    }
+                    if isMoneyOut, transaction.reimbursementStatus != "reimbursed" {
+                        Toggle("I expect reimbursement", isOn: $reimbursable)
                     }
                 }
             }
@@ -267,6 +397,10 @@ private struct EditTransactionView: View {
         model.accountId = newAccount.id
         model.bookedAt = ISO8601DateFormatter().string(from: date)
         model.pending = pending
+        model.expensePurpose = expensePurpose
+        if model.reimbursementStatus != "reimbursed" {
+            model.reimbursementStatus = reimbursable && newAmount < 0 ? "pending" : nil
+        }
         model.updatedAt = now
         enqueueFullTransaction(context: context, transactionID: model.id)
         autoLinkRecurringPayment(model, payments: recurringPayments, context: context)

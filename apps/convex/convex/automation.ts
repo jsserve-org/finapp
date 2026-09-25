@@ -16,7 +16,7 @@ export const runDemo = mutation({ args: { tokenHash: v.string(), now: v.number()
   if (existing) await ctx.db.patch(existing._id, { value: accountValue, version: existing.version + 1 }); else await ctx.db.insert("accounts", { userId: session.userId, externalId: accountId, value: accountValue, version: 1 });
   await addChange(ctx, session.userId, "account", accountId, "upsert", accountValue);
   for (const item of [{ id: `coffee-${date.slice(0, 10)}`, description: "Corner Coffee", amount: -525 }, { id: `salary-${date.slice(0, 10)}`, description: "Salary", amount: 320000 }]) {
-    const value = { id: item.id, accountId, description: item.description, amount: { amountMinor: item.amount, currency: "USD" }, bookedAt: date, pending: false, updatedAt: date };
+    const value = { id: item.id, accountId, description: item.description, amount: { amountMinor: item.amount, currency: "USD" }, bookedAt: date, pending: false, source: "automation", updatedAt: date };
     const old = await ctx.db.query("transactions").withIndex("by_user_external", (q) => q.eq("userId", session.userId).eq("externalId", item.id)).unique();
     if (old) await ctx.db.patch(old._id, { value, deleted: false, version: old.version + 1 }); else await ctx.db.insert("transactions", { userId: session.userId, externalId: item.id, value, version: 1, deleted: false });
     await addChange(ctx, session.userId, "transaction", item.id, "upsert", value);

@@ -11,6 +11,10 @@ struct NewBillView: View {
     @State private var category = "Bills"
     @State private var paymentDate = Date()
     @State private var accountId = ""
+    @State private var expensePurpose = "personal"
+    @State private var reimbursable = false
+
+    private var availableAccounts: [CachedAccount] { accounts.filter { $0.currency == currency } }
 
     var body: some View {
         NavigationStack {
@@ -25,14 +29,27 @@ struct NewBillView: View {
                     Section("Bill") {
                         TextField("Name", text: $name)
                         TextField("Amount", text: $amount).keyboardType(.decimalPad)
-                        LabeledContent("Currency", value: currency)
+                        Picker("Currency", selection: $currency) {
+                            ForEach(SupportedCurrency.all) { option in
+                                Text("\(option.code) — \(option.name)").tag(option.code)
+                            }
+                        }
                         TextField("Category", text: $category)
+                    }
+
+                    Section("For") {
+                        Picker("Purpose", selection: $expensePurpose) {
+                            Text("Personal").tag("personal")
+                            Text("School").tag("school")
+                            Text("Someone else").tag("someoneElse")
+                        }
+                        Toggle("I expect reimbursement", isOn: $reimbursable)
                     }
 
                     Section {
                         DatePicker("Payment date", selection: $paymentDate, displayedComponents: .date)
                         Picker("Pay from", selection: $accountId) {
-                            ForEach(accounts) { Text($0.name).tag($0.id) }
+                            ForEach(availableAccounts) { Text($0.name).tag($0.id) }
                         }
                     } header: {
                         Text("Payment")
@@ -51,7 +68,15 @@ struct NewBillView: View {
                 }
             }
             .task { selectDefaultAccount() }
-            .onChange(of: accountId) { _, _ in selectAccountCurrency() }
+            .onChange(of: currency) { _, _ in selectDefaultAccount(force: true) }
+            .onChange(of: expensePurpose) { _, purpose in
+                if purpose == "school", category == "Bills" { category = "School" }
+            }
+            .onChange(of: accountId) { _, id in
+                if accounts.first(where: { $0.id == id })?.kind == "sharedCredit" {
+                    expensePurpose = "someoneElse"
+                }
+            }
         }
     }
 
@@ -60,14 +85,14 @@ struct NewBillView: View {
         return NSDecimalNumber(decimal: decimal * 100).intValue
     }
 
-    private func selectDefaultAccount() {
-        guard accountId.isEmpty, let account = accounts.first else { return }
-        accountId = account.id
-        currency = account.currency
-    }
-
-    private func selectAccountCurrency() {
-        if let account = accounts.first(where: { $0.id == accountId }) { currency = account.currency }
+    private func selectDefaultAccount(force: Bool = false) {
+        if !force, accountId.isEmpty, availableAccounts.isEmpty, let first = accounts.first {
+            currency = first.currency
+            accountId = first.id
+            return
+        }
+        if !force, availableAccounts.contains(where: { $0.id == accountId }) { return }
+        accountId = availableAccounts.first?.id ?? ""
     }
 
     private func save() {
@@ -81,6 +106,9 @@ struct NewBillView: View {
             bookedAt: timestamp,
             pending: false,
             category: category.trimmingCharacters(in: .whitespaces).isEmpty ? "Bills" : category.trimmingCharacters(in: .whitespaces),
+            source: "manual",
+            expensePurpose: expensePurpose,
+            reimbursementStatus: reimbursable ? "pending" : nil,
             updatedAt: timestamp
         ), initialVersion: 0)
         context.insert(transaction)

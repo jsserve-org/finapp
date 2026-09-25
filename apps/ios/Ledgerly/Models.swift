@@ -18,12 +18,18 @@ struct TransactionDTO: Codable, Equatable, Identifiable {
     let pending: Bool
     let category: String?
     let recurringPaymentId: String?
+    let source: String?
+    let expensePurpose: String?
+    let reimbursementStatus: String?
+    let reimbursementTransactionId: String?
     let updatedAt: String
 
-    init(id: String, accountId: String, description: String, amount: Money, bookedAt: String, pending: Bool, category: String?, recurringPaymentId: String? = nil, updatedAt: String) {
+    init(id: String, accountId: String, description: String, amount: Money, bookedAt: String, pending: Bool, category: String?, recurringPaymentId: String? = nil, source: String? = nil, expensePurpose: String? = nil, reimbursementStatus: String? = nil, reimbursementTransactionId: String? = nil, updatedAt: String) {
         self.id = id; self.accountId = accountId; self.description = description; self.amount = amount
         self.bookedAt = bookedAt; self.pending = pending; self.category = category
-        self.recurringPaymentId = recurringPaymentId; self.updatedAt = updatedAt
+        self.recurringPaymentId = recurringPaymentId; self.source = source; self.expensePurpose = expensePurpose
+        self.reimbursementStatus = reimbursementStatus; self.reimbursementTransactionId = reimbursementTransactionId
+        self.updatedAt = updatedAt
     }
 }
 
@@ -216,7 +222,15 @@ enum JSONValue: Codable, Equatable {
         updatedAt = dto.updatedAt
     }
 
-    var displayKind: String { kind.capitalized }
+    var displayKind: String {
+        switch kind {
+        case "sharedCredit": "Someone else's card"
+        case "credit": "Credit card"
+        default: kind.capitalized
+        }
+    }
+
+    var isIncludedInNetWorth: Bool { kind != "sharedCredit" }
 }
 
 @Model final class CachedTransaction {
@@ -229,6 +243,10 @@ enum JSONValue: Codable, Equatable {
     var pending: Bool
     var category: String?
     var recurringPaymentId: String?
+    var source: String?
+    var expensePurpose: String?
+    var reimbursementStatus: String?
+    var reimbursementTransactionId: String?
     var version: Int
     var updatedAt: String
 
@@ -242,6 +260,10 @@ enum JSONValue: Codable, Equatable {
         pending = dto.pending
         category = dto.category
         recurringPaymentId = dto.recurringPaymentId
+        source = dto.source
+        expensePurpose = dto.expensePurpose
+        reimbursementStatus = dto.reimbursementStatus
+        reimbursementTransactionId = dto.reimbursementTransactionId
         version = initialVersion
         updatedAt = dto.updatedAt
     }
@@ -255,6 +277,10 @@ enum JSONValue: Codable, Equatable {
         pending = dto.pending
         category = dto.category
         recurringPaymentId = dto.recurringPaymentId
+        source = dto.source
+        expensePurpose = dto.expensePurpose
+        reimbursementStatus = dto.reimbursementStatus
+        reimbursementTransactionId = dto.reimbursementTransactionId
         self.version = version
         updatedAt = dto.updatedAt
     }

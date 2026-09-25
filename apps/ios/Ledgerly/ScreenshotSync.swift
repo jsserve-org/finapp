@@ -141,7 +141,7 @@ final class ScreenshotSyncService {
         let transaction = CachedTransaction(dto: TransactionDTO(
             id: UUID().uuidString.lowercased(), accountId: account.id, description: payment.title,
             amount: Money(amountMinor: -payment.amountMinor, currency: account.currency), bookedAt: timestamp,
-            pending: false, category: "Screenshot Sync", updatedAt: timestamp
+            pending: false, category: "Screenshot Sync", source: "screenshot", updatedAt: timestamp
         ), initialVersion: 0)
         context.insert(transaction)
         context.insert(PendingTransactionCreate(entityId: transaction.id))
