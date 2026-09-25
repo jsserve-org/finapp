@@ -12,6 +12,9 @@ struct SyncEngine {
     /// Returns the number of pending mutations that were accepted.
     @discardableResult
     func runSync(context: ModelContext) async throws -> Int {
+        let serverConfig = try await api.serverConfig()
+        let compatibility = LedgerlyCompatibility.evaluate(serverConfig)
+        guard compatibility.canSync else { throw APIError.incompatible(compatibility.message) }
         let settings = try context.fetch(FetchDescriptor<SyncSetting>())
         let cursor = settings.first(where: { $0.key == "cursor" })?.value
 
@@ -21,6 +24,7 @@ struct SyncEngine {
         let pendingAccounts = try context.fetch(FetchDescriptor<PendingAccountMutation>(sortBy: [SortDescriptor(\.createdAt)]))
         let pendingTransactions = try context.fetch(FetchDescriptor<PendingTransactionCreate>(sortBy: [SortDescriptor(\.createdAt)]))
         let pendingRecurring = try context.fetch(FetchDescriptor<PendingRecurringMutation>(sortBy: [SortDescriptor(\.createdAt)]))
+        let pendingStocks = try context.fetch(FetchDescriptor<PendingStockMutation>(sortBy: [SortDescriptor(\.createdAt)]))
         let accountOperations: [SyncOperation] = try pendingAccounts.compactMap { mutation in
             if mutation.action == "delete" {
                 return SyncOperation(mutationId: mutation.mutationId, entity: "account", action: "delete", entityId: mutation.entityId, value: nil, baseVersion: 0)
@@ -42,9 +46,23 @@ struct SyncEngine {
             let dto = RecurringPaymentDTO(id: payment.id, name: payment.name, amountMinor: payment.amountMinor, currency: payment.currency, frequency: payment.frequency, nextDate: payment.nextDate, accountId: payment.accountId, category: payment.category, isActive: payment.isActive)
             return SyncOperation(mutationId: mutation.mutationId, entity: "recurringPayment", action: "upsert", entityId: payment.id, value: .init(recurringPayment: dto), baseVersion: 0)
         }
+        let stockOperations: [SyncOperation] = try pendingStocks.compactMap { mutation in
+            if mutation.action == "delete" {
+                return SyncOperation(mutationId: mutation.mutationId, entity: mutation.entityKind, action: "delete", entityId: mutation.entityId, value: nil, baseVersion: 0)
+            }
+            if mutation.entityKind == "stockHolding", let holding = try fetchOne(StockHolding.self, id: mutation.entityId, context: context) {
+                let dto = StockHoldingDTO(id: holding.id, symbol: holding.symbol, name: holding.name, currency: holding.currency, quantity: holding.quantity, averageCostMinor: holding.averageCostMinor, currentPriceMinor: holding.currentPriceMinor, linkedAccountId: holding.linkedAccountId, updatedAt: holding.updatedAt)
+                return SyncOperation(mutationId: mutation.mutationId, entity: mutation.entityKind, action: "upsert", entityId: holding.id, value: .init(stockHolding: dto), baseVersion: 0)
+            }
+            if mutation.entityKind == "stockTrade", let trade = try fetchOne(StockTrade.self, id: mutation.entityId, context: context) {
+                let dto = StockTradeDTO(id: trade.id, holdingId: trade.holdingId, symbol: trade.symbol, side: trade.side, currency: trade.currency, quantity: trade.quantity, priceMinor: trade.priceMinor, feesMinor: trade.feesMinor, tradedAt: trade.tradedAt, linkedAccountId: trade.linkedAccountId)
+                return SyncOperation(mutationId: mutation.mutationId, entity: mutation.entityKind, action: "upsert", entityId: trade.id, value: .init(stockTrade: dto), baseVersion: 0)
+            }
+            return nil
+        }
         var accepted = 0
-        if !pending.isEmpty || !pendingAccounts.isEmpty || !pendingTransactions.isEmpty || !pendingRecurring.isEmpty {
-            let result = try await api.sync(cursor: cursor, operations: accountOperations + transactionOperations + recurringOperations + pending.map(\.operation))
+        if !pending.isEmpty || !pendingAccounts.isEmpty || !pendingTransactions.isEmpty || !pendingRecurring.isEmpty || !pendingStocks.isEmpty {
+            let result = try await api.sync(cursor: cursor, operations: accountOperations + transactionOperations + recurringOperations + stockOperations + pending.map(\.operation))
             let acceptedIds = Set(result.acceptedMutationIds)
             for mutation in pending where acceptedIds.contains(mutation.mutationId) {
                 context.delete(mutation)
@@ -59,6 +77,10 @@ struct SyncEngine {
                 accepted += 1
             }
             for mutation in pendingRecurring where acceptedIds.contains(mutation.mutationId) {
+                context.delete(mutation)
+                accepted += 1
+            }
+            for mutation in pendingStocks where acceptedIds.contains(mutation.mutationId) {
                 context.delete(mutation)
                 accepted += 1
             }
@@ -92,6 +114,8 @@ struct SyncEngine {
                 if change.entity == "recurringPayment" {
                     try fetchOne(RecurringPayment.self, id: entityID, context: context).map(context.delete)
                 }
+                if change.entity == "stockHolding" { try fetchOne(StockHolding.self, id: entityID, context: context).map(context.delete) }
+                if change.entity == "stockTrade" { try fetchOne(StockTrade.self, id: entityID, context: context).map(context.delete) }
                 continue
             }
             guard let value = change.value else { continue }
@@ -125,6 +149,24 @@ struct SyncEngine {
                     item.isActive = dto.isActive
                 } else {
                     context.insert(RecurringPayment(id: dto.id, name: dto.name, amountMinor: dto.amountMinor, currency: dto.currency, frequency: dto.frequency, nextDate: dto.nextDate, accountId: dto.accountId, category: dto.category, isActive: dto.isActive))
+                }
+            case "stockHolding":
+                let dto = try decoder.decode(StockHoldingDTO.self, from: data)
+                if let item = try fetchOne(StockHolding.self, id: entityID, context: context) {
+                    item.symbol = dto.symbol; item.name = dto.name; item.quantity = dto.quantity
+                    item.averageCostMinor = dto.averageCostMinor; item.currentPriceMinor = dto.currentPriceMinor
+                    item.currency = dto.currency; item.linkedAccountId = dto.linkedAccountId; item.updatedAt = dto.updatedAt
+                } else {
+                    context.insert(StockHolding(id: dto.id, symbol: dto.symbol, name: dto.name, quantity: dto.quantity, averageCostMinor: dto.averageCostMinor, currentPriceMinor: dto.currentPriceMinor, currency: dto.currency, linkedAccountId: dto.linkedAccountId, updatedAt: dto.updatedAt))
+                }
+            case "stockTrade":
+                let dto = try decoder.decode(StockTradeDTO.self, from: data)
+                if let item = try fetchOne(StockTrade.self, id: entityID, context: context) {
+                    item.holdingId = dto.holdingId; item.symbol = dto.symbol; item.side = dto.side
+                    item.quantity = dto.quantity; item.priceMinor = dto.priceMinor; item.feesMinor = dto.feesMinor
+                    item.currency = dto.currency; item.tradedAt = dto.tradedAt; item.linkedAccountId = dto.linkedAccountId
+                } else {
+                    context.insert(StockTrade(id: dto.id, holdingId: dto.holdingId, symbol: dto.symbol, side: dto.side, quantity: dto.quantity, priceMinor: dto.priceMinor, feesMinor: dto.feesMinor, currency: dto.currency, tradedAt: dto.tradedAt, linkedAccountId: dto.linkedAccountId))
                 }
             default:
                 continue
@@ -177,7 +219,7 @@ struct SyncEngine {
             lastSyncedAt = Date()
         } catch {
             isOffline = true
-            lastError = String(describing: error)
+            lastError = error.localizedDescription
         }
     }
 }

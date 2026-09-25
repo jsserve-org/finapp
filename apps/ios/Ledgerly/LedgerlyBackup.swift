@@ -45,12 +45,30 @@ struct LedgerlyBackup: Codable {
         let isActive: Bool
     }
 
+    struct Holding: Codable {
+        let id, symbol, name, currency: String
+        let quantity: Double
+        let averageCostMinor, currentPriceMinor: Int
+        let linkedAccountId: String?
+        let updatedAt: String
+    }
+
+    struct Trade: Codable {
+        let id, holdingId, symbol, side, currency: String
+        let quantity: Double
+        let priceMinor, feesMinor: Int
+        let tradedAt: String
+        let linkedAccountId: String?
+    }
+
     let format: String
     let version: Int
     let exportedAt: Date
     let accounts: [Account]
     let transactions: [Transaction]
     let recurringPayments: [Recurring]
+    let stockHoldings: [Holding]?
+    let stockTrades: [Trade]?
 }
 
 struct LedgerlyBackupDocument: FileDocument {
@@ -96,7 +114,13 @@ enum LedgerlyBackupService {
         let recurring = try context.fetch(FetchDescriptor<RecurringPayment>()).map {
             LedgerlyBackup.Recurring(id: $0.id, name: $0.name, amountMinor: $0.amountMinor, currency: $0.currency, frequency: $0.frequency, nextDate: $0.nextDate, accountId: $0.accountId, category: $0.category, isActive: $0.isActive)
         }
-        return LedgerlyBackup(format: "com.ledgerly.backup", version: 1, exportedAt: Date(), accounts: accounts, transactions: transactions, recurringPayments: recurring)
+        let holdings = try context.fetch(FetchDescriptor<StockHolding>()).map {
+            LedgerlyBackup.Holding(id: $0.id, symbol: $0.symbol, name: $0.name, currency: $0.currency, quantity: $0.quantity, averageCostMinor: $0.averageCostMinor, currentPriceMinor: $0.currentPriceMinor, linkedAccountId: $0.linkedAccountId, updatedAt: $0.updatedAt)
+        }
+        let trades = try context.fetch(FetchDescriptor<StockTrade>()).map {
+            LedgerlyBackup.Trade(id: $0.id, holdingId: $0.holdingId, symbol: $0.symbol, side: $0.side, currency: $0.currency, quantity: $0.quantity, priceMinor: $0.priceMinor, feesMinor: $0.feesMinor, tradedAt: $0.tradedAt, linkedAccountId: $0.linkedAccountId)
+        }
+        return LedgerlyBackup(format: "com.ledgerly.backup", version: 1, exportedAt: Date(), accounts: accounts, transactions: transactions, recurringPayments: recurring, stockHoldings: holdings, stockTrades: trades)
     }
 
     @discardableResult
@@ -107,9 +131,13 @@ enum LedgerlyBackupService {
         let currentAccounts = try context.fetch(FetchDescriptor<CachedAccount>())
         let currentTransactions = try context.fetch(FetchDescriptor<CachedTransaction>())
         let currentRecurring = try context.fetch(FetchDescriptor<RecurringPayment>())
+        let currentHoldings = try context.fetch(FetchDescriptor<StockHolding>())
+        let currentTrades = try context.fetch(FetchDescriptor<StockTrade>())
         let accountsByID = Dictionary(uniqueKeysWithValues: currentAccounts.map { ($0.id, $0) })
         let transactionsByID = Dictionary(uniqueKeysWithValues: currentTransactions.map { ($0.id, $0) })
         let recurringByID = Dictionary(uniqueKeysWithValues: currentRecurring.map { ($0.id, $0) })
+        let holdingsByID = Dictionary(uniqueKeysWithValues: currentHoldings.map { ($0.id, $0) })
+        let tradesByID = Dictionary(uniqueKeysWithValues: currentTrades.map { ($0.id, $0) })
 
         for item in backup.accounts {
             let dto = AccountDTO(id: item.id, name: item.name, institution: item.institution, kind: item.kind, balance: Money(amountMinor: item.amountMinor, currency: item.currency), updatedAt: item.updatedAt)
@@ -135,8 +163,20 @@ enum LedgerlyBackupService {
                 context.insert(RecurringPayment(id: item.id, name: item.name, amountMinor: item.amountMinor, currency: item.currency, frequency: item.frequency, nextDate: item.nextDate, accountId: item.accountId, category: item.category, isActive: item.isActive))
             }
         }
+        for item in backup.stockHoldings ?? [] {
+            if let existing = holdingsByID[item.id] {
+                existing.symbol = item.symbol; existing.name = item.name; existing.quantity = item.quantity
+                existing.averageCostMinor = item.averageCostMinor; existing.currentPriceMinor = item.currentPriceMinor
+                existing.currency = item.currency; existing.linkedAccountId = item.linkedAccountId; existing.updatedAt = item.updatedAt
+            } else {
+                context.insert(StockHolding(id: item.id, symbol: item.symbol, name: item.name, quantity: item.quantity, averageCostMinor: item.averageCostMinor, currentPriceMinor: item.currentPriceMinor, currency: item.currency, linkedAccountId: item.linkedAccountId, updatedAt: item.updatedAt))
+            }
+        }
+        for item in backup.stockTrades ?? [] where tradesByID[item.id] == nil {
+            context.insert(StockTrade(id: item.id, holdingId: item.holdingId, symbol: item.symbol, side: item.side, quantity: item.quantity, priceMinor: item.priceMinor, feesMinor: item.feesMinor, currency: item.currency, tradedAt: item.tradedAt, linkedAccountId: item.linkedAccountId))
+        }
         try context.save()
-        return backup.accounts.count + backup.transactions.count + backup.recurringPayments.count
+        return backup.accounts.count + backup.transactions.count + backup.recurringPayments.count + (backup.stockHoldings?.count ?? 0) + (backup.stockTrades?.count ?? 0)
     }
 }
 

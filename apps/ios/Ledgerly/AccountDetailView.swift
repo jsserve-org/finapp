@@ -8,6 +8,7 @@ struct AccountDetailView: View {
     @Query private var accounts: [CachedAccount]
     @Query(sort: \CachedTransaction.bookedAt, order: .reverse) private var transactions: [CachedTransaction]
     @Query private var recurringPayments: [RecurringPayment]
+    @Query private var linkedHoldings: [StockHolding]
     @State private var confirmingDelete = false
     @State private var selectedTransaction: TransactionSnapshot?
 
@@ -17,6 +18,7 @@ struct AccountDetailView: View {
         _accounts = Query(filter: #Predicate<CachedAccount> { $0.id == id })
         _transactions = Query(filter: #Predicate<CachedTransaction> { $0.accountId == id }, sort: \CachedTransaction.bookedAt, order: .reverse)
         _recurringPayments = Query(filter: #Predicate<RecurringPayment> { $0.accountId == id })
+        _linkedHoldings = Query(filter: #Predicate<StockHolding> { $0.linkedAccountId == id })
     }
 
     var body: some View {
@@ -97,6 +99,11 @@ struct AccountDetailView: View {
         context.insert(PendingAccountMutation(entityId: accountID, action: "delete"))
         transactions.forEach(context.delete)
         recurringPayments.forEach(context.delete)
+        for holding in linkedHoldings {
+            holding.linkedAccountId = nil
+            holding.updatedAt = ISO8601DateFormatter().string(from: Date())
+            context.insert(PendingStockMutation(entityId: holding.id, entity: "stockHolding"))
+        }
         context.delete(account)
         try? context.save()
         dismiss()

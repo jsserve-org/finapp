@@ -66,8 +66,9 @@ struct NativeAccountsView: View {
 struct NativeInsightsView: View {
     @Query private var accounts: [CachedAccount]
     @Query private var transactions: [CachedTransaction]
+    @Query private var holdings: [StockHolding]
     private var currencies: [String] {
-        Array(Set(accounts.map(\.currency) + transactions.map(\.currency))).sorted()
+        Array(Set(accounts.map(\.currency) + transactions.map(\.currency) + holdings.map(\.currency))).sorted()
     }
 
     var body: some View {
@@ -75,7 +76,9 @@ struct NativeInsightsView: View {
             List {
                 Section("Summary") {
                     ForEach(currencies.isEmpty ? [SupportedCurrency.defaultCode] : currencies, id: \.self) { currency in
-                        let netWorth = accounts.filter { $0.currency == currency && $0.isIncludedInNetWorth }.reduce(0) { $0 + $1.amountMinor }
+                        let accountWorth = accounts.filter { $0.currency == currency && $0.isIncludedInNetWorth }.reduce(0) { $0 + $1.amountMinor }
+                        let investmentWorth = holdings.filter { $0.currency == currency }.reduce(0) { $0 + $1.marketValueMinor }
+                        let netWorth = accountWorth + investmentWorth
                         let inflow = transactions.filter { $0.currency == currency && $0.amountMinor > 0 }.reduce(0) { $0 + $1.amountMinor }
                         let outflow = abs(transactions.filter { $0.currency == currency && $0.amountMinor < 0 }.reduce(0) { $0 + $1.amountMinor })
                         VStack(alignment: .leading, spacing: 10) {

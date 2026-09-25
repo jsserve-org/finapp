@@ -12,6 +12,8 @@ struct SettingsView: View {
     @State private var showingExporter = false
     @State private var showingImporter = false
     @State private var backupMessage: String?
+    @State private var compatibility: LedgerlyCompatibility?
+    @State private var serverVersion: String?
 
     var body: some View {
         Form {
@@ -33,6 +35,13 @@ struct SettingsView: View {
                         }
                         NavigationLink { ConnectionHealthView() } label: { Label("Server status", systemImage: "network") }
                         LabeledContent("Status", value: healthState ?? "—")
+                        LabeledContent("App version", value: LedgerlyCompatibility.appVersion)
+                        LabeledContent("Server version", value: serverVersion ?? "—")
+                        if let compatibility {
+                            Label(compatibility.message, systemImage: compatibility.canSync ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                                .font(.caption)
+                                .foregroundStyle(compatibility.canSync ? Color.secondary : Color.red)
+                        }
                         Button { Task { await check() } } label: {
                             if isChecking { ProgressView() } else { Label("Check connection", systemImage: "stethoscope") }
                         }
@@ -88,6 +97,7 @@ struct SettingsView: View {
         .fileImporter(isPresented: $showingImporter, allowedContentTypes: [.json]) { result in
             importBackup(result)
         }
+        .task { await checkVersions() }
     }
 
     private func check() async {
@@ -96,9 +106,16 @@ struct SettingsView: View {
         do {
             try await APIClient.shared.healthReady()
             healthState = "ready"
+            await checkVersions()
         } catch {
             healthState = "unreachable"
         }
+    }
+
+    private func checkVersions() async {
+        guard !session.localOnly, let config = try? await APIClient.shared.serverConfig() else { return }
+        serverVersion = config.serverVersion
+        compatibility = LedgerlyCompatibility.evaluate(config)
     }
 
     private func exportBackup() {

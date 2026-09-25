@@ -5,6 +5,7 @@ struct DashboardView: View {
     @Environment(\.modelContext) private var context
     @Environment(SessionController.self) private var session
     @Query(sort: \CachedAccount.name) private var accounts: [CachedAccount]
+    @Query(sort: \StockHolding.symbol) private var holdings: [StockHolding]
     @State private var sync = SyncController()
     @State private var showingNewAccount = false
 
@@ -14,8 +15,17 @@ struct DashboardView: View {
     var body: some View {
         NavigationStack {
             List {
+                if let error = sync.lastError {
+                    Section {
+                        Label(error, systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.red)
+                    } footer: {
+                        Text("Open Settings → Server after updating either the app or backend.")
+                    }
+                }
                 accountSection("Your accounts", accounts: ownedAccounts)
                 if !trackedCards.isEmpty { accountSection("Cards you track", accounts: trackedCards) }
+                investmentSection
                 if accounts.isEmpty { emptyState }
             }
             .listStyle(.insetGrouped)
@@ -33,6 +43,37 @@ struct DashboardView: View {
             .sheet(isPresented: $showingNewAccount) { NewAccountView() }
             .task { if session.isAuthenticated { await sync.refresh(context: context) } }
         }
+    }
+
+    private var investmentSection: some View {
+        Section("Investments") {
+            NavigationLink { StockPortfolioView() } label: {
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("Portfolio", systemImage: "chart.line.uptrend.xyaxis")
+                        .font(.headline)
+                    if holdings.isEmpty {
+                        Text("Add your first stock trade")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(portfolioTotals, id: \.0) { currency, amount in
+                            HStack {
+                                Text(currency).foregroundStyle(.secondary)
+                                Spacer()
+                                Text(money(amount, currency)).fontWeight(.semibold)
+                            }
+                        }
+                    }
+                }
+                .padding(.vertical, 3)
+            }
+        }
+    }
+
+    private var portfolioTotals: [(String, Int)] {
+        Dictionary(grouping: holdings, by: \.currency)
+            .map { ($0.key, $0.value.reduce(0) { $0 + $1.marketValueMinor }) }
+            .sorted { $0.0 < $1.0 }
     }
 
     @ViewBuilder

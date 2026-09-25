@@ -9,7 +9,7 @@ final class SyncEngineTests: XCTestCase {
 
     override func setUpWithError() throws {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        let container = try ModelContainer(for: CachedAccount.self, CachedTransaction.self, SyncSetting.self, PendingMutation.self, PendingAccountMutation.self, PendingTransactionCreate.self, PendingRecurringMutation.self, RecurringPayment.self, configurations: config)
+        let container = try ModelContainer(for: CachedAccount.self, CachedTransaction.self, SyncSetting.self, PendingMutation.self, PendingAccountMutation.self, PendingTransactionCreate.self, PendingRecurringMutation.self, PendingStockMutation.self, RecurringPayment.self, StockHolding.self, StockTrade.self, configurations: config)
         context = ModelContext(container)
         context.autosaveEnabled = false
         engine = SyncEngine(api: APIClient.shared)
@@ -149,6 +149,29 @@ final class SyncEngineTests: XCTestCase {
         try engine.apply([SyncChange(sequence: 10, entity: "recurringPayment", entityId: "bill-1", action: "delete", value: nil)], context: context)
         bills = try context.fetch(FetchDescriptor<RecurringPayment>())
         XCTAssertTrue(bills.isEmpty)
+    }
+
+    func testApplyUpsertsStockHoldingAndTrade() throws {
+        try engine.apply([change(11, entity: "stockHolding", id: "holding-1", value: #"{"id":"holding-1","symbol":"AAPL","name":"Apple","currency":"USD","quantity":2.5,"averageCostMinor":18000,"currentPriceMinor":20000,"linkedAccountId":"account-1","updatedAt":"2026-09-25T10:00:00.000Z"}"#)], context: context)
+        try engine.apply([change(12, entity: "stockTrade", id: "trade-1", value: #"{"id":"trade-1","holdingId":"holding-1","symbol":"AAPL","side":"buy","currency":"USD","quantity":2.5,"priceMinor":18000,"feesMinor":100,"tradedAt":"2026-09-25T10:00:00.000Z","linkedAccountId":"account-1"}"#)], context: context)
+
+        let holding = try XCTUnwrap(context.fetch(FetchDescriptor<StockHolding>()).first)
+        XCTAssertEqual(holding.marketValueMinor, 50_000)
+        XCTAssertEqual(holding.gainLossMinor, 5_000)
+        XCTAssertEqual(try context.fetch(FetchDescriptor<StockTrade>()).first?.symbol, "AAPL")
+    }
+
+    func testServerCompatibilityDetectsLegacyAndMismatchedServers() {
+        let legacy = ServerConfig(registrationEnabled: true, convexUrl: "http://localhost:3210", serverVersion: nil, syncProtocolVersion: nil, minimumAppVersion: nil, latestAppVersion: nil)
+        XCTAssertEqual(LedgerlyCompatibility.evaluate(legacy), .serverOutdated)
+        let mismatch = ServerConfig(registrationEnabled: true, convexUrl: "http://localhost:3210", serverVersion: "0.4.0", syncProtocolVersion: 1, minimumAppVersion: "0.4.0", latestAppVersion: "0.4.0")
+        XCTAssertEqual(LedgerlyCompatibility.evaluate(mismatch), .protocolMismatch(server: 1))
+    }
+
+    func testStockTradeMathLinksBuyAndSellCashCorrectly() {
+        XCTAssertEqual(StockTradeMath.cashChange(side: "buy", quantity: 2.5, priceMinor: 10_00, feesMinor: 25), -2_525)
+        XCTAssertEqual(StockTradeMath.cashChange(side: "sell", quantity: 2.5, priceMinor: 10_00, feesMinor: 25), 2_475)
+        XCTAssertEqual(StockTradeMath.averageCost(oldQuantity: 1, oldAverageMinor: 10_00, boughtQuantity: 1, priceMinor: 12_00, feesMinor: 0), 11_00)
     }
 
     // MARK: - Recurring payment matching
@@ -319,7 +342,7 @@ final class SyncEngineTests: XCTestCase {
 
         let backup = try LedgerlyBackupService.create(from: context)
         let destinationConfig = ModelConfiguration(isStoredInMemoryOnly: true)
-        let destinationContainer = try ModelContainer(for: CachedAccount.self, CachedTransaction.self, SyncSetting.self, PendingMutation.self, PendingAccountMutation.self, PendingTransactionCreate.self, PendingRecurringMutation.self, RecurringPayment.self, configurations: destinationConfig)
+        let destinationContainer = try ModelContainer(for: CachedAccount.self, CachedTransaction.self, SyncSetting.self, PendingMutation.self, PendingAccountMutation.self, PendingTransactionCreate.self, PendingRecurringMutation.self, PendingStockMutation.self, RecurringPayment.self, StockHolding.self, StockTrade.self, configurations: destinationConfig)
         let destination = ModelContext(destinationContainer)
 
         XCTAssertEqual(try LedgerlyBackupService.restore(backup, into: destination), 3)
@@ -328,6 +351,17 @@ final class SyncEngineTests: XCTestCase {
         XCTAssertEqual(try destination.fetchCount(FetchDescriptor<CachedTransaction>()), 1)
         XCTAssertEqual(try destination.fetchCount(FetchDescriptor<RecurringPayment>()), 1)
         XCTAssertEqual(try destination.fetch(FetchDescriptor<CachedTransaction>()).first?.recurringPaymentId, "recurring-1")
+    }
+
+
+    func testBackupIncludesStockPortfolio() throws {
+        let holding = StockHolding(id: "holding-1", symbol: "TSM", name: "TSMC", quantity: 10, averageCostMinor: 90_00, currentPriceMinor: 110_00, currency: "USD", linkedAccountId: nil)
+        context.insert(holding)
+        context.insert(StockTrade(id: "trade-1", holdingId: holding.id, symbol: "TSM", side: "buy", quantity: 10, priceMinor: 90_00, feesMinor: 0, currency: "USD", tradedAt: ISO8601DateFormatter().string(from: Date()), linkedAccountId: nil))
+        try context.save()
+        let backup = try LedgerlyBackupService.create(from: context)
+        XCTAssertEqual(backup.stockHoldings?.first?.symbol, "TSM")
+        XCTAssertEqual(backup.stockTrades?.first?.side, "buy")
     }
 
     private func transaction(title: String, amountMinor: Int, currency: String, accountID: String, category: String?, source: String? = nil) -> CachedTransaction {

@@ -36,6 +36,16 @@ The generated value is the self-hosted equivalent of a cloud `CONVEX_DEPLOYMENT`
 
 The login screens let users set both endpoints. Emulator defaults are `http://10.0.2.2:3000` and `http://10.0.2.2:3210`; the iOS Simulator uses `localhost`. Administrators can set `ALLOW_REGISTRATION=false` and restart the API after creating users. The API then rejects registration with HTTP 403 and `/v1/config` tells both apps to hide the registration option.
 
+The API also publishes its server, minimum-app, latest-app, and sync-protocol versions. The iOS app checks these values before syncing and shows an explicit update warning instead of silently dropping unsupported data. After pulling a release that changes the sync schema, update both pieces together:
+
+```sh
+docker compose pull api convex-deploy
+docker compose --profile tools run --rm convex-deploy
+docker compose up -d api
+```
+
+Stock holdings and trades sync as first-class records. A trade can link to a same-currency bank account; buys subtract cash, sells return cash, and the matching account transaction remains visible in activity. Current holding value is included in Insights net worth.
+
 ## Opening ports
 
 For a private LAN test, replace `localhost` in the three `PUBLIC_*` values with the server's LAN IP, then allow only trusted LAN clients:

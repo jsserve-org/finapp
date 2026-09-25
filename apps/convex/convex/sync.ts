@@ -21,6 +21,12 @@ export const exchange = mutation({ args: { tokenHash: v.string(), cursor: v.stri
         await ctx.db.patch(payment._id, { deleted: true, version: payment.version + 1 });
         await addChange(ctx, session.userId, "recurringPayment", payment.externalId, "delete", null);
       }
+      const holdings = await ctx.db.query("stockHoldings").withIndex("by_user", (q) => q.eq("userId", session.userId)).collect();
+      for (const holding of holdings.filter((item) => !item.deleted && item.value?.linkedAccountId === operation.entityId)) {
+        const value = { ...holding.value, linkedAccountId: null, updatedAt: new Date(args.now).toISOString() };
+        await ctx.db.patch(holding._id, { value, version: holding.version + 1 });
+        await addChange(ctx, session.userId, "stockHolding", holding.externalId, "upsert", value);
+      }
       await addChange(ctx, session.userId, "account", operation.entityId, "delete", null);
       await ctx.db.insert("mutations", { userId: session.userId, mutationId: operation.mutationId });
       acceptedMutationIds.push(operation.mutationId);
@@ -50,6 +56,23 @@ export const exchange = mutation({ args: { tokenHash: v.string(), cursor: v.stri
         if (payment) await ctx.db.patch(payment._id, { value: operation.value, deleted: false, version: payment.version + 1 });
         else await ctx.db.insert("recurringPayments", { userId: session.userId, externalId: operation.entityId, value: operation.value, version: 1, deleted: false });
         await addChange(ctx, session.userId, "recurringPayment", operation.entityId, "upsert", operation.value);
+      } else {
+        continue;
+      }
+      await ctx.db.insert("mutations", { userId: session.userId, mutationId: operation.mutationId });
+      acceptedMutationIds.push(operation.mutationId);
+      continue;
+    }
+    if (operation.entity === "stockHolding" || operation.entity === "stockTrade") {
+      const table = operation.entity === "stockHolding" ? "stockHoldings" : "stockTrades";
+      const record = await ctx.db.query(table).withIndex("by_user_external", (q) => q.eq("userId", session.userId).eq("externalId", operation.entityId)).unique();
+      if (operation.action === "delete") {
+        if (record) await ctx.db.patch(record._id, { deleted: true, version: record.version + 1 });
+        await addChange(ctx, session.userId, operation.entity, operation.entityId, "delete", null);
+      } else if (operation.value?.id === operation.entityId) {
+        if (record) await ctx.db.patch(record._id, { value: operation.value, deleted: false, version: record.version + 1 });
+        else await ctx.db.insert(table, { userId: session.userId, externalId: operation.entityId, value: operation.value, version: 1, deleted: false });
+        await addChange(ctx, session.userId, operation.entity, operation.entityId, "upsert", operation.value);
       } else {
         continue;
       }
