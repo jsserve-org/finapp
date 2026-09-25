@@ -3,11 +3,14 @@ import SwiftUI
 
 struct NativeAccountsView: View {
     @Query(sort: \CachedAccount.name) private var accounts: [CachedAccount]
+    @Query(sort: \StockHolding.symbol) private var holdings: [StockHolding]
     @State private var showingNewAccount = false
+    @AppStorage("ledgerly.hideFinancialAmounts") private var hidesFinancialAmounts = false
     private var balances: [(currency: String, amount: Int)] {
-        let grouped = Dictionary(grouping: accounts.filter(\.isIncludedInNetWorth), by: \.currency)
-        return grouped.map { (currency: $0.key, amount: $0.value.reduce(0) { $0 + $1.amountMinor }) }
-            .sorted { $0.currency < $1.currency }
+        NetWorthCalculator.totals(accounts: accounts, holdings: holdings).map { currency, amount in
+            (currency: currency, amount: amount)
+        }
+        .sorted { $0.currency < $1.currency }
     }
 
     var body: some View {
@@ -16,12 +19,12 @@ struct NativeAccountsView: View {
                 Section("Total") {
                     if balances.isEmpty {
                         LabeledContent("Balance") {
-                            Text(money(0, SupportedCurrency.defaultCode)).font(.title2.bold())
+                            Text(hidesFinancialAmounts ? "••••" : money(0, SupportedCurrency.defaultCode)).font(.title2.bold())
                         }
                     } else {
                         ForEach(balances, id: \.currency) { balance in
                             LabeledContent(balance.currency) {
-                                Text(money(balance.amount, balance.currency)).font(.title2.bold())
+                                Text(hidesFinancialAmounts ? "••••" : money(balance.amount, balance.currency)).font(.title2.bold())
                             }
                         }
                     }
@@ -38,7 +41,7 @@ struct NativeAccountsView: View {
                             } icon: {
                                 Image(systemName: AppIcon.account(kind: account.kind)).ledgerlyIcon()
                             }
-                            .badge(Text(money(account.amountMinor, account.currency)))
+                            .badge(Text(hidesFinancialAmounts ? "••••" : money(account.amountMinor, account.currency)))
                         }
                     }
                     if accounts.isEmpty {
@@ -47,7 +50,19 @@ struct NativeAccountsView: View {
                 }
             }
             .navigationTitle("Accounts")
-            .toolbar { Button("Add account", systemImage: "plus") { showingNewAccount = true } }
+            .toolbar {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    Button {
+                        hidesFinancialAmounts.toggle()
+                    } label: {
+                        Label(
+                            hidesFinancialAmounts ? "Show financial amounts" : "Hide financial amounts",
+                            systemImage: hidesFinancialAmounts ? "eye.slash" : "eye"
+                        )
+                    }
+                    Button("Add account", systemImage: "plus") { showingNewAccount = true }
+                }
+            }
             .sheet(isPresented: $showingNewAccount) { NewAccountView() }
         }
     }
@@ -68,6 +83,8 @@ struct NativeActivityView: View {
     @State private var showingCustomDates = false
     @State private var customStartDate = Calendar.current.date(byAdding: .month, value: -3, to: Date()) ?? Date()
     @State private var customEndDate = Date()
+    @State private var showsAllRecurringPayments = false
+    @State private var transactionDisplayLimit = 50
 
     init() {
         var descriptor = FetchDescriptor<CachedTransaction>(
@@ -97,6 +114,7 @@ struct NativeActivityView: View {
 
     var body: some View {
         let displayedTransactions = visibleTransactions
+        let displayedTransactionRows = displayedTransactions.prefix(transactionDisplayLimit)
         let accountsByID = Dictionary(uniqueKeysWithValues: accounts.map { ($0.id, $0) })
         let paymentsByID = Dictionary(uniqueKeysWithValues: recurringPayments.map { ($0.id, $0) })
         NavigationStack {
@@ -144,13 +162,22 @@ struct NativeActivityView: View {
                 }
 
                 Section {
-                    ForEach(recurringPayments) { payment in
+                    ForEach(visibleRecurringPayments) { payment in
                         Button { editingRecurringPayment = payment } label: { recurringRow(payment) }
                             .buttonStyle(.plain)
                     }
-                        .onDelete(perform: deleteRecurringPayments)
+                    .onDelete(perform: deleteRecurringPayments)
                     if recurringPayments.isEmpty {
                         Text("No recurring bills yet.").foregroundStyle(.secondary)
+                    } else if recurringPayments.count > 3 {
+                        Button {
+                            withAnimation { showsAllRecurringPayments.toggle() }
+                        } label: {
+                            Label(
+                                showsAllRecurringPayments ? "Show fewer" : "Show all \(recurringPayments.count)",
+                                systemImage: showsAllRecurringPayments ? "chevron.up" : "chevron.down"
+                            )
+                        }
                     }
                 } header: {
                     Text("Recurring bills")
@@ -159,7 +186,7 @@ struct NativeActivityView: View {
                 }
 
                 Section {
-                    ForEach(displayedTransactions) { transaction in
+                    ForEach(displayedTransactionRows) { transaction in
                         let snapshot = TransactionSnapshot(
                             transaction,
                             account: accountsByID[transaction.accountId],
@@ -176,6 +203,15 @@ struct NativeActivityView: View {
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
+                    }
+                    if displayedTransactions.count > transactionDisplayLimit {
+                        Button("Show 50 more", systemImage: "chevron.down") {
+                            withAnimation { transactionDisplayLimit += 50 }
+                        }
+                    } else if transactionDisplayLimit > 50 && displayedTransactions.count > 50 {
+                        Button("Show fewer", systemImage: "chevron.up") {
+                            withAnimation { transactionDisplayLimit = 50 }
+                        }
                     }
                     if transactions.isEmpty {
                         ContentUnavailableView("No activity", systemImage: AppIcon.activity, description: Text("Transactions you add or sync will appear here."))
@@ -210,7 +246,7 @@ struct NativeActivityView: View {
                         .textCase(nil)
                     }
                 } footer: {
-                    Text("Showing \(displayedTransactions.count) transactions. Ledgerly loads at most the newest 500 records to keep Activity responsive.")
+                    Text("Showing \(min(displayedTransactions.count, transactionDisplayLimit)) of \(displayedTransactions.count) matching transactions. Ledgerly loads at most the newest 500 records to keep Activity responsive.")
                 }
             }
             .navigationTitle("Activity")
@@ -227,6 +263,10 @@ struct NativeActivityView: View {
                 }
             }
         }
+    }
+
+    private var visibleRecurringPayments: ArraySlice<RecurringPayment> {
+        recurringPayments.prefix(showsAllRecurringPayments ? recurringPayments.count : 3)
     }
 
     private func recurringRow(_ payment: RecurringPayment) -> some View {

@@ -266,7 +266,7 @@ struct NewRecurringPaymentView: View {
     private let existingPayment: RecurringPayment?
     private let transactionID: String?
     private let onSave: ((RecurringPayment) -> Void)?
-    private let frequencies = [("weekly", "Weekly"), ("everyTwoWeeks", "Every 2 weeks"), ("monthly", "Monthly"), ("yearly", "Yearly")]
+    private let frequencies = [("weekly", "Weekly"), ("everyTwoWeeks", "Every 2 weeks"), ("monthly", "Monthly"), ("yearly", "Yearly"), ("everyTwoYears", "Every 2 years")]
 
     init(payment: RecurringPayment? = nil) {
         existingPayment = payment

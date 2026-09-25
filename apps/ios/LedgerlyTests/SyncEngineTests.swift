@@ -219,6 +219,21 @@ final class SyncEngineTests: XCTestCase {
         XCTAssertEqual(StockTradeMath.averageCost(oldQuantity: 1, oldAverageMinor: 10_00, boughtQuantity: 1, priceMinor: 12_00, feesMinor: 0), 11_00)
     }
 
+    func testNetWorthIncludesStockHoldingsAndExcludesTrackedCards() {
+        let cash = CachedAccount(dto: AccountDTO(id: "cash", name: "Cash", institution: "Manual", kind: "cash", balance: Money(amountMinor: 10_000, currency: "USD"), updatedAt: "2026-09-25T10:00:00.000Z"))
+        let trackedCard = CachedAccount(dto: AccountDTO(id: "card", name: "Dad's card", institution: "Manual", kind: "sharedCredit", balance: Money(amountMinor: -2_000, currency: "USD"), updatedAt: "2026-09-25T10:00:00.000Z"))
+        let holding = StockHolding(symbol: "AAPL", name: "Apple", quantity: 2, averageCostMinor: 4_000, currentPriceMinor: 5_000, currency: "USD", linkedAccountId: cash.id)
+
+        let totals = NetWorthCalculator.totals(accounts: [cash, trackedCard], holdings: [holding])
+
+        XCTAssertEqual(totals["USD"], 20_000)
+    }
+
+    func testEveryTwoYearsFrequencyHasReadableLabel() {
+        let payment = RecurringPayment(name: "Domain", amountMinor: 3_000, currency: "USD", frequency: "everyTwoYears", nextDate: Date(), accountId: nil, category: "Domains")
+        XCTAssertEqual(payment.frequencyLabel, "Every 2 years")
+    }
+
     func testAddingMoneyCreatesGreenTransactionAndUpdatesBalance() throws {
         let account = CachedAccount(name: "Cash", institution: "Wallet", kind: "cash", amountMinor: 500_00, currency: "TWD")
         context.insert(account)

@@ -34,7 +34,7 @@ export type RecurringPayment = {
   name: string;
   amountMinor: number;
   currency: string;
-  frequency: "weekly" | "everyTwoWeeks" | "monthly" | "yearly";
+  frequency: "weekly" | "everyTwoWeeks" | "monthly" | "yearly" | "everyTwoYears";
   nextDate: string;
   accountId?: string;
   category: string;

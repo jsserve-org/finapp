@@ -45,11 +45,11 @@ struct BillAccountQuery: EntityQuery {
 }
 
 enum BillFrequency: String, AppEnum {
-    case weekly, everyTwoWeeks, monthly, yearly
+    case weekly, everyTwoWeeks, monthly, yearly, everyTwoYears
 
     static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "Frequency")
     static let caseDisplayRepresentations: [BillFrequency: DisplayRepresentation] = [
-        .weekly: "Weekly", .everyTwoWeeks: "Every 2 weeks", .monthly: "Monthly", .yearly: "Yearly",
+        .weekly: "Weekly", .everyTwoWeeks: "Every 2 weeks", .monthly: "Monthly", .yearly: "Yearly", .everyTwoYears: "Every 2 years",
     ]
 }
 
