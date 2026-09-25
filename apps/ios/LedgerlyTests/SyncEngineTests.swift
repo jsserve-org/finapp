@@ -1,4 +1,5 @@
 import SwiftData
+import UIKit
 import XCTest
 @testable import Ledgerly
 
@@ -16,6 +17,22 @@ final class SyncEngineTests: XCTestCase {
     }
 
     // MARK: - JSONValue
+
+    func testAccountIconsAreValidAndMatchAccountMeaning() {
+        let expected = [
+            "checking": "building.columns.fill",
+            "savings": "banknote.fill",
+            "credit": "creditcard.fill",
+            "sharedCredit": "creditcard.fill",
+            "investment": "chart.line.uptrend.xyaxis",
+            "cash": "wallet.bifold.fill",
+        ]
+
+        for (kind, symbol) in expected {
+            XCTAssertEqual(AppIcon.account(kind: kind), symbol)
+            XCTAssertNotNil(UIImage(systemName: symbol), "Missing SF Symbol: \(symbol)")
+        }
+    }
 
     func testScreenshotPaymentParserFindsTWDPaymentAndIgnoresBalance() {
         let payment = ScreenshotPaymentParser.parse(lines: [
