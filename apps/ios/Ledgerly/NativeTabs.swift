@@ -36,7 +36,7 @@ struct NativeAccountsView: View {
                                     Text("\(account.institution) · \(account.displayKind)").font(.subheadline).foregroundStyle(.secondary)
                                 }
                             } icon: {
-                                Image(systemName: accountSymbol(account)).ledgerlyIcon()
+                                Image(systemName: AppIcon.account(kind: account.kind)).ledgerlyIcon()
                             }
                             .badge(Text(money(account.amountMinor, account.currency)))
                         }
@@ -52,15 +52,6 @@ struct NativeAccountsView: View {
         }
     }
 
-    private func accountSymbol(_ account: CachedAccount) -> String {
-        switch account.kind {
-        case "checking": "creditcard.fill"
-        case "savings": "banknote.fill"
-        case "credit", "sharedCredit": "creditcard.trianglebadge.exclamationmark"
-        case "investment": "chart.line.uptrend.xyaxis"
-        default: AppIcon.cash
-        }
-    }
 }
 
 struct NativeActivityView: View {
