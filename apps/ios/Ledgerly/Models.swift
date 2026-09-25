@@ -23,17 +23,20 @@ struct TransactionDTO: Codable, Equatable, Identifiable {
     let expensePurpose: String?
     let reimbursementStatus: String?
     let reimbursementTransactionId: String?
+    let refundTransactionId: String?
+    let refundedTransactionId: String?
     let transferId: String?
     let transferAccountId: String?
     let transferDirection: String?
     let updatedAt: String
 
-    init(id: String, accountId: String, description: String, amount: Money, originalAmount: Money? = nil, bookedAt: String, pending: Bool, category: String?, recurringPaymentId: String? = nil, source: String? = nil, expensePurpose: String? = nil, reimbursementStatus: String? = nil, reimbursementTransactionId: String? = nil, transferId: String? = nil, transferAccountId: String? = nil, transferDirection: String? = nil, updatedAt: String) {
+    init(id: String, accountId: String, description: String, amount: Money, originalAmount: Money? = nil, bookedAt: String, pending: Bool, category: String?, recurringPaymentId: String? = nil, source: String? = nil, expensePurpose: String? = nil, reimbursementStatus: String? = nil, reimbursementTransactionId: String? = nil, refundTransactionId: String? = nil, refundedTransactionId: String? = nil, transferId: String? = nil, transferAccountId: String? = nil, transferDirection: String? = nil, updatedAt: String) {
         self.id = id; self.accountId = accountId; self.description = description; self.amount = amount
         self.originalAmount = originalAmount
         self.bookedAt = bookedAt; self.pending = pending; self.category = category
         self.recurringPaymentId = recurringPaymentId; self.source = source; self.expensePurpose = expensePurpose
         self.reimbursementStatus = reimbursementStatus; self.reimbursementTransactionId = reimbursementTransactionId
+        self.refundTransactionId = refundTransactionId; self.refundedTransactionId = refundedTransactionId
         self.transferId = transferId; self.transferAccountId = transferAccountId; self.transferDirection = transferDirection
         self.updatedAt = updatedAt
     }
@@ -292,6 +295,8 @@ enum JSONValue: Codable, Equatable {
     var expensePurpose: String?
     var reimbursementStatus: String?
     var reimbursementTransactionId: String?
+    var refundTransactionId: String?
+    var refundedTransactionId: String?
     var transferId: String?
     var transferAccountId: String?
     var transferDirection: String?
@@ -314,6 +319,8 @@ enum JSONValue: Codable, Equatable {
         expensePurpose = dto.expensePurpose
         reimbursementStatus = dto.reimbursementStatus
         reimbursementTransactionId = dto.reimbursementTransactionId
+        refundTransactionId = dto.refundTransactionId
+        refundedTransactionId = dto.refundedTransactionId
         transferId = dto.transferId
         transferAccountId = dto.transferAccountId
         transferDirection = dto.transferDirection
@@ -336,6 +343,8 @@ enum JSONValue: Codable, Equatable {
         expensePurpose = dto.expensePurpose
         reimbursementStatus = dto.reimbursementStatus
         reimbursementTransactionId = dto.reimbursementTransactionId
+        refundTransactionId = dto.refundTransactionId
+        refundedTransactionId = dto.refundedTransactionId
         transferId = dto.transferId
         transferAccountId = dto.transferAccountId
         transferDirection = dto.transferDirection

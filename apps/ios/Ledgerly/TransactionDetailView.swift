@@ -21,6 +21,8 @@ struct TransactionSnapshot: Identifiable, Hashable {
     var expensePurpose: String?
     var reimbursementStatus: String?
     var reimbursementTransactionID: String?
+    var refundTransactionID: String?
+    var refundedTransactionID: String?
     var transferID: String?
     var transferAccountID: String?
     var transferDirection: String?
@@ -46,6 +48,8 @@ struct TransactionSnapshot: Identifiable, Hashable {
         expensePurpose = transaction.expensePurpose
         reimbursementStatus = transaction.reimbursementStatus
         reimbursementTransactionID = transaction.reimbursementTransactionId
+        refundTransactionID = transaction.refundTransactionId
+        refundedTransactionID = transaction.refundedTransactionId
         transferID = transaction.transferId
         transferAccountID = transaction.transferAccountId
         transferDirection = transaction.transferDirection
@@ -60,12 +64,32 @@ struct TransactionDetailView: View {
     @State private var showingEditor = false
     @State private var showDeleteConfirm = false
     @State private var showReimbursementAccounts = false
+    @State private var showReimbursementPicker = false
+    @State private var showRefundPicker = false
+    @State private var showRefundAccounts = false
     @State private var showMergeReview = false
     @Query(sort: \CachedAccount.name) private var accounts: [CachedAccount]
     @Query(sort: \CachedTransaction.bookedAt, order: .reverse) private var allTransactions: [CachedTransaction]
 
     private var reimbursementAccounts: [CachedAccount] {
         accounts.filter { $0.currency == transaction.currency && $0.kind != "sharedCredit" }
+    }
+
+    private var incomingCandidates: [LinkedTransactionCandidate] {
+        allTransactions.filter {
+            $0.id != transaction.id && $0.amountMinor > 0 && $0.currency == transaction.currency &&
+            $0.reimbursementTransactionId == nil && $0.refundedTransactionId == nil
+        }.map { candidate in
+            LinkedTransactionCandidate(candidate, account: accounts.first { $0.id == candidate.accountId })
+        }
+    }
+
+    private var expenseCandidates: [LinkedTransactionCandidate] {
+        allTransactions.filter {
+            $0.id != transaction.id && $0.amountMinor < 0 && $0.currency == transaction.currency && $0.refundTransactionId == nil
+        }.map { candidate in
+            LinkedTransactionCandidate(candidate, account: accounts.first { $0.id == candidate.accountId })
+        }
     }
 
     private var mergeCandidate: TransactionMergeCandidate? {
@@ -121,11 +145,29 @@ struct TransactionDetailView: View {
                 Section("Reimbursement") {
                     detailRow("Status", transaction.reimbursementStatus == "reimbursed" ? "Reimbursed" : "Waiting for repayment")
                     if transaction.reimbursementStatus == "pending" {
-                        Button("Mark as reimbursed", systemImage: "arrow.uturn.backward.circle.fill") {
+                        Button("Link existing reimbursement", systemImage: "link") {
+                            showReimbursementPicker = true
+                        }
+                        Button("Add reimbursement", systemImage: "plus.circle.fill") {
                             showReimbursementAccounts = true
                         }
                         .foregroundStyle(.green)
                     }
+                }
+            }
+
+            Section("Refund") {
+                if transaction.amountMinor < 0 {
+                    if transaction.refundTransactionID != nil {
+                        Label("Refunded", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                    } else {
+                        Button("Link existing refund", systemImage: "link") { showRefundPicker = true }
+                        Button("Add refund", systemImage: "plus.circle.fill") { showRefundAccounts = true }
+                    }
+                } else if transaction.refundedTransactionID != nil {
+                    Label("Marked as refund", systemImage: "arrow.uturn.backward.circle.fill").foregroundStyle(.green)
+                } else {
+                    Button("Mark as refund", systemImage: "arrow.uturn.backward.circle") { showRefundPicker = true }
                 }
             }
 
@@ -186,6 +228,21 @@ struct TransactionDetailView: View {
         .sheet(isPresented: $showingEditor, onDismiss: refreshTransaction) {
             EditTransactionView(transaction: transaction)
         }
+        .sheet(isPresented: $showReimbursementPicker) {
+            LinkedTransactionPicker(title: "Select reimbursement", candidates: incomingCandidates) { candidate in
+                linkReimbursement(candidate.id)
+                showReimbursementPicker = false
+            }
+        }
+        .sheet(isPresented: $showRefundPicker) {
+            LinkedTransactionPicker(
+                title: transaction.amountMinor < 0 ? "Select refund" : "Select purchase",
+                candidates: transaction.amountMinor < 0 ? incomingCandidates : expenseCandidates
+            ) { candidate in
+                linkRefund(candidate.id)
+                showRefundPicker = false
+            }
+        }
         .confirmationDialog("Delete this transaction?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
             Button("Delete", role: .destructive) { delete() }
         } message: {
@@ -198,6 +255,14 @@ struct TransactionDetailView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Ledgerly will add a green money-in transaction and link it to this expense.")
+        }
+        .confirmationDialog("Where was the refund paid?", isPresented: $showRefundAccounts, titleVisibility: .visible) {
+            ForEach(reimbursementAccounts) { account in
+                Button(account.name) { createRefund(into: account) }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Ledgerly will add a green refund transaction and update that account once.")
         }
         .sheet(isPresented: $showMergeReview) {
             if let candidate = mergeCandidate {
@@ -252,6 +317,8 @@ struct TransactionDetailView: View {
         transaction.expensePurpose = model.expensePurpose
         transaction.reimbursementStatus = model.reimbursementStatus
         transaction.reimbursementTransactionID = model.reimbursementTransactionId
+        transaction.refundTransactionID = model.refundTransactionId
+        transaction.refundedTransactionID = model.refundedTransactionId
         transaction.transferID = model.transferId
         transaction.transferAccountID = model.transferAccountId
         transaction.transferDirection = model.transferDirection
@@ -277,6 +344,32 @@ struct TransactionDetailView: View {
         refreshTransaction()
     }
 
+    private func linkReimbursement(_ candidateID: String) {
+        guard let expense = fetchTransaction(), let payment = fetchTransaction(id: candidateID) else { return }
+        ReimbursementService.link(expense, to: payment, context: context)
+        refreshTransaction()
+    }
+
+    private func linkRefund(_ candidateID: String) {
+        guard let current = fetchTransaction(), let candidate = fetchTransaction(id: candidateID) else { return }
+        let expense = current.amountMinor < 0 ? current : candidate
+        let refund = current.amountMinor > 0 ? current : candidate
+        RefundService.link(expense: expense, refund: refund, context: context)
+        refreshTransaction()
+    }
+
+    private func createRefund(into account: CachedAccount) {
+        guard let expense = fetchTransaction(), expense.amountMinor < 0 else { return }
+        _ = RefundService.create(for: expense, into: account, context: context)
+        refreshTransaction()
+    }
+
+    private func fetchTransaction(id: String) -> CachedTransaction? {
+        var descriptor = FetchDescriptor<CachedTransaction>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        return try? context.fetch(descriptor).first
+    }
+
     private func purposeLabel(_ purpose: String?) -> String {
         switch purpose {
         case "school": "School"
@@ -291,6 +384,7 @@ struct TransactionDetailView: View {
         case "automation": "Automation import"
         case "screenshot": "Screenshot import"
         case "reimbursement": "Reimbursement"
+        case "refund": "Refund"
         case "transfer": "Account transfer"
         case "stockTrade": "Stock trade"
         default: "Synced"
@@ -330,6 +424,61 @@ private struct MergeReviewView: View {
             }
             Text("\(label) · \(item.bookedDate?.formatted(date: .abbreviated, time: .omitted) ?? "Unknown date")")
                 .font(.subheadline).foregroundStyle(.secondary)
+        }
+    }
+}
+
+private struct LinkedTransactionCandidate: Identifiable, Hashable {
+    let id: String
+    let title: String
+    let amountMinor: Int
+    let currency: String
+    let date: Date?
+    let accountName: String
+
+    init(_ transaction: CachedTransaction, account: CachedAccount?) {
+        id = transaction.id
+        title = transaction.title
+        amountMinor = transaction.amountMinor
+        currency = transaction.currency
+        date = transaction.bookedDate
+        accountName = account?.name ?? "Unknown account"
+    }
+}
+
+private struct LinkedTransactionPicker: View {
+    @Environment(\.dismiss) private var dismiss
+    let title: String
+    let candidates: [LinkedTransactionCandidate]
+    let select: (LinkedTransactionCandidate) -> Void
+
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(candidates) { candidate in
+                    Button { select(candidate) } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: PaymentIcon.symbol(title: candidate.title, category: nil, amountMinor: candidate.amountMinor))
+                                .ledgerlyIcon(color: PaymentIcon.color(amountMinor: candidate.amountMinor))
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(candidate.title).font(.headline).foregroundStyle(.primary)
+                                Text("\(candidate.accountName) · \(candidate.date?.formatted(date: .abbreviated, time: .omitted) ?? "Unknown date")")
+                                    .font(.subheadline).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Text(money(candidate.amountMinor, candidate.currency))
+                                .fontWeight(.semibold).foregroundStyle(PaymentIcon.color(amountMinor: candidate.amountMinor))
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+                if candidates.isEmpty {
+                    ContentUnavailableView("No matching transactions", systemImage: "link", description: Text("Add or import the transaction first, then return here to link it."))
+                }
+            }
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
         }
     }
 }
@@ -409,7 +558,7 @@ private struct EditTransactionView: View {
                 }
                 Section("Details") {
                     TextField("Description", text: $title)
-                    TextField("Category", text: $category)
+                    TransactionCategoryPicker(selection: $category)
                     DatePicker("Date and time", selection: $date)
                     Picker("Account", selection: $accountID) {
                         ForEach(compatibleAccounts) { account in Text(account.name).tag(account.id) }
@@ -486,6 +635,7 @@ private struct RecurringPaymentLinkView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     @Query(sort: \RecurringPayment.name) private var recurringPayments: [RecurringPayment]
+    @State private var showingCreate = false
 
     private var compatiblePayments: [RecurringPayment] {
         RecurringPaymentMatcher.linkablePayments(accountID: transaction.accountID, payments: recurringPayments)
@@ -493,6 +643,14 @@ private struct RecurringPaymentLinkView: View {
 
     var body: some View {
         List {
+            Section {
+                Button("Create subscription from transaction", systemImage: "plus.circle.fill") {
+                    showingCreate = true
+                }
+            } footer: {
+                Text("Name, amount, currency, account, and category will be filled from this transaction.")
+            }
+
             Section {
                 Button { select(nil) } label: {
                     selectionRow(
@@ -526,6 +684,12 @@ private struct RecurringPaymentLinkView: View {
         .listSectionSpacing(.compact)
         .navigationTitle("Link recurring bill")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showingCreate) {
+            NewRecurringPaymentView(transaction: transaction) { payment in
+                transaction.recurringPaymentID = payment.id
+                transaction.recurringPaymentName = payment.name
+            }
+        }
     }
 
     private func selectionRow(title: String, subtitle: String, symbol: String, selected: Bool) -> some View {

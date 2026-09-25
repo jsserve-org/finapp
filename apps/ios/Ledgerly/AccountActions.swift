@@ -56,6 +56,49 @@ enum AccountActionService {
     }
 }
 
+struct QuickAccountEntryPicker: View {
+    @Environment(\.dismiss) private var dismiss
+    @Query(sort: \CachedAccount.name) private var accounts: [CachedAccount]
+    let direction: AccountEntryDirection
+    @State private var selectedAccount: CachedAccount?
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    ForEach(accounts) { account in
+                        Button { selectedAccount = account } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: AppIcon.account(kind: account.kind)).ledgerlyIcon()
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(account.name).font(.headline).foregroundStyle(.primary)
+                                    Text("\(account.institution) · \(account.currency)").font(.subheadline).foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                } header: {
+                    Text("Select an account")
+                } footer: {
+                    Text("After choosing the account, enter the amount and details.")
+                }
+                if accounts.isEmpty {
+                    ContentUnavailableView("No accounts", systemImage: AppIcon.accounts, description: Text("Create an account before adding money."))
+                }
+            }
+            .navigationTitle(direction.title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
+            .sheet(item: $selectedAccount) { account in
+                AccountEntryView(account: account, direction: direction)
+            }
+        }
+    }
+}
+
 struct AccountEntryView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
@@ -76,7 +119,7 @@ struct AccountEntryView: View {
                 } header: { Text(direction.title) }
                 Section("Details") {
                     TextField("Description", text: $description)
-                    TextField("Category", text: $category)
+                    TransactionCategoryPicker(selection: $category)
                     DatePicker("Date", selection: $date)
                 }
                 Section {

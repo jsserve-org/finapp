@@ -107,6 +107,17 @@ enum BillShortcutError: Error, CustomLocalizedStringResourceConvertible {
     var localizedStringResource: LocalizedStringResource { "Amount must be greater than zero." }
 }
 
+struct OpenAddMoneyIntent: AppIntent {
+    static let title: LocalizedStringResource = "Add Money"
+    static let description = IntentDescription("Open Ledgerly and choose the account to add money to.")
+    static let openAppWhenRun = true
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        UserDefaults.standard.set("moneyIn", forKey: "ledgerly.pendingAddFlow")
+        return .result(dialog: "Choose the account in Ledgerly, then enter the amount.")
+    }
+}
+
 struct LedgerlyShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
@@ -120,6 +131,12 @@ struct LedgerlyShortcuts: AppShortcutsProvider {
             phrases: ["Add a recurring bill in \(.applicationName)"],
             shortTitle: "Add Recurring Bill",
             systemImageName: "repeat"
+        )
+        AppShortcut(
+            intent: OpenAddMoneyIntent(),
+            phrases: ["Add money in \(.applicationName)", "Deposit money in \(.applicationName)"],
+            shortTitle: "Add Money",
+            systemImageName: "plus.circle.fill"
         )
     }
 }

@@ -31,6 +31,8 @@ struct LedgerlyBackup: Codable {
         let expensePurpose: String?
         let reimbursementStatus: String?
         let reimbursementTransactionId: String?
+        let refundTransactionId: String?
+        let refundedTransactionId: String?
         let transferId: String?
         let transferAccountId: String?
         let transferDirection: String?
@@ -114,7 +116,7 @@ enum LedgerlyBackupService {
             LedgerlyBackup.Account(id: $0.id, name: $0.name, institution: $0.institution, kind: $0.kind, amountMinor: $0.amountMinor, currency: $0.currency, version: $0.version, updatedAt: $0.updatedAt)
         }
         let transactions = try context.fetch(FetchDescriptor<CachedTransaction>()).map {
-            LedgerlyBackup.Transaction(id: $0.id, accountId: $0.accountId, title: $0.title, amountMinor: $0.amountMinor, currency: $0.currency, originalAmountMinor: $0.originalAmountMinor, originalCurrency: $0.originalCurrency, bookedAt: $0.bookedAt, pending: $0.pending, category: $0.category, recurringPaymentId: $0.recurringPaymentId, source: $0.source, expensePurpose: $0.expensePurpose, reimbursementStatus: $0.reimbursementStatus, reimbursementTransactionId: $0.reimbursementTransactionId, transferId: $0.transferId, transferAccountId: $0.transferAccountId, transferDirection: $0.transferDirection, version: $0.version, updatedAt: $0.updatedAt)
+            LedgerlyBackup.Transaction(id: $0.id, accountId: $0.accountId, title: $0.title, amountMinor: $0.amountMinor, currency: $0.currency, originalAmountMinor: $0.originalAmountMinor, originalCurrency: $0.originalCurrency, bookedAt: $0.bookedAt, pending: $0.pending, category: $0.category, recurringPaymentId: $0.recurringPaymentId, source: $0.source, expensePurpose: $0.expensePurpose, reimbursementStatus: $0.reimbursementStatus, reimbursementTransactionId: $0.reimbursementTransactionId, refundTransactionId: $0.refundTransactionId, refundedTransactionId: $0.refundedTransactionId, transferId: $0.transferId, transferAccountId: $0.transferAccountId, transferDirection: $0.transferDirection, version: $0.version, updatedAt: $0.updatedAt)
         }
         let recurring = try context.fetch(FetchDescriptor<RecurringPayment>()).map {
             LedgerlyBackup.Recurring(id: $0.id, name: $0.name, amountMinor: $0.amountMinor, currency: $0.currency, frequency: $0.frequency, nextDate: $0.nextDate, accountId: $0.accountId, category: $0.category, isActive: $0.isActive)
@@ -153,7 +155,7 @@ enum LedgerlyBackupService {
             let originalAmount = item.originalAmountMinor.flatMap { amount in
                 item.originalCurrency.map { Money(amountMinor: amount, currency: $0) }
             }
-            let dto = TransactionDTO(id: item.id, accountId: item.accountId, description: item.title, amount: Money(amountMinor: item.amountMinor, currency: item.currency), originalAmount: originalAmount, bookedAt: item.bookedAt, pending: item.pending, category: item.category, recurringPaymentId: item.recurringPaymentId, source: item.source, expensePurpose: item.expensePurpose, reimbursementStatus: item.reimbursementStatus, reimbursementTransactionId: item.reimbursementTransactionId, transferId: item.transferId, transferAccountId: item.transferAccountId, transferDirection: item.transferDirection, updatedAt: item.updatedAt)
+            let dto = TransactionDTO(id: item.id, accountId: item.accountId, description: item.title, amount: Money(amountMinor: item.amountMinor, currency: item.currency), originalAmount: originalAmount, bookedAt: item.bookedAt, pending: item.pending, category: item.category, recurringPaymentId: item.recurringPaymentId, source: item.source, expensePurpose: item.expensePurpose, reimbursementStatus: item.reimbursementStatus, reimbursementTransactionId: item.reimbursementTransactionId, refundTransactionId: item.refundTransactionId, refundedTransactionId: item.refundedTransactionId, transferId: item.transferId, transferAccountId: item.transferAccountId, transferDirection: item.transferDirection, updatedAt: item.updatedAt)
             if let existing = transactionsByID[item.id] { existing.apply(dto, version: item.version) }
             else { context.insert(CachedTransaction(dto: dto, initialVersion: item.version)) }
         }

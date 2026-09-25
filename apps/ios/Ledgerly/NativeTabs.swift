@@ -63,6 +63,18 @@ struct NativeActivityView: View {
     @State private var showingNewRecurringPayment = false
     @State private var editingRecurringPayment: RecurringPayment?
     @State private var selectedTransaction: TransactionSnapshot?
+    @State private var searchText = ""
+
+    private var visibleTransactions: [CachedTransaction] {
+        transactions.filter { transaction in
+            TransactionSearch.matches(
+                searchText,
+                transaction: transaction,
+                account: accounts.first { $0.id == transaction.accountId },
+                recurringPayment: recurringPayments.first { $0.id == transaction.recurringPaymentId }
+            )
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -125,7 +137,7 @@ struct NativeActivityView: View {
                 }
 
                 Section("Bills & transactions") {
-                    ForEach(transactions) { transaction in
+                    ForEach(visibleTransactions) { transaction in
                         let snapshot = TransactionSnapshot(
                             transaction,
                             account: accounts.first { $0.id == transaction.accountId },
@@ -145,10 +157,13 @@ struct NativeActivityView: View {
                     }
                     if transactions.isEmpty {
                         ContentUnavailableView("No activity", systemImage: AppIcon.activity, description: Text("Transactions you add or sync will appear here."))
+                    } else if visibleTransactions.isEmpty {
+                        ContentUnavailableView.search(text: searchText)
                     }
                 }
             }
             .navigationTitle("Activity")
+            .searchable(text: $searchText, prompt: "Search transactions")
             .navigationDestination(item: $selectedTransaction) { snapshot in
                 TransactionDetailView(transaction: snapshot)
             }
@@ -221,6 +236,20 @@ struct NativeActivityView: View {
             context.delete(payment)
         }
         try? context.save()
+    }
+}
+
+enum TransactionSearch {
+    static func matches(_ query: String, transaction: CachedTransaction, account: CachedAccount?, recurringPayment: RecurringPayment?) -> Bool {
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !needle.isEmpty else { return true }
+        let date = transaction.bookedDate?.formatted(date: .abbreviated, time: .omitted) ?? ""
+        let fields = [
+            transaction.title, transaction.category ?? "", transaction.currency,
+            account?.name ?? "", account?.institution ?? "", recurringPayment?.name ?? "",
+            money(transaction.amountMinor, transaction.currency), date,
+        ]
+        return fields.contains { $0.localizedCaseInsensitiveContains(needle) }
     }
 }
 

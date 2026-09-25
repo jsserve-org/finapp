@@ -33,6 +33,17 @@ struct DashboardView: View {
                         }
                     }
                 }
+                if !categoryTotals.isEmpty {
+                    Section("Spending by category") {
+                        ForEach(Array(categoryTotals.enumerated()), id: \.offset) { _, item in
+                            HStack {
+                                Label(item.category, systemImage: PaymentIcon.symbol(title: "", category: item.category, amountMinor: -1))
+                                Spacer()
+                                Text(money(item.amount, item.currency)).fontWeight(.semibold)
+                            }
+                        }
+                    }
+                }
                 investmentSection
             }
             .listStyle(.insetGrouped)
@@ -94,6 +105,18 @@ struct DashboardView: View {
         Dictionary(grouping: holdings, by: \.currency)
             .map { ($0.key, $0.value.reduce(0) { $0 + $1.marketValueMinor }) }
             .sorted { $0.0 < $1.0 }
+    }
+
+    private var categoryTotals: [(category: String, currency: String, amount: Int)] {
+        let expenses = transactions.filter { $0.amountMinor < 0 }
+        let grouped = Dictionary(grouping: expenses) { "\($0.currency)|\($0.category ?? "Uncategorized")" }
+        return grouped.map { key, values in
+            let parts = key.split(separator: "|", maxSplits: 1).map(String.init)
+            return (parts.count > 1 ? parts[1] : "Uncategorized", parts[0], abs(values.reduce(0) { $0 + $1.amountMinor }))
+        }
+        .sorted { $0.amount > $1.amount }
+        .prefix(8)
+        .map { $0 }
     }
 
     private func money(_ amount: Int, _ currency: String) -> String {

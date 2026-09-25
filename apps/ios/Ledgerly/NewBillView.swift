@@ -30,13 +30,8 @@ struct NewBillView: View {
                 } else {
                     Section("Bill") {
                         TextField("Name", text: $name)
-                        TextField("Purchase amount", text: $amount).keyboardType(.decimalPad)
-                        Picker("Currency", selection: $currency) {
-                            ForEach(SupportedCurrency.all) { option in
-                                Text("\(option.code) — \(option.name)").tag(option.code)
-                            }
-                        }
-                        TextField("Category", text: $category)
+                        MoneyEntryRow(label: "Purchase amount", amount: $amount, currency: $currency)
+                        TransactionCategoryPicker(selection: $category)
                     }
 
                     Section("For") {
