@@ -142,6 +142,46 @@ final class SyncEngineTests: XCTestCase {
         XCTAssertTrue(bills.isEmpty)
     }
 
+    // MARK: - Recurring payment matching
+
+    func testRecurringMatcherAutoLinksExactMerchantAmountAndAccount() throws {
+        let account = CachedAccount(name: "Checking", institution: "Test Bank", kind: "checking", amountMinor: 50_000, currency: "TWD")
+        context.insert(account)
+        let transaction = transaction(title: "Netflix.com", amountMinor: -390_00, currency: "TWD", accountID: account.id, category: "Entertainment")
+        let bill = RecurringPayment(name: "Netflix", amountMinor: 390_00, currency: "TWD", frequency: "monthly", nextDate: Date(), accountId: account.id, category: "Entertainment")
+        context.insert(transaction)
+        context.insert(bill)
+
+        XCTAssertTrue(autoLinkRecurringPayment(transaction, payments: [bill], context: context))
+        XCTAssertEqual(transaction.recurringPaymentId, bill.id)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<PendingTransactionCreate>()), 1)
+    }
+
+    func testRecurringMatcherKeepsAmountOnlyMatchAsSuggestion() {
+        let transaction = transaction(title: "Neighborhood market", amountMinor: -499_00, currency: "TWD", accountID: "account-1", category: "Groceries")
+        let bill = RecurringPayment(name: "Video service", amountMinor: 499_00, currency: "TWD", frequency: "monthly", nextDate: Date(), accountId: nil, category: "Entertainment")
+
+        let match = RecurringPaymentMatcher.bestMatch(for: transaction, payments: [bill])
+        XCTAssertEqual(match?.payment.id, bill.id)
+        XCTAssertFalse(match?.shouldAutoLink ?? true)
+    }
+
+    func testRecurringMatcherRejectsWrongCurrencyAndAccount() {
+        let transaction = transaction(title: "Netflix", amountMinor: -390_00, currency: "TWD", accountID: "account-1", category: "Entertainment")
+        let wrongCurrency = RecurringPayment(name: "Netflix", amountMinor: 390_00, currency: "USD", frequency: "monthly", nextDate: Date(), accountId: "account-1", category: "Entertainment")
+        let wrongAccount = RecurringPayment(name: "Netflix", amountMinor: 390_00, currency: "TWD", frequency: "monthly", nextDate: Date(), accountId: "account-2", category: "Entertainment")
+
+        XCTAssertNil(RecurringPaymentMatcher.bestMatch(for: transaction, payments: [wrongCurrency, wrongAccount]))
+    }
+
+    func testRecurringMatcherNeverAutoLinksIncome() {
+        let transaction = transaction(title: "Monthly salary", amountMinor: 68_000_00, currency: "TWD", accountID: "account-1", category: "Income")
+        let bill = RecurringPayment(name: "Monthly salary", amountMinor: 68_000_00, currency: "TWD", frequency: "monthly", nextDate: Date(), accountId: "account-1", category: "Income")
+
+        XCTAssertFalse(autoLinkRecurringPayment(transaction, payments: [bill], context: context))
+        XCTAssertNil(transaction.recurringPaymentId)
+    }
+
     // MARK: - Cursor
 
     func testSaveCursorInsertsThenUpdates() throws {
@@ -222,5 +262,14 @@ final class SyncEngineTests: XCTestCase {
         XCTAssertEqual(try destination.fetchCount(FetchDescriptor<CachedTransaction>()), 1)
         XCTAssertEqual(try destination.fetchCount(FetchDescriptor<RecurringPayment>()), 1)
         XCTAssertEqual(try destination.fetch(FetchDescriptor<CachedTransaction>()).first?.recurringPaymentId, "recurring-1")
+    }
+
+    private func transaction(title: String, amountMinor: Int, currency: String, accountID: String, category: String?) -> CachedTransaction {
+        let timestamp = ISO8601DateFormatter().string(from: Date())
+        return CachedTransaction(dto: TransactionDTO(
+            id: UUID().uuidString.lowercased(), accountId: accountID, description: title,
+            amount: Money(amountMinor: amountMinor, currency: currency), bookedAt: timestamp,
+            pending: false, category: category, updatedAt: timestamp
+        ))
     }
 }

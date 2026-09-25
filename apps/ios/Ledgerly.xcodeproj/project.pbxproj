@@ -17,6 +17,7 @@
 		471693F283B52650E8D6405E /* SupportedCurrency.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4884CB17F759342E9DB1556E /* SupportedCurrency.swift */; };
 		5762EC5917970812C489302E /* SyncEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55C65570FEA7E03FA70CD303 /* SyncEngine.swift */; };
 		6091BDC00C18B4345EA546EB /* ConnectionHealthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9DC72A3EAAF59ED0F765873 /* ConnectionHealthView.swift */; };
+		64BDC77AEBBB6E397B8555B3 /* RecurringPaymentMatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6BFE0868670C415AB30F4A3 /* RecurringPaymentMatcher.swift */; };
 		79FD5B18FB2919B659AC21C0 /* NewBillView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97D7472127FBF4EE641D49AE /* NewBillView.swift */; };
 		85243F606AF4070693F950D1 /* LedgerlyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0C42285F60A69C2A53C0989 /* LedgerlyApp.swift */; };
 		90BDA2B01A8F3FE5BAA3E609 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF071C23BB846F913BD1DAC3 /* DashboardView.swift */; };
@@ -71,6 +72,7 @@
 		ED7C885C03FE7BC27EC2A787 /* ScreenshotSyncSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotSyncSettingsView.swift; sourceTree = "<group>"; };
 		EDEEF15E27DB83D45F19BE51 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		F6773294291C9F0179902676 /* Ledgerly.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Ledgerly.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F6BFE0868670C415AB30F4A3 /* RecurringPaymentMatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecurringPaymentMatcher.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -113,6 +115,7 @@
 				66E1969D51CF787D24A489A0 /* NativeTabs.swift */,
 				97D7472127FBF4EE641D49AE /* NewBillView.swift */,
 				C4A67EB3AC66E32417CA61DF /* PaymentIcon.swift */,
+				F6BFE0868670C415AB30F4A3 /* RecurringPaymentMatcher.swift */,
 				DFBC8BFF6BBF45BAC50DD36B /* ScreenshotSync.swift */,
 				ED7C885C03FE7BC27EC2A787 /* ScreenshotSyncSettingsView.swift */,
 				5E4F996392A4CF8542BEDE55 /* SettingsView.swift */,
@@ -239,6 +242,7 @@
 				B80071EC414C2C333DAF9623 /* NativeTabs.swift in Sources */,
 				79FD5B18FB2919B659AC21C0 /* NewBillView.swift in Sources */,
 				994C6023DF322D75578FE0C9 /* PaymentIcon.swift in Sources */,
+				64BDC77AEBBB6E397B8555B3 /* RecurringPaymentMatcher.swift in Sources */,
 				A30BD357A21EB8542ED4DE30 /* ScreenshotSync.swift in Sources */,
 				3C95F58F42BCA8DDE9089E86 /* ScreenshotSyncSettingsView.swift in Sources */,
 				11074CA4D54C74BB4A35F6EB /* SettingsView.swift in Sources */,
@@ -417,7 +421,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 11;
+				CURRENT_PROJECT_VERSION = 12;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Ledgerly/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -425,7 +429,7 @@
 					"@executable_path/Frameworks",
 				);
 				LEDGERLY_BASE_URL = "http://localhost:3000";
-				MARKETING_VERSION = 0.2.0;
+				MARKETING_VERSION = 0.2.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ledgerly.app;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -437,7 +441,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 11;
+				CURRENT_PROJECT_VERSION = 12;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Ledgerly/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -445,7 +449,7 @@
 					"@executable_path/Frameworks",
 				);
 				LEDGERLY_BASE_URL = "http://localhost:3000";
-				MARKETING_VERSION = 0.2.0;
+				MARKETING_VERSION = 0.2.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ledgerly.app;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
