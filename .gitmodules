@@ -4,3 +4,6 @@
 [submodule "automations/easycard"]
 	path = automations/easycard
 	url = https://github.com/jsserve-org/finapp-easycard.git
+[submodule "automations/tcstock"]
+	path = automations/tcstock
+	url = https://github.com/jsserve-org/finapp-tcstock.git
