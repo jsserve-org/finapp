@@ -7,6 +7,7 @@ struct NewBillView: View {
     @Query(sort: \CachedAccount.name) private var accounts: [CachedAccount]
     @State private var name = ""
     @State private var amount = ""
+    @State private var settlementAmount = ""
     @State private var currency = SupportedCurrency.defaultCode
     @State private var category = "Bills"
     @State private var paymentDate = Date()
@@ -14,7 +15,8 @@ struct NewBillView: View {
     @State private var expensePurpose = "personal"
     @State private var reimbursable = false
 
-    private var availableAccounts: [CachedAccount] { accounts.filter { $0.currency == currency } }
+    private var selectedAccount: CachedAccount? { accounts.first { $0.id == accountId } }
+    private var needsSettlementAmount: Bool { selectedAccount.map { $0.currency != currency } ?? false }
 
     var body: some View {
         NavigationStack {
@@ -28,7 +30,7 @@ struct NewBillView: View {
                 } else {
                     Section("Bill") {
                         TextField("Name", text: $name)
-                        TextField("Amount", text: $amount).keyboardType(.decimalPad)
+                        TextField("Purchase amount", text: $amount).keyboardType(.decimalPad)
                         Picker("Currency", selection: $currency) {
                             ForEach(SupportedCurrency.all) { option in
                                 Text("\(option.code) — \(option.name)").tag(option.code)
@@ -49,12 +51,16 @@ struct NewBillView: View {
                     Section {
                         DatePicker("Payment date", selection: $paymentDate, displayedComponents: .date)
                         Picker("Pay from", selection: $accountId) {
-                            ForEach(availableAccounts) { Text($0.name).tag($0.id) }
+                            ForEach(accounts) { Text("\($0.name) · \($0.currency)").tag($0.id) }
+                        }
+                        if let account = selectedAccount, needsSettlementAmount {
+                            TextField("Amount charged in \(account.currency)", text: $settlementAmount)
+                                .keyboardType(.decimalPad)
                         }
                     } header: {
                         Text("Payment")
                     } footer: {
-                        Text("A one-time bill has one payment date and does not repeat.")
+                        Text(needsSettlementAmount ? "Enter the original purchase and the amount your bank charged after conversion." : "A one-time bill has one payment date and does not repeat.")
                     }
                 }
             }
@@ -64,11 +70,10 @@ struct NewBillView: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save() }
-                        .disabled(accounts.isEmpty || name.trimmingCharacters(in: .whitespaces).isEmpty || parsedAmount <= 0 || accountId.isEmpty)
+                        .disabled(accounts.isEmpty || name.trimmingCharacters(in: .whitespaces).isEmpty || parsedAmount <= 0 || accountId.isEmpty || (needsSettlementAmount && parsedSettlementAmount <= 0))
                 }
             }
             .task { selectDefaultAccount() }
-            .onChange(of: currency) { _, _ in selectDefaultAccount(force: true) }
             .onChange(of: expensePurpose) { _, purpose in
                 if purpose == "school", category == "Bills" { category = "School" }
             }
@@ -84,25 +89,28 @@ struct NewBillView: View {
         let decimal = Decimal(string: amount.replacingOccurrences(of: ",", with: ".")) ?? 0
         return NSDecimalNumber(decimal: decimal * 100).intValue
     }
+    private var parsedSettlementAmount: Int {
+        let decimal = Decimal(string: settlementAmount.replacingOccurrences(of: ",", with: ".")) ?? 0
+        return NSDecimalNumber(decimal: decimal * 100).intValue
+    }
 
-    private func selectDefaultAccount(force: Bool = false) {
-        if !force, accountId.isEmpty, availableAccounts.isEmpty, let first = accounts.first {
-            currency = first.currency
-            accountId = first.id
-            return
-        }
-        if !force, availableAccounts.contains(where: { $0.id == accountId }) { return }
-        accountId = availableAccounts.first?.id ?? ""
+    private func selectDefaultAccount() {
+        if accounts.contains(where: { $0.id == accountId }) { return }
+        accountId = accounts.first?.id ?? ""
+        if let account = accounts.first { currency = account.currency }
     }
 
     private func save() {
         guard let account = accounts.first(where: { $0.id == accountId }) else { return }
         let timestamp = ISO8601DateFormatter().string(from: paymentDate)
+        let settledAmount = needsSettlementAmount ? parsedSettlementAmount : parsedAmount
+        let originalAmount = needsSettlementAmount ? Money(amountMinor: -parsedAmount, currency: currency) : nil
         let transaction = CachedTransaction(dto: TransactionDTO(
             id: UUID().uuidString.lowercased(),
             accountId: account.id,
             description: name.trimmingCharacters(in: .whitespaces),
-            amount: Money(amountMinor: -parsedAmount, currency: currency),
+            amount: Money(amountMinor: -settledAmount, currency: account.currency),
+            originalAmount: originalAmount,
             bookedAt: timestamp,
             pending: false,
             category: category.trimmingCharacters(in: .whitespaces).isEmpty ? "Bills" : category.trimmingCharacters(in: .whitespaces),
@@ -115,7 +123,7 @@ struct NewBillView: View {
         context.insert(PendingTransactionCreate(entityId: transaction.id))
         let recurringPayments = (try? context.fetch(FetchDescriptor<RecurringPayment>())) ?? []
         autoLinkRecurringPayment(transaction, payments: recurringPayments, context: context)
-        account.amountMinor -= parsedAmount
+        account.amountMinor -= settledAmount
         account.updatedAt = ISO8601DateFormatter().string(from: Date())
         context.insert(PendingAccountMutation(entityId: account.id))
         try? context.save()

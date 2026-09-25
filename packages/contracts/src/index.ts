@@ -14,6 +14,7 @@ export type Transaction = {
   accountId: string;
   description: string;
   amount: Money;
+  originalAmount?: Money;
   bookedAt: string;
   pending: boolean;
   category?: string;

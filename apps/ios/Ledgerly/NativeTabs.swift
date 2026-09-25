@@ -63,47 +63,6 @@ struct NativeAccountsView: View {
     }
 }
 
-struct NativeInsightsView: View {
-    @Query private var accounts: [CachedAccount]
-    @Query private var transactions: [CachedTransaction]
-    @Query private var holdings: [StockHolding]
-    private var currencies: [String] {
-        Array(Set(accounts.map(\.currency) + transactions.map(\.currency) + holdings.map(\.currency))).sorted()
-    }
-
-    var body: some View {
-        NavigationStack {
-            List {
-                Section("Summary") {
-                    ForEach(currencies.isEmpty ? [SupportedCurrency.defaultCode] : currencies, id: \.self) { currency in
-                        let accountWorth = accounts.filter { $0.currency == currency && $0.isIncludedInNetWorth }.reduce(0) { $0 + $1.amountMinor }
-                        let investmentWorth = holdings.filter { $0.currency == currency }.reduce(0) { $0 + $1.marketValueMinor }
-                        let netWorth = accountWorth + investmentWorth
-                        let inflow = transactions.filter { $0.currency == currency && $0.amountMinor > 0 }.reduce(0) { $0 + $1.amountMinor }
-                        let outflow = abs(transactions.filter { $0.currency == currency && $0.amountMinor < 0 }.reduce(0) { $0 + $1.amountMinor })
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text(currency).font(.headline)
-                            insightRow("Net worth", netWorth, currency, color: .primary)
-                            insightRow("Money in", inflow, currency, color: .green)
-                            insightRow("Money out", outflow, currency, color: .red)
-                        }
-                        .padding(.vertical, 4)
-                    }
-                }
-            }
-            .navigationTitle("Insights")
-        }
-    }
-
-    private func insightRow(_ label: String, _ amount: Int, _ currency: String, color: Color) -> some View {
-        HStack {
-            Text(label).foregroundStyle(.secondary)
-            Spacer()
-            Text(money(amount, currency)).fontWeight(.semibold).foregroundStyle(color)
-        }
-    }
-}
-
 struct NativeActivityView: View {
     @Environment(\.modelContext) private var context
     @Query(sort: \CachedTransaction.bookedAt, order: .reverse) private var transactions: [CachedTransaction]
@@ -233,12 +192,20 @@ struct NativeActivityView: View {
                 Text(transactionSubtitle(transaction)).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            Text(money(transaction.amountMinor, transaction.currency))
-                .fontWeight(.semibold)
-                .foregroundStyle(PaymentIcon.color(amountMinor: transaction.amountMinor))
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-                .layoutPriority(1)
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(money(transaction.amountMinor, transaction.currency))
+                    .fontWeight(.semibold)
+                    .foregroundStyle(PaymentIcon.color(amountMinor: transaction.amountMinor))
+                if let originalAmountMinor = transaction.originalAmountMinor,
+                   let originalCurrency = transaction.originalCurrency {
+                    Text("Originally \(money(originalAmountMinor, originalCurrency))")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .layoutPriority(1)
         }
     }
 

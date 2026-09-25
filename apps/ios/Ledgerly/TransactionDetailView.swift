@@ -7,6 +7,8 @@ struct TransactionSnapshot: Identifiable, Hashable {
     var title: String
     var amountMinor: Int
     let currency: String
+    var originalAmountMinor: Int?
+    var originalCurrency: String?
     var bookedDate: Date?
     var pending: Bool
     var category: String?
@@ -30,6 +32,8 @@ struct TransactionSnapshot: Identifiable, Hashable {
         title = transaction.title
         amountMinor = transaction.amountMinor
         currency = transaction.currency
+        originalAmountMinor = transaction.originalAmountMinor
+        originalCurrency = transaction.originalCurrency
         bookedDate = transaction.bookedDate
         pending = transaction.pending
         category = transaction.category
@@ -93,6 +97,11 @@ struct TransactionDetailView: View {
 
             Section("Payment details") {
                 detailRow("Description", transaction.title)
+                if let originalAmountMinor = transaction.originalAmountMinor,
+                   let originalCurrency = transaction.originalCurrency {
+                    detailRow("Original purchase", absoluteMoney(originalAmountMinor, originalCurrency))
+                    detailRow("Bank settlement", absoluteMoney(transaction.amountMinor, transaction.currency))
+                }
                 detailRow("Category", transaction.category ?? "Uncategorized")
                 detailRow("Purpose", purposeLabel(transaction.expensePurpose))
                 detailRow("Direction", transaction.amountMinor < 0 ? "Money out" : "Money in")
@@ -150,7 +159,7 @@ struct TransactionDetailView: View {
             } header: {
                 Text("Subscription")
             } footer: {
-                Text("Ledgerly matches the account, currency, amount, merchant name, and category. Strong matches are linked automatically; uncertain matches stay as suggestions.")
+                Text("Ledgerly matches the original purchase currency when available. Foreign-currency bills can also be linked manually.")
             }
 
             Section("Record information") {
@@ -232,6 +241,8 @@ struct TransactionDetailView: View {
         guard let model = fetchTransaction() else { return }
         transaction.title = model.title
         transaction.amountMinor = model.amountMinor
+        transaction.originalAmountMinor = model.originalAmountMinor
+        transaction.originalCurrency = model.originalCurrency
         transaction.bookedDate = model.bookedDate
         transaction.pending = model.pending
         transaction.category = model.category
@@ -332,6 +343,9 @@ private struct EditTransactionView: View {
     @State private var title: String
     @State private var category: String
     @State private var amount: String
+    @State private var hasOriginalAmount: Bool
+    @State private var originalAmount: String
+    @State private var originalCurrency: String
     @State private var isMoneyOut: Bool
     @State private var date: Date
     @State private var accountID: String
@@ -344,6 +358,9 @@ private struct EditTransactionView: View {
         _title = State(initialValue: transaction.title)
         _category = State(initialValue: transaction.category ?? "")
         _amount = State(initialValue: NSDecimalNumber(value: Double(transaction.amountMinor).magnitude / 100).stringValue)
+        _hasOriginalAmount = State(initialValue: transaction.originalAmountMinor != nil && transaction.originalCurrency != nil)
+        _originalAmount = State(initialValue: transaction.originalAmountMinor.map { NSDecimalNumber(value: Double($0).magnitude / 100).stringValue } ?? "")
+        _originalCurrency = State(initialValue: transaction.originalCurrency ?? SupportedCurrency.all.first(where: { $0.code != transaction.currency })?.code ?? SupportedCurrency.defaultCode)
         _isMoneyOut = State(initialValue: transaction.amountMinor < 0)
         _date = State(initialValue: transaction.bookedDate ?? Date())
         _accountID = State(initialValue: transaction.accountID)
@@ -355,6 +372,10 @@ private struct EditTransactionView: View {
     private var compatibleAccounts: [CachedAccount] { accounts.filter { $0.currency == transaction.currency } }
     private var parsedAmount: Int {
         let decimal = Decimal(string: amount.replacingOccurrences(of: ",", with: ".")) ?? 0
+        return NSDecimalNumber(decimal: decimal * 100).intValue
+    }
+    private var parsedOriginalAmount: Int {
+        let decimal = Decimal(string: originalAmount.replacingOccurrences(of: ",", with: ".")) ?? 0
         return NSDecimalNumber(decimal: decimal * 100).intValue
     }
 
@@ -370,6 +391,21 @@ private struct EditTransactionView: View {
                     TextField("Amount", text: $amount).keyboardType(.decimalPad)
                     LabeledContent("Currency", value: transaction.currency)
                     Toggle("Pending", isOn: $pending)
+                }
+                Section {
+                    Toggle("Paid in another currency", isOn: $hasOriginalAmount)
+                    if hasOriginalAmount {
+                        TextField("Original amount", text: $originalAmount).keyboardType(.decimalPad)
+                        Picker("Original currency", selection: $originalCurrency) {
+                            ForEach(SupportedCurrency.all) { option in
+                                Text("\(option.code) — \(option.name)").tag(option.code)
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Original purchase")
+                } footer: {
+                    Text("Use this when the merchant charged one currency but your bank settled the account in another, such as JPY charged and TWD settled.")
                 }
                 Section("Details") {
                     TextField("Description", text: $title)
@@ -394,7 +430,7 @@ private struct EditTransactionView: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save() }
-                        .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || parsedAmount <= 0 || accountID.isEmpty)
+                        .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || parsedAmount <= 0 || accountID.isEmpty || (hasOriginalAmount && parsedOriginalAmount <= 0))
                 }
             }
         }
@@ -421,6 +457,8 @@ private struct EditTransactionView: View {
         let trimmedCategory = category.trimmingCharacters(in: .whitespacesAndNewlines)
         model.category = trimmedCategory.isEmpty ? nil : trimmedCategory
         model.amountMinor = newAmount
+        model.originalAmountMinor = hasOriginalAmount ? (isMoneyOut ? -parsedOriginalAmount : parsedOriginalAmount) : nil
+        model.originalCurrency = hasOriginalAmount ? originalCurrency : nil
         model.accountId = newAccount.id
         model.bookedAt = ISO8601DateFormatter().string(from: date)
         model.pending = pending
@@ -450,7 +488,7 @@ private struct RecurringPaymentLinkView: View {
     @Query(sort: \RecurringPayment.name) private var recurringPayments: [RecurringPayment]
 
     private var compatiblePayments: [RecurringPayment] {
-        RecurringPaymentMatcher.compatiblePayments(currency: transaction.currency, accountID: transaction.accountID, payments: recurringPayments)
+        RecurringPaymentMatcher.linkablePayments(accountID: transaction.accountID, payments: recurringPayments)
     }
 
     var body: some View {
@@ -482,7 +520,7 @@ private struct RecurringPaymentLinkView: View {
             } header: {
                 Text("Recurring bills")
             } footer: {
-                Text("Showing bills that use \(transaction.currency) and this account.")
+                Text("Showing bills for this account in any currency. The \(transaction.currency) bank settlement stays unchanged.")
             }
         }
         .listSectionSpacing(.compact)

@@ -8,21 +8,23 @@ struct RecurringPaymentMatch {
 }
 
 enum RecurringPaymentMatcher {
+    static func linkablePayments(accountID: String, payments: [RecurringPayment]) -> [RecurringPayment] {
+        payments.filter { $0.isActive && ($0.accountId == nil || $0.accountId == accountID) }
+    }
+
     static func compatiblePayments(for transaction: CachedTransaction, payments: [RecurringPayment]) -> [RecurringPayment] {
-        compatiblePayments(currency: transaction.currency, accountID: transaction.accountId, payments: payments)
+        compatiblePayments(currency: transaction.originalCurrency ?? transaction.currency, accountID: transaction.accountId, payments: payments)
     }
 
     static func compatiblePayments(currency: String, accountID: String, payments: [RecurringPayment]) -> [RecurringPayment] {
-        payments.filter {
-            $0.isActive && $0.currency == currency && ($0.accountId == nil || $0.accountId == accountID)
-        }
+        linkablePayments(accountID: accountID, payments: payments).filter { $0.currency == currency }
     }
 
     static func bestMatch(for transaction: CachedTransaction, payments: [RecurringPayment]) -> RecurringPaymentMatch? {
         bestMatch(
             title: transaction.title,
-            amountMinor: transaction.amountMinor,
-            currency: transaction.currency,
+            amountMinor: transaction.originalAmountMinor ?? transaction.amountMinor,
+            currency: transaction.originalCurrency ?? transaction.currency,
             accountID: transaction.accountId,
             category: transaction.category,
             payments: payments

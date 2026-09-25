@@ -14,6 +14,7 @@ struct AccountDTO: Codable, Equatable, Identifiable {
 struct TransactionDTO: Codable, Equatable, Identifiable {
     let id, accountId, description: String
     let amount: Money
+    let originalAmount: Money?
     let bookedAt: String
     let pending: Bool
     let category: String?
@@ -27,8 +28,9 @@ struct TransactionDTO: Codable, Equatable, Identifiable {
     let transferDirection: String?
     let updatedAt: String
 
-    init(id: String, accountId: String, description: String, amount: Money, bookedAt: String, pending: Bool, category: String?, recurringPaymentId: String? = nil, source: String? = nil, expensePurpose: String? = nil, reimbursementStatus: String? = nil, reimbursementTransactionId: String? = nil, transferId: String? = nil, transferAccountId: String? = nil, transferDirection: String? = nil, updatedAt: String) {
+    init(id: String, accountId: String, description: String, amount: Money, originalAmount: Money? = nil, bookedAt: String, pending: Bool, category: String?, recurringPaymentId: String? = nil, source: String? = nil, expensePurpose: String? = nil, reimbursementStatus: String? = nil, reimbursementTransactionId: String? = nil, transferId: String? = nil, transferAccountId: String? = nil, transferDirection: String? = nil, updatedAt: String) {
         self.id = id; self.accountId = accountId; self.description = description; self.amount = amount
+        self.originalAmount = originalAmount
         self.bookedAt = bookedAt; self.pending = pending; self.category = category
         self.recurringPaymentId = recurringPaymentId; self.source = source; self.expensePurpose = expensePurpose
         self.reimbursementStatus = reimbursementStatus; self.reimbursementTransactionId = reimbursementTransactionId
@@ -280,6 +282,8 @@ enum JSONValue: Codable, Equatable {
     var title: String
     var amountMinor: Int
     var currency: String
+    var originalAmountMinor: Int?
+    var originalCurrency: String?
     var bookedAt: String
     var pending: Bool
     var category: String?
@@ -300,6 +304,8 @@ enum JSONValue: Codable, Equatable {
         title = dto.description
         amountMinor = dto.amount.amountMinor
         currency = dto.amount.currency
+        originalAmountMinor = dto.originalAmount?.amountMinor
+        originalCurrency = dto.originalAmount?.currency
         bookedAt = dto.bookedAt
         pending = dto.pending
         category = dto.category
@@ -320,6 +326,8 @@ enum JSONValue: Codable, Equatable {
         title = dto.description
         amountMinor = dto.amount.amountMinor
         currency = dto.amount.currency
+        originalAmountMinor = dto.originalAmount?.amountMinor
+        originalCurrency = dto.originalAmount?.currency
         bookedAt = dto.bookedAt
         pending = dto.pending
         category = dto.category

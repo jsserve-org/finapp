@@ -31,8 +31,9 @@ describe("health", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.registrationEnabled).toBe(true);
-    expect(body.serverVersion).toBe("0.4.0");
+    expect(body.serverVersion).toBe("0.5.0");
     expect(body.syncProtocolVersion).toBe(2);
     expect(body.minimumAppVersion).toBe("0.4.0");
+    expect(body.latestAppVersion).toBe("0.5.0");
   });
 });

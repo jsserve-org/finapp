@@ -97,6 +97,13 @@ final class SyncEngineTests: XCTestCase {
         XCTAssertEqual(transaction.reimbursementStatus, "pending")
     }
 
+    func testTransactionDTOCarriesForeignPurchaseAndSettlementAmounts() throws {
+        let payload = #"{"id":"t1","accountId":"a1","description":"Japan purchase","amount":{"amountMinor":-21500,"currency":"TWD"},"originalAmount":{"amountMinor":-100000,"currency":"JPY"},"bookedAt":"2026-09-21T10:00:00.000Z","pending":false,"updatedAt":"2026-09-21T10:00:00.000Z"}"#
+        let transaction = try JSONDecoder().decode(TransactionDTO.self, from: Data(payload.utf8))
+        XCTAssertEqual(transaction.amount, Money(amountMinor: -21_500, currency: "TWD"))
+        XCTAssertEqual(transaction.originalAmount, Money(amountMinor: -100_000, currency: "JPY"))
+    }
+
     // MARK: - Cache application
 
     private func change(_ sequence: Int, entity: String, id: String, value: String?) -> SyncChange {
@@ -235,6 +242,23 @@ final class SyncEngineTests: XCTestCase {
         XCTAssertNil(RecurringPaymentMatcher.bestMatch(for: transaction, payments: [wrongCurrency, wrongAccount]))
     }
 
+    func testRecurringBillCanBeLinkedManuallyAcrossSettlementCurrencies() {
+        let yenBill = RecurringPayment(name: "Japan service", amountMinor: 1_000_00, currency: "JPY", frequency: "monthly", nextDate: Date(), accountId: "account-1", category: "Bills")
+        let otherAccount = RecurringPayment(name: "Other account", amountMinor: 1_000_00, currency: "JPY", frequency: "monthly", nextDate: Date(), accountId: "account-2", category: "Bills")
+
+        XCTAssertEqual(RecurringPaymentMatcher.linkablePayments(accountID: "account-1", payments: [yenBill, otherAccount]).map(\.id), [yenBill.id])
+        XCTAssertTrue(RecurringPaymentMatcher.compatiblePayments(currency: "TWD", accountID: "account-1", payments: [yenBill]).isEmpty)
+    }
+
+    func testRecurringMatcherUsesOriginalPurchaseCurrency() {
+        let transaction = transaction(title: "Japan service", amountMinor: -215_00, currency: "TWD", accountID: "account-1", category: "Bills", originalAmount: Money(amountMinor: -1_000_00, currency: "JPY"))
+        let yenBill = RecurringPayment(name: "Japan service", amountMinor: 1_000_00, currency: "JPY", frequency: "monthly", nextDate: Date(), accountId: "account-1", category: "Bills")
+
+        let match = RecurringPaymentMatcher.bestMatch(for: transaction, payments: [yenBill])
+        XCTAssertEqual(match?.payment.id, yenBill.id)
+        XCTAssertTrue(match?.shouldAutoLink ?? false)
+    }
+
     func testRecurringMatcherNeverAutoLinksIncome() {
         let transaction = transaction(title: "Monthly salary", amountMinor: 68_000_00, currency: "TWD", accountID: "account-1", category: "Income")
         let bill = RecurringPayment(name: "Monthly salary", amountMinor: 68_000_00, currency: "TWD", frequency: "monthly", nextDate: Date(), accountId: "account-1", category: "Income")
@@ -365,7 +389,7 @@ final class SyncEngineTests: XCTestCase {
         let account = CachedAccount(name: "Checking", institution: "Test Bank", kind: "checking", amountMinor: 12_345, currency: "TWD")
         context.insert(account)
         let timestamp = ISO8601DateFormatter().string(from: Date())
-        context.insert(CachedTransaction(dto: TransactionDTO(id: "transaction-1", accountId: account.id, description: "Coffee", amount: Money(amountMinor: -150, currency: "TWD"), bookedAt: timestamp, pending: false, category: "Dining", recurringPaymentId: "recurring-1", updatedAt: timestamp)))
+        context.insert(CachedTransaction(dto: TransactionDTO(id: "transaction-1", accountId: account.id, description: "Coffee", amount: Money(amountMinor: -150, currency: "TWD"), originalAmount: Money(amountMinor: -700, currency: "JPY"), bookedAt: timestamp, pending: false, category: "Dining", recurringPaymentId: "recurring-1", updatedAt: timestamp)))
         context.insert(RecurringPayment(id: "recurring-1", name: "Rent", amountMinor: 18_000_00, currency: "TWD", frequency: "monthly", nextDate: Date(), accountId: account.id, category: "Housing"))
         try context.save()
 
@@ -380,6 +404,7 @@ final class SyncEngineTests: XCTestCase {
         XCTAssertEqual(try destination.fetchCount(FetchDescriptor<CachedTransaction>()), 1)
         XCTAssertEqual(try destination.fetchCount(FetchDescriptor<RecurringPayment>()), 1)
         XCTAssertEqual(try destination.fetch(FetchDescriptor<CachedTransaction>()).first?.recurringPaymentId, "recurring-1")
+        XCTAssertEqual(try destination.fetch(FetchDescriptor<CachedTransaction>()).first?.originalCurrency, "JPY")
     }
 
 
@@ -393,11 +418,11 @@ final class SyncEngineTests: XCTestCase {
         XCTAssertEqual(backup.stockTrades?.first?.side, "buy")
     }
 
-    private func transaction(title: String, amountMinor: Int, currency: String, accountID: String, category: String?, source: String? = nil) -> CachedTransaction {
+    private func transaction(title: String, amountMinor: Int, currency: String, accountID: String, category: String?, source: String? = nil, originalAmount: Money? = nil) -> CachedTransaction {
         let timestamp = ISO8601DateFormatter().string(from: Date())
         return CachedTransaction(dto: TransactionDTO(
             id: UUID().uuidString.lowercased(), accountId: accountID, description: title,
-            amount: Money(amountMinor: amountMinor, currency: currency), bookedAt: timestamp,
+            amount: Money(amountMinor: amountMinor, currency: currency), originalAmount: originalAmount, bookedAt: timestamp,
             pending: false, category: category, source: source, updatedAt: timestamp
         ))
     }

@@ -51,6 +51,13 @@ struct SettingsView: View {
                     LabeledContent("App", value: "Ledgerly")
                     LabeledContent("Sync", value: "Cursor-based /v1/sync")
                 }
+                Section("Privacy") {
+                    NavigationLink { AppPrivacySettingsView() } label: {
+                        Label("App lock & screenshots", systemImage: "lock.shield.fill")
+                    }
+                    Text("Hide financial information outside the active app, configure PIN or biometrics, and control screenshot notices.")
+                        .foregroundStyle(.secondary)
+                }
                 Section("Backup") {
                     Button("Export backup", systemImage: "square.and.arrow.up") { exportBackup() }
                     Button("Import backup", systemImage: "square.and.arrow.down") { showingImporter = true }
