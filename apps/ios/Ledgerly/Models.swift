@@ -43,6 +43,22 @@ struct RecurringPaymentDTO: Codable, Equatable, Identifiable {
     let isActive: Bool
 }
 
+struct StockHoldingDTO: Codable, Equatable, Identifiable {
+    let id, symbol, name, currency: String
+    let quantity: Double
+    let averageCostMinor, currentPriceMinor: Int
+    let linkedAccountId: String?
+    let updatedAt: String
+}
+
+struct StockTradeDTO: Codable, Equatable, Identifiable {
+    let id, holdingId, symbol, side, currency: String
+    let quantity: Double
+    let priceMinor, feesMinor: Int
+    let tradedAt: String
+    let linkedAccountId: String?
+}
+
 struct SyncChange: Codable {
     let sequence: Int
     let entity: String
@@ -75,11 +91,14 @@ struct SyncOperation: Encodable {
         var account: AccountDTO?
         var transaction: TransactionDTO?
         var recurringPayment: RecurringPaymentDTO?
+        var stockHolding: StockHoldingDTO?
+        var stockTrade: StockTradeDTO?
 
-        init(description: String? = nil, category: String? = nil, recurringPaymentId: String? = nil, includesRecurringPaymentId: Bool = false, account: AccountDTO? = nil, transaction: TransactionDTO? = nil, recurringPayment: RecurringPaymentDTO? = nil) {
+        init(description: String? = nil, category: String? = nil, recurringPaymentId: String? = nil, includesRecurringPaymentId: Bool = false, account: AccountDTO? = nil, transaction: TransactionDTO? = nil, recurringPayment: RecurringPaymentDTO? = nil, stockHolding: StockHoldingDTO? = nil, stockTrade: StockTradeDTO? = nil) {
             self.description = description; self.category = category; self.recurringPaymentId = recurringPaymentId
             self.includesRecurringPaymentId = includesRecurringPaymentId
             self.account = account; self.transaction = transaction; self.recurringPayment = recurringPayment
+            self.stockHolding = stockHolding; self.stockTrade = stockTrade
         }
 
         enum CodingKeys: String, CodingKey { case description; case category; case recurringPaymentId }
@@ -87,6 +106,8 @@ struct SyncOperation: Encodable {
             if let account { try account.encode(to: encoder); return }
             if let transaction { try transaction.encode(to: encoder); return }
             if let recurringPayment { try recurringPayment.encode(to: encoder); return }
+            if let stockHolding { try stockHolding.encode(to: encoder); return }
+            if let stockTrade { try stockTrade.encode(to: encoder); return }
             var container = encoder.container(keyedBy: CodingKeys.self)
             if let description, !description.isEmpty { try container.encode(description, forKey: .description) }
             if let category { try container.encode(category, forKey: .category) }
@@ -136,6 +157,22 @@ struct SyncOperation: Encodable {
     init(entityId: String, action: String) {
         mutationId = UUID().uuidString.lowercased()
         self.entityId = entityId
+        self.action = action
+        createdAt = Date()
+    }
+}
+
+@Model final class PendingStockMutation {
+    @Attribute(.unique) var mutationId: String
+    var entityId: String
+    var entityKind: String = "stockHolding"
+    var action: String
+    var createdAt: Date
+
+    init(entityId: String, entity: String, action: String = "upsert") {
+        mutationId = UUID().uuidString.lowercased()
+        self.entityId = entityId
+        self.entityKind = entity
         self.action = action
         createdAt = Date()
     }
@@ -338,6 +375,47 @@ enum JSONValue: Codable, Equatable {
         case "yearly": "Yearly"
         default: "Monthly"
         }
+    }
+}
+
+@Model final class StockHolding {
+    @Attribute(.unique) var id: String
+    var symbol: String
+    var name: String
+    var quantity: Double
+    var averageCostMinor: Int
+    var currentPriceMinor: Int
+    var currency: String
+    var linkedAccountId: String?
+    var updatedAt: String
+
+    init(id: String = UUID().uuidString.lowercased(), symbol: String, name: String, quantity: Double, averageCostMinor: Int, currentPriceMinor: Int, currency: String, linkedAccountId: String?, updatedAt: String = ISO8601DateFormatter().string(from: Date())) {
+        self.id = id; self.symbol = symbol; self.name = name; self.quantity = quantity
+        self.averageCostMinor = averageCostMinor; self.currentPriceMinor = currentPriceMinor
+        self.currency = currency; self.linkedAccountId = linkedAccountId; self.updatedAt = updatedAt
+    }
+
+    var marketValueMinor: Int { Int((quantity * Double(currentPriceMinor)).rounded()) }
+    var costBasisMinor: Int { Int((quantity * Double(averageCostMinor)).rounded()) }
+    var gainLossMinor: Int { marketValueMinor - costBasisMinor }
+}
+
+@Model final class StockTrade {
+    @Attribute(.unique) var id: String
+    var holdingId: String
+    var symbol: String
+    var side: String
+    var quantity: Double
+    var priceMinor: Int
+    var feesMinor: Int
+    var currency: String
+    var tradedAt: String
+    var linkedAccountId: String?
+
+    init(id: String = UUID().uuidString.lowercased(), holdingId: String, symbol: String, side: String, quantity: Double, priceMinor: Int, feesMinor: Int, currency: String, tradedAt: String, linkedAccountId: String?) {
+        self.id = id; self.holdingId = holdingId; self.symbol = symbol; self.side = side
+        self.quantity = quantity; self.priceMinor = priceMinor; self.feesMinor = feesMinor
+        self.currency = currency; self.tradedAt = tradedAt; self.linkedAccountId = linkedAccountId
     }
 }
 

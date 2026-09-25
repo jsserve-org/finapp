@@ -1,9 +1,19 @@
 import Foundation
 
-enum APIError: Error, Equatable {
+enum APIError: Error, Equatable, LocalizedError {
     case invalidResponse
     case http(Int, String?)
     case offline
+    case incompatible(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidResponse: "The server returned an invalid response."
+        case .http(let status, let message): message ?? "Server request failed (\(status))."
+        case .offline: "The server is unreachable."
+        case .incompatible(let message): message
+        }
+    }
 }
 
 struct AuthResponse: Codable {
@@ -13,7 +23,14 @@ struct AuthResponse: Codable {
     let user: User
     let context: Context
 }
-struct ServerConfig: Codable { let registrationEnabled: Bool; let convexUrl: String }
+struct ServerConfig: Codable {
+    let registrationEnabled: Bool
+    let convexUrl: String
+    let serverVersion: String?
+    let syncProtocolVersion: Int?
+    let minimumAppVersion: String?
+    let latestAppVersion: String?
+}
 
 struct RemoteAccount: Codable, Identifiable {
     let id, name, institution, kind: String
@@ -115,10 +132,12 @@ actor APIClient {
     private struct SyncRequestBody: Encodable {
         let cursor: String?
         let operations: [SyncOperation]
+        let appVersion: String
+        let protocolVersion: Int
     }
 
     func sync(cursor: String?, operations: [SyncOperation] = []) async throws -> SyncResponse {
-        let body = try JSONEncoder().encode(SyncRequestBody(cursor: cursor, operations: operations))
+        let body = try JSONEncoder().encode(SyncRequestBody(cursor: cursor, operations: operations, appVersion: LedgerlyCompatibility.appVersion, protocolVersion: LedgerlyCompatibility.syncProtocolVersion))
         let request = makeRequest(path: "/v1/sync", method: "POST", body: body)
         return try decoder.decode(SyncResponse.self, from: await send(request))
     }

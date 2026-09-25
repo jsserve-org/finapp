@@ -22,7 +22,7 @@ export type Transaction = {
 
 export type SyncOperation = {
   mutationId: string;
-  entity: "account" | "transaction";
+  entity: "account" | "transaction" | "recurringPayment" | "stockHolding" | "stockTrade";
   action: "upsert" | "delete";
   entityId: string;
   value?: Account | Partial<Pick<Transaction, "description" | "category">>;
@@ -32,7 +32,7 @@ export type SyncOperation = {
 export type SyncRequest = { cursor?: string; operations: SyncOperation[] };
 export type SyncChange = {
   sequence: number;
-  entity: "account" | "transaction";
+  entity: "account" | "transaction" | "recurringPayment" | "stockHolding" | "stockTrade";
   entityId: string;
   action: "upsert" | "delete";
   value: Account | Transaction | null;

@@ -29,6 +29,10 @@ describe("health", () => {
   it("publishes registration policy without authentication", async () => {
     const response = await app.request("/v1/config");
     expect(response.status).toBe(200);
-    expect((await response.json()).registrationEnabled).toBe(true);
+    const body = await response.json();
+    expect(body.registrationEnabled).toBe(true);
+    expect(body.serverVersion).toBe("0.4.0");
+    expect(body.syncProtocolVersion).toBe(2);
+    expect(body.minimumAppVersion).toBe("0.4.0");
   });
 });

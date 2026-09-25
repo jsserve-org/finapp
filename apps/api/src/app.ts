@@ -49,7 +49,14 @@ function requireDeployment(requested: string) {
 }
 
 app.get("/health/live", (c) => c.json({ status: "ok" }));
-app.get("/v1/config", (c) => c.json({ registrationEnabled: config.ALLOW_REGISTRATION, convexUrl: normalizedURL(config.PUBLIC_CONVEX_URL) }));
+app.get("/v1/config", (c) => c.json({
+  registrationEnabled: config.ALLOW_REGISTRATION,
+  convexUrl: normalizedURL(config.PUBLIC_CONVEX_URL),
+  serverVersion: config.API_VERSION,
+  syncProtocolVersion: config.SYNC_PROTOCOL_VERSION,
+  minimumAppVersion: config.MINIMUM_APP_VERSION,
+  latestAppVersion: config.LATEST_APP_VERSION,
+}));
 app.get("/health/ready", async (c) => {
   try {
     await convexQuery("system:health", {});
@@ -102,6 +109,9 @@ app.post("/v1/auth/logout", async (c) => {
 
 app.post("/v1/sync", async (c) => {
   const body = await c.req.json().catch(() => ({ operations: [] }));
+  if (body.protocolVersion !== config.SYNC_PROTOCOL_VERSION) {
+    throw new HTTPException(426, { message: `Update Ledgerly: this server requires sync protocol ${config.SYNC_PROTOCOL_VERSION}` });
+  }
   return c.json(await convexMutation("sync:exchange", { tokenHash: await sha256(c.get("sessionToken")), cursor: body.cursor ?? "0", operations: body.operations ?? [], now: Date.now() }));
 });
 
