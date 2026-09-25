@@ -25,7 +25,7 @@ curl "$LEDGERLY_API/v1/accounts" \
 
 ## Create a one-time bill
 
-`amountMinor` is the positive amount in the currency's minor unit: `1299` means USD 12.99. `date` must be an ISO 8601 timestamp. The bill currency must match the selected account.
+`amountMinor` is the positive purchase amount in the merchant's currency: `1299` means USD 12.99. `date` must be an ISO 8601 timestamp. When the purchase currency differs from the account currency, also send `settlementAmountMinor` with the converted amount the bank actually charged. Ledgerly keeps both values and changes the account balance only by the settlement amount.
 
 ```sh
 curl -X POST "$LEDGERLY_API/v1/bills" \
@@ -42,6 +42,8 @@ curl -X POST "$LEDGERLY_API/v1/bills" \
     "category":"Utilities"
   }'
 ```
+
+For example, a JPY 1,000 purchase settled as TWD 215 against a TWD account uses `"amountMinor":100000`, `"currency":"JPY"`, and `"settlementAmountMinor":21500`.
 
 ## Create a recurring bill
 

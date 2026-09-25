@@ -42,6 +42,10 @@ enum TransactionMerger {
         let imported = candidate.imported
         if imported.category == nil || imported.category?.isEmpty == true { imported.category = manual.category }
         if imported.expensePurpose == nil { imported.expensePurpose = manual.expensePurpose }
+        if imported.originalAmountMinor == nil {
+            imported.originalAmountMinor = manual.originalAmountMinor
+            imported.originalCurrency = manual.originalCurrency
+        }
         if imported.recurringPaymentId == nil { imported.recurringPaymentId = manual.recurringPaymentId }
         if imported.reimbursementStatus == nil { imported.reimbursementStatus = manual.reimbursementStatus }
         imported.updatedAt = ISO8601DateFormatter().string(from: Date())

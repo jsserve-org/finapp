@@ -22,13 +22,17 @@ export const create = mutation({
     if (bill.type === "oneTime") {
       const account = await ctx.db.query("accounts").withIndex("by_user_external", (q) => q.eq("userId", session.userId).eq("externalId", bill.accountId)).unique();
       if (!account) throw new Error("ACCOUNT_NOT_FOUND");
-      if (account.value?.balance?.currency !== bill.currency) throw new Error("CURRENCY_MISMATCH");
+      const accountCurrency = account.value?.balance?.currency;
+      const isForeignCurrency = accountCurrency !== bill.currency;
+      if (isForeignCurrency && !bill.settlementAmountMinor) throw new Error("SETTLEMENT_AMOUNT_REQUIRED");
+      const settlementAmountMinor = bill.settlementAmountMinor ?? bill.amountMinor;
       const timestamp = new Date(args.now).toISOString();
       const transaction = {
         id: bill.id,
         accountId: bill.accountId,
         description: bill.name,
-        amount: { amountMinor: -bill.amountMinor, currency: bill.currency },
+        amount: { amountMinor: -settlementAmountMinor, currency: accountCurrency },
+        ...(isForeignCurrency ? { originalAmount: { amountMinor: -bill.amountMinor, currency: bill.currency } } : {}),
         bookedAt: bill.date,
         pending: false,
         category: bill.category,
@@ -36,7 +40,7 @@ export const create = mutation({
       };
       await ctx.db.insert("transactions", { userId: session.userId, externalId: bill.id, value: transaction, version: 1, deleted: false });
       await addChange(ctx, session.userId, "transaction", bill.id, "upsert", transaction);
-      const accountValue = { ...account.value, balance: { ...account.value.balance, amountMinor: account.value.balance.amountMinor - bill.amountMinor }, updatedAt: timestamp };
+      const accountValue = { ...account.value, balance: { ...account.value.balance, amountMinor: account.value.balance.amountMinor - settlementAmountMinor }, updatedAt: timestamp };
       await ctx.db.patch(account._id, { value: accountValue, version: account.version + 1 });
       await addChange(ctx, session.userId, "account", account.externalId, "upsert", accountValue);
     } else {

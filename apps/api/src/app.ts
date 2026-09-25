@@ -32,7 +32,7 @@ const apiKeyName = z.object({ name: z.string().trim().min(1).max(80) });
 const bill = z.discriminatedUnion("type", [
   z.object({
     id: z.string().uuid().optional(), type: z.literal("oneTime"), name: z.string().trim().min(1).max(120),
-    amountMinor: z.number().int().positive(), currency, date: z.string().datetime(),
+    amountMinor: z.number().int().positive(), currency, settlementAmountMinor: z.number().int().positive().optional(), date: z.string().datetime(),
     accountId: z.string().min(1), category: z.string().trim().min(1).max(80).default("Bills"),
   }),
   z.object({
@@ -145,7 +145,7 @@ app.post("/v1/bills", zValidator("json", bill), async (c) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (message.includes("ACCOUNT_NOT_FOUND")) throw new HTTPException(404, { message: "Account not found" });
-    if (message.includes("CURRENCY_MISMATCH")) throw new HTTPException(409, { message: "Bill currency must match the account currency" });
+    if (message.includes("SETTLEMENT_AMOUNT_REQUIRED")) throw new HTTPException(409, { message: "Provide the amount charged in the account currency" });
     throw error;
   }
 });

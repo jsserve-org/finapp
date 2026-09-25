@@ -5,10 +5,16 @@ import Observation
 @main
 struct LedgerlyApp: App {
     @State private var session = SessionController()
+    @State private var security = AppSecurityController()
+    @State private var screenshots = ScreenshotNotificationController()
     var body: some Scene {
         WindowGroup {
-            if session.canUseApp { RootTabView().environment(session) }
-            else { LoginView().environment(session) }
+            LedgerlyPrivacyRoot {
+                if session.canUseApp { RootTabView().environment(session) }
+                else { LoginView().environment(session) }
+            }
+            .environment(security)
+            .environment(screenshots)
         }
             .modelContainer(for: [CachedAccount.self, CachedTransaction.self, SyncSetting.self, PendingMutation.self, PendingAccountMutation.self, PendingTransactionCreate.self, PendingRecurringMutation.self, PendingStockMutation.self, RecurringPayment.self, StockHolding.self, StockTrade.self])
     }
@@ -122,7 +128,7 @@ private struct RootTabView: View {
 
     var body: some View {
         TabView(selection: $selection) {
-            Tab("Overview", systemImage: AppIcon.overview, value: RootTab.overview) {
+            Tab("Insights", systemImage: AppIcon.insights, value: RootTab.overview) {
                 DashboardView()
             }
 
@@ -236,7 +242,7 @@ struct NewRecurringPaymentView: View {
         }
     }
 
-    private var availableAccounts: [CachedAccount] { accounts.filter { $0.currency == currency } }
+    private var availableAccounts: [CachedAccount] { accounts }
 
     var body: some View {
         NavigationStack {
@@ -265,8 +271,10 @@ struct NewRecurringPaymentView: View {
                     Section("Account") {
                         Picker("Pay from", selection: $accountId) {
                             Text("Not selected").tag("")
-                            ForEach(availableAccounts) { Text($0.name).tag($0.id) }
+                            ForEach(availableAccounts) { Text("\($0.name) · \($0.currency)").tag($0.id) }
                         }
+                        Text("The bank may settle this bill in the account's currency. The bill keeps its original currency.")
+                            .font(.footnote).foregroundStyle(.secondary)
                     }
                 }
                 Section {
@@ -282,7 +290,6 @@ struct NewRecurringPaymentView: View {
                 ToolbarItem(placement: .confirmationAction) { Button("Save") { save() }.disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || parsedAmount <= 0) }
             }
             .task { selectDefaultAccount() }
-            .onChange(of: currency) { _, _ in selectDefaultAccount(force: true) }
         }
     }
 
@@ -313,8 +320,8 @@ struct NewRecurringPaymentView: View {
         dismiss()
     }
 
-    private func selectDefaultAccount(force: Bool = false) {
-        if !force, availableAccounts.contains(where: { $0.id == accountId }) { return }
-        accountId = availableAccounts.first?.id ?? ""
+    private func selectDefaultAccount() {
+        if availableAccounts.contains(where: { $0.id == accountId }) { return }
+        accountId = availableAccounts.first(where: { $0.currency == currency })?.id ?? availableAccounts.first?.id ?? ""
     }
 }

@@ -65,12 +65,20 @@ struct AccountDetailView: View {
                                         .lineLimit(1)
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                Text(money(transaction.amountMinor, transaction.currency))
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(PaymentIcon.color(amountMinor: transaction.amountMinor))
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.7)
-                                    .layoutPriority(1)
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    Text(money(transaction.amountMinor, transaction.currency))
+                                        .fontWeight(.semibold)
+                                        .foregroundStyle(PaymentIcon.color(amountMinor: transaction.amountMinor))
+                                    if let originalAmountMinor = transaction.originalAmountMinor,
+                                       let originalCurrency = transaction.originalCurrency {
+                                        Text("Originally \(money(originalAmountMinor, originalCurrency))")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
+                                .layoutPriority(1)
                                 Image(systemName: "chevron.right")
                                     .font(.caption.weight(.semibold))
                                     .foregroundStyle(.tertiary)
