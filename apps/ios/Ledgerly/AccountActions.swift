@@ -57,6 +57,20 @@ enum AccountActionService {
 }
 
 struct AccountEntryView: View {
+    private enum Step: Int {
+        case account
+        case amount
+        case details
+
+        var title: String {
+            switch self {
+            case .account: "Choose account"
+            case .amount: "Enter amount"
+            case .details: "Additional information"
+            }
+        }
+    }
+
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @Query(sort: \CachedAccount.name) private var accounts: [CachedAccount]
@@ -68,6 +82,7 @@ struct AccountEntryView: View {
     @State private var currency: String
     @State private var category = ""
     @State private var date = Date()
+    @State private var step: Step = .account
 
     init(account: CachedAccount? = nil, direction: AccountEntryDirection) {
         self.direction = direction
@@ -76,49 +91,100 @@ struct AccountEntryView: View {
         _currency = State(initialValue: account?.currency ?? SupportedCurrency.defaultCode)
     }
 
-    private var compatibleAccounts: [CachedAccount] { accounts.filter { $0.currency == currency } }
     private var selectedAccount: CachedAccount? { accounts.first { $0.id == selectedAccountID } }
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    MoneyAmountHeader(title: direction.title, amount: $amount, currency: $currency, tint: direction.color)
+            Group {
+                switch step {
+                case .account: accountStep
+                case .amount: amountStep
+                case .details: detailsStep
                 }
-                Section("Account") {
-                    ForEach(compatibleAccounts) { account in
-                        Button { selectedAccountID = account.id } label: { accountRow(account, selected: account.id == selectedAccountID) }
-                            .buttonStyle(.plain)
-                    }
-                    if compatibleAccounts.isEmpty {
-                        Text("No \(currency) accounts available.").foregroundStyle(.secondary)
-                    }
-                }
-                Section("Details") {
-                    TextField("Description", text: $description)
-                    TransactionCategoryPicker(selection: $category)
-                    DatePicker("Date", selection: $date)
-                }
-                Section {
-                    Button(direction.title, systemImage: direction.symbol, action: save)
-                        .frame(maxWidth: .infinity)
-                        .fontWeight(.semibold)
-                        .buttonStyle(.borderedProminent)
-                        .tint(direction.color)
-                        .controlSize(.large)
-                        .disabled(parsedAmount <= 0 || selectedAccount == nil)
-                }
-                .listRowBackground(Color.clear)
             }
-            .navigationTitle(direction.title)
+            .navigationTitle(step.title)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    if step == .account {
+                        Button("Cancel") { dismiss() }
+                    } else {
+                        Button("Back", systemImage: "chevron.left") { goBack() }
+                    }
+                }
+                if step != .account {
+                    ToolbarItem(placement: .confirmationAction) { Button("Cancel") { dismiss() } }
+                }
+            }
             .task {
                 if description.isEmpty { description = direction.defaultDescription }
                 if category.isEmpty { category = direction.defaultCategory }
                 selectDefaultAccount()
             }
-            .onChange(of: currency) { _, _ in selectDefaultAccount() }
+        }
+    }
+
+    private var accountStep: some View {
+        Form {
+            Section {
+                FlowStepHeader(current: 1, total: 3, instruction: direction == .moneyIn ? "Where should the money go?" : "Which account paid?")
+            }
+            .listRowBackground(Color.clear)
+            Section("Account") {
+                ForEach(accounts) { account in
+                    Button {
+                        selectedAccountID = account.id
+                        currency = account.currency
+                    } label: {
+                        accountRow(account, selected: account.id == selectedAccountID)
+                    }
+                    .buttonStyle(.plain)
+                }
+                if accounts.isEmpty {
+                    ContentUnavailableView("No accounts", systemImage: "building.columns", description: Text("Create an account before recording money."))
+                }
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            FlowButton(title: "Enter amount", systemImage: "arrow.right", tint: direction.color, disabled: selectedAccount == nil) {
+                step = .amount
+            }
+        }
+    }
+
+    private var amountStep: some View {
+        Form {
+            Section {
+                FlowStepHeader(current: 2, total: 3, instruction: selectedAccount?.name ?? "Amount")
+                MoneyAmountHeader(title: direction == .moneyIn ? "Money in" : "Money out", amount: $amount, currency: $currency, tint: direction.color, currencyLocked: true)
+            }
+            .listRowBackground(Color.clear)
+        }
+        .safeAreaInset(edge: .bottom) {
+            FlowButton(title: "Additional information", systemImage: "arrow.right", tint: direction.color, disabled: parsedAmount <= 0) {
+                step = .details
+            }
+        }
+    }
+
+    private var detailsStep: some View {
+        Form {
+            Section {
+                FlowStepHeader(current: 3, total: 3, instruction: "Review and save")
+            }
+            .listRowBackground(Color.clear)
+            Section("Summary") {
+                LabeledContent("Account", value: selectedAccount?.name ?? "")
+                LabeledContent("Amount", value: money(parsedAmount, currency))
+            }
+            Section("Optional details") {
+                TextField("Description", text: $description)
+                TransactionCategoryPicker(selection: $category)
+                DatePicker("Date", selection: $date)
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            FlowButton(title: direction.title, systemImage: direction.symbol, tint: direction.color, disabled: parsedAmount <= 0 || selectedAccount == nil, action: save)
         }
     }
 
@@ -138,8 +204,17 @@ struct AccountEntryView: View {
     }
 
     private func selectDefaultAccount() {
-        if compatibleAccounts.contains(where: { $0.id == selectedAccountID }) { return }
-        selectedAccountID = compatibleAccounts.first(where: { $0.id == preferredAccountID })?.id ?? compatibleAccounts.first?.id ?? ""
+        if let selectedAccount {
+            currency = selectedAccount.currency
+            return
+        }
+        selectedAccountID = accounts.first(where: { $0.id == preferredAccountID })?.id ?? accounts.first?.id ?? ""
+        if let selectedAccount { currency = selectedAccount.currency }
+    }
+
+    private func goBack() {
+        guard let previous = Step(rawValue: step.rawValue - 1) else { return }
+        step = previous
     }
 
     private func money(_ amount: Int, _ code: String) -> String {
@@ -166,6 +241,22 @@ struct AccountEntryView: View {
 }
 
 struct AccountTransferView: View {
+    private enum Step: Int {
+        case source
+        case destination
+        case amount
+        case details
+
+        var title: String {
+            switch self {
+            case .source: "From account"
+            case .destination: "To account"
+            case .amount: "Transfer amount"
+            case .details: "Additional information"
+            }
+        }
+    }
+
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @Query(sort: \CachedAccount.name) private var accounts: [CachedAccount]
@@ -176,6 +267,7 @@ struct AccountTransferView: View {
     @State private var currency: String
     @State private var note = "Transfer"
     @State private var date = Date()
+    @State private var step: Step = .source
 
     init(source: CachedAccount? = nil) {
         preferredSourceID = source?.id
@@ -183,54 +275,121 @@ struct AccountTransferView: View {
         _currency = State(initialValue: source?.currency ?? SupportedCurrency.defaultCode)
     }
 
-    private var compatibleAccounts: [CachedAccount] { accounts.filter { $0.currency == currency } }
     private var source: CachedAccount? { accounts.first { $0.id == sourceID } }
     private var destination: CachedAccount? { accounts.first { $0.id == destinationID } }
-    private var destinations: [CachedAccount] { compatibleAccounts.filter { $0.id != sourceID } }
+    private var destinations: [CachedAccount] { accounts.filter { $0.currency == currency && $0.id != sourceID } }
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    MoneyAmountHeader(title: "Transfer amount", amount: $amount, currency: $currency, tint: .blue)
+            Group {
+                switch step {
+                case .source: sourceStep
+                case .destination: destinationStep
+                case .amount: amountStep
+                case .details: detailsStep
                 }
-                Section("From") {
-                    ForEach(compatibleAccounts) { account in
-                        Button {
-                            sourceID = account.id
-                            selectDefaultDestination()
-                        } label: {
-                            accountRow(account, selected: account.id == sourceID)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                Section("To") {
-                    ForEach(destinations) { account in
-                        Button { destinationID = account.id } label: { accountRow(account, selected: account.id == destinationID) }
-                            .buttonStyle(.plain)
-                    }
-                    if destinations.isEmpty { Text("Add another \(currency) account to transfer money.").foregroundStyle(.secondary) }
-                }
-                Section("Details") {
-                    TextField("Description", text: $note)
-                    DatePicker("Date", selection: $date)
-                }
-                Section {
-                    Button("Transfer money", systemImage: "arrow.left.arrow.right.circle.fill", action: transfer)
-                        .frame(maxWidth: .infinity)
-                        .fontWeight(.semibold)
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
-                        .disabled(parsedAmount <= 0 || source == nil || destination == nil)
-                }
-                .listRowBackground(Color.clear)
             }
-            .navigationTitle("Transfer money")
+            .navigationTitle(step.title)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    if step == .source {
+                        Button("Cancel") { dismiss() }
+                    } else {
+                        Button("Back", systemImage: "chevron.left") { goBack() }
+                    }
+                }
+                if step != .source {
+                    ToolbarItem(placement: .confirmationAction) { Button("Cancel") { dismiss() } }
+                }
+            }
             .task { selectDefaults() }
-            .onChange(of: currency) { _, _ in selectDefaults() }
+        }
+    }
+
+    private var sourceStep: some View {
+        Form {
+            Section {
+                FlowStepHeader(current: 1, total: 4, instruction: "Choose the account sending money")
+            }
+            .listRowBackground(Color.clear)
+            Section("From") {
+                ForEach(accounts) { account in
+                    Button {
+                        sourceID = account.id
+                        currency = account.currency
+                        selectDefaultDestination()
+                    } label: { accountRow(account, selected: account.id == sourceID) }
+                        .buttonStyle(.plain)
+                }
+                if accounts.isEmpty {
+                    ContentUnavailableView("No accounts", systemImage: "building.columns", description: Text("Create an account before making a transfer."))
+                }
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            FlowButton(title: "Choose destination", systemImage: "arrow.right", tint: .blue, disabled: source == nil) {
+                step = .destination
+            }
+        }
+    }
+
+    private var destinationStep: some View {
+        Form {
+            Section {
+                FlowStepHeader(current: 2, total: 4, instruction: "Where should the money go?")
+            }
+            .listRowBackground(Color.clear)
+            Section("To") {
+                ForEach(destinations) { account in
+                    Button { destinationID = account.id } label: { accountRow(account, selected: account.id == destinationID) }
+                        .buttonStyle(.plain)
+                }
+                if destinations.isEmpty {
+                    ContentUnavailableView("No destination", systemImage: "arrow.left.arrow.right", description: Text("Add another \(currency) account to transfer money."))
+                }
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            FlowButton(title: "Enter amount", systemImage: "arrow.right", tint: .blue, disabled: destination == nil) {
+                step = .amount
+            }
+        }
+    }
+
+    private var amountStep: some View {
+        Form {
+            Section {
+                FlowStepHeader(current: 3, total: 4, instruction: transferRoute)
+                MoneyAmountHeader(title: "Transfer amount", amount: $amount, currency: $currency, tint: .blue, currencyLocked: true)
+            }
+            .listRowBackground(Color.clear)
+        }
+        .safeAreaInset(edge: .bottom) {
+            FlowButton(title: "Additional information", systemImage: "arrow.right", tint: .blue, disabled: parsedAmount <= 0) {
+                step = .details
+            }
+        }
+    }
+
+    private var detailsStep: some View {
+        Form {
+            Section {
+                FlowStepHeader(current: 4, total: 4, instruction: "Review and transfer")
+            }
+            .listRowBackground(Color.clear)
+            Section("Summary") {
+                LabeledContent("From", value: source?.name ?? "")
+                LabeledContent("To", value: destination?.name ?? "")
+                LabeledContent("Amount", value: money(parsedAmount, currency))
+            }
+            Section("Optional details") {
+                TextField("Description", text: $note)
+                DatePicker("Date", selection: $date)
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            FlowButton(title: "Transfer money", systemImage: "arrow.left.arrow.right.circle.fill", tint: .blue, disabled: parsedAmount <= 0 || source == nil || destination == nil, action: transfer)
         }
     }
 
@@ -250,9 +409,10 @@ struct AccountTransferView: View {
     }
 
     private func selectDefaults() {
-        if !compatibleAccounts.contains(where: { $0.id == sourceID }) {
-            sourceID = compatibleAccounts.first(where: { $0.id == preferredSourceID })?.id ?? compatibleAccounts.first?.id ?? ""
+        if !accounts.contains(where: { $0.id == sourceID }) {
+            sourceID = accounts.first(where: { $0.id == preferredSourceID })?.id ?? accounts.first?.id ?? ""
         }
+        if let source { currency = source.currency }
         selectDefaultDestination()
     }
 
@@ -265,6 +425,16 @@ struct AccountTransferView: View {
         (Double(amount) / 100).formatted(.currency(code: code).presentation(.isoCode))
     }
 
+    private var transferRoute: String {
+        guard let source, let destination else { return "Transfer" }
+        return "\(source.name) → \(destination.name)"
+    }
+
+    private func goBack() {
+        guard let previous = Step(rawValue: step.rawValue - 1) else { return }
+        step = previous
+    }
+
     private var parsedAmount: Int {
         let decimal = Decimal(string: amount.replacingOccurrences(of: ",", with: ".")) ?? 0
         return NSDecimalNumber(decimal: decimal * 100).intValue
@@ -275,6 +445,48 @@ struct AccountTransferView: View {
         let title = note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Transfer" : note.trimmingCharacters(in: .whitespacesAndNewlines)
         AccountActionService.transfer(amountMinor: parsedAmount, description: title, date: date, source: source, destination: destination, context: context)
         dismiss()
+    }
+}
+
+private struct FlowStepHeader: View {
+    let current: Int
+    let total: Int
+    let instruction: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Step \(current) of \(total)")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            ProgressView(value: Double(current), total: Double(total))
+            Text(instruction)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.primary)
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+private struct FlowButton: View {
+    let title: String
+    let systemImage: String
+    let tint: Color
+    let disabled: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .frame(maxWidth: .infinity)
+                .fontWeight(.semibold)
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
+        .tint(tint)
+        .disabled(disabled)
+        .padding(.horizontal)
+        .padding(.vertical, 10)
+        .background(.bar)
     }
 }
 

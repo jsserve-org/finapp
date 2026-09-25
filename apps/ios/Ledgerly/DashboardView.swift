@@ -8,6 +8,7 @@ struct DashboardView: View {
     @Query private var transactions: [CachedTransaction]
     @Query(sort: \StockHolding.symbol) private var holdings: [StockHolding]
     @State private var sync = SyncController()
+    @State private var selectedMonth = Date()
 
     init() {
         var descriptor = FetchDescriptor<CachedTransaction>(
@@ -41,15 +42,47 @@ struct DashboardView: View {
                         }
                     }
                 }
-                if !categoryTotals.isEmpty {
-                    Section("Recent spending by category") {
+                Section {
+                    if categoryTotals.isEmpty {
+                        ContentUnavailableView(
+                            "No spending this month",
+                            systemImage: "calendar",
+                            description: Text("Choose another month to see its expenses.")
+                        )
+                    } else {
                         ForEach(Array(categoryTotals.enumerated()), id: \.offset) { _, item in
-                            HStack {
-                                Label(item.category, systemImage: PaymentIcon.symbol(title: "", category: item.category, amountMinor: -1))
-                                Spacer()
-                                Text(money(item.amount, item.currency)).fontWeight(.semibold)
+                            NavigationLink {
+                                CategoryTransactionsView(category: item.category, currency: item.currency, month: selectedMonth)
+                            } label: {
+                                HStack {
+                                    Label(item.category, systemImage: PaymentIcon.symbol(title: "", category: item.category, amountMinor: -1))
+                                    Spacer()
+                                    Text(money(item.amount, item.currency)).fontWeight(.semibold)
+                                }
                             }
                         }
+                    }
+                } header: {
+                    HStack {
+                        Text("Spending by category")
+                        Spacer()
+                        Menu {
+                            ForEach(availableMonths, id: \.self) { month in
+                                Button {
+                                    selectedMonth = month
+                                } label: {
+                                    if Calendar.current.isDate(month, equalTo: selectedMonth, toGranularity: .month) {
+                                        Label(month.formatted(.dateTime.month(.wide).year()), systemImage: "checkmark")
+                                    } else {
+                                        Text(month.formatted(.dateTime.month(.wide).year()))
+                                    }
+                                }
+                            }
+                        } label: {
+                            Label(selectedMonth.formatted(.dateTime.month(.abbreviated).year()), systemImage: "calendar")
+                                .font(.caption.weight(.semibold))
+                        }
+                        .textCase(nil)
                     }
                 }
                 investmentSection
@@ -116,7 +149,9 @@ struct DashboardView: View {
     }
 
     private var categoryTotals: [(category: String, currency: String, amount: Int)] {
-        let expenses = transactions.filter { $0.amountMinor < 0 }
+        let expenses = transactions.filter {
+            $0.amountMinor < 0 && $0.bookedDate.map { Calendar.current.isDate($0, equalTo: selectedMonth, toGranularity: .month) } == true
+        }
         let grouped = Dictionary(grouping: expenses) { "\($0.currency)|\($0.category ?? "Uncategorized")" }
         return grouped.map { key, values in
             let parts = key.split(separator: "|", maxSplits: 1).map(String.init)
@@ -127,7 +162,111 @@ struct DashboardView: View {
         .map { $0 }
     }
 
+    private var availableMonths: [Date] {
+        let calendar = Calendar.current
+        var months = transactions.compactMap(\.bookedDate).compactMap {
+            calendar.date(from: calendar.dateComponents([.year, .month], from: $0))
+        }
+        if let current = calendar.date(from: calendar.dateComponents([.year, .month], from: Date())) {
+            months.append(current)
+        }
+        return Array(Set(months)).sorted(by: >)
+    }
+
     private func money(_ amount: Int, _ currency: String) -> String {
         (Double(amount) / 100).formatted(.currency(code: currency).presentation(.isoCode))
+    }
+}
+
+private struct CategoryTransactionsView: View {
+    @Query private var transactions: [CachedTransaction]
+    @Query(sort: \CachedAccount.name) private var accounts: [CachedAccount]
+    @Query(sort: \RecurringPayment.nextDate) private var recurringPayments: [RecurringPayment]
+    @State private var selectedTransaction: TransactionSnapshot?
+    let category: String
+    let currency: String
+    let month: Date
+
+    init(category: String, currency: String, month: Date) {
+        self.category = category
+        self.currency = currency
+        self.month = month
+        let calendar = Calendar.current
+        let start = calendar.date(from: calendar.dateComponents([.year, .month], from: month)) ?? month
+        let end = calendar.date(byAdding: .month, value: 1, to: start) ?? month
+        let startISO = ISO8601DateFormatter().string(from: start)
+        let endISO = ISO8601DateFormatter().string(from: end)
+        _transactions = Query(
+            filter: #Predicate<CachedTransaction> {
+                $0.bookedAt >= startISO && $0.bookedAt < endISO && $0.currency == currency && $0.amountMinor < 0
+            },
+            sort: [SortDescriptor(\CachedTransaction.bookedAt, order: .reverse)]
+        )
+    }
+
+    private var visibleTransactions: [CachedTransaction] {
+        transactions.filter { ($0.category ?? "Uncategorized") == category }
+    }
+
+    var body: some View {
+        List {
+            Section {
+                ForEach(visibleTransactions) { transaction in
+                    Button {
+                        selectedTransaction = TransactionSnapshot(
+                            transaction,
+                            account: accounts.first { $0.id == transaction.accountId },
+                            recurringPayment: recurringPayments.first { $0.id == transaction.recurringPaymentId },
+                            transferAccount: accounts.first { $0.id == transaction.transferAccountId }
+                        )
+                    } label: {
+                        transactionRow(transaction)
+                    }
+                    .buttonStyle(.plain)
+                }
+                if visibleTransactions.isEmpty {
+                    ContentUnavailableView("No transactions", systemImage: "calendar", description: Text("No \(category) expenses were recorded in this month."))
+                }
+            } header: {
+                Text("\(visibleTransactions.count) transactions")
+            }
+        }
+        .navigationTitle(category)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                VStack(spacing: 0) {
+                    Text(category).font(.headline)
+                    Text(month.formatted(.dateTime.month(.wide).year())).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .navigationDestination(item: $selectedTransaction) { snapshot in
+            TransactionDetailView(transaction: snapshot)
+        }
+    }
+
+    private func transactionRow(_ transaction: CachedTransaction) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: PaymentIcon.symbol(title: transaction.title, category: transaction.category, amountMinor: transaction.amountMinor))
+                .ledgerlyIcon(color: .red)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(transaction.title).font(.headline).lineLimit(1)
+                Text(transaction.bookedDate?.formatted(date: .abbreviated, time: .omitted) ?? "Unknown date")
+                    .font(.subheadline).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Text(money(transaction.amountMinor, transaction.currency))
+                .fontWeight(.semibold)
+                .foregroundStyle(.red)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
+        }
+        .contentShape(Rectangle())
+    }
+
+    private func money(_ amount: Int, _ code: String) -> String {
+        (Double(amount) / 100).formatted(.currency(code: code).presentation(.isoCode))
     }
 }
