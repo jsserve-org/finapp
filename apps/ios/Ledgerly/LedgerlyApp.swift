@@ -140,9 +140,7 @@ private struct RootTabView: View {
             Tab(value: RootTab.add) {
                 Color.clear
             } label: {
-                Label("Add", systemImage: "plus.circle.fill")
-                    .hidden()
-                    .accessibilityHidden(true)
+                EmptyView()
             }
 
             Tab("Activity", systemImage: AppIcon.activity, value: RootTab.activity) {
