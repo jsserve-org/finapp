@@ -1,20 +1,22 @@
 import SwiftData
 import SwiftUI
 
-private struct TransactionSnapshot: Identifiable {
+struct TransactionSnapshot: Identifiable, Hashable {
     let id: String
     let accountID: String
-    let title: String
-    let amountMinor: Int
+    var title: String
+    var amountMinor: Int
     let currency: String
-    let bookedDate: Date?
-    let pending: Bool
-    let category: String?
-    let recurringPaymentID: String?
-    let version: Int
-    let updatedDate: Date?
+    var bookedDate: Date?
+    var pending: Bool
+    var category: String?
+    var recurringPaymentID: String?
+    var updatedDate: Date?
+    var accountName: String?
+    var institution: String?
+    var recurringPaymentName: String?
 
-    init(_ transaction: CachedTransaction) {
+    init(_ transaction: CachedTransaction, account: CachedAccount? = nil, recurringPayment: RecurringPayment? = nil) {
         id = transaction.id
         accountID = transaction.accountId
         title = transaction.title
@@ -24,36 +26,27 @@ private struct TransactionSnapshot: Identifiable {
         pending = transaction.pending
         category = transaction.category
         recurringPaymentID = transaction.recurringPaymentId
-        version = transaction.version
         updatedDate = transaction.updatedDate
+        accountName = account?.name
+        institution = account?.institution
+        recurringPaymentName = recurringPayment?.name
     }
 }
 
 struct TransactionDetailView: View {
-    let transactionID: String
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
-    @Query(sort: \CachedAccount.name) private var accounts: [CachedAccount]
-    @Query(sort: \RecurringPayment.name) private var recurringPayments: [RecurringPayment]
-    @State private var transaction: TransactionSnapshot?
-    @State private var finishedLoading = false
+    @State private var transaction: TransactionSnapshot
     @State private var showingEditor = false
     @State private var showDeleteConfirm = false
 
-    private var account: CachedAccount? { transaction.flatMap { selected in accounts.first { $0.id == selected.accountID } } }
-    private var recurringPayment: RecurringPayment? { transaction.flatMap { selected in recurringPayments.first { $0.id == selected.recurringPaymentID } } }
-    private var suggestedPayment: RecurringPayment? {
-        guard let transaction, transaction.recurringPaymentID == nil else { return nil }
-        return RecurringPaymentMatcher.bestMatch(
-            title: transaction.title, amountMinor: transaction.amountMinor, currency: transaction.currency,
-            accountID: transaction.accountID, category: transaction.category, payments: recurringPayments
-        )?.payment
+    init(transaction: TransactionSnapshot) {
+        _transaction = State(initialValue: transaction)
     }
 
     var body: some View {
         Form {
-            if let transaction {
-                Section {
+            Section {
                 VStack(spacing: 10) {
                     Image(systemName: PaymentIcon.symbol(title: transaction.title, category: transaction.category, amountMinor: transaction.amountMinor))
                         .font(.system(size: 38, weight: .semibold))
@@ -70,38 +63,34 @@ struct TransactionDetailView: View {
             }
 
             Section("Payment details") {
-                LabeledContent("Description", value: transaction.title)
-                LabeledContent("Category", value: transaction.category ?? "Uncategorized")
-                LabeledContent("Direction", value: transaction.amountMinor < 0 ? "Money out" : "Money in")
-                LabeledContent("Status") {
+                detailRow("Description", transaction.title)
+                detailRow("Category", transaction.category ?? "Uncategorized")
+                detailRow("Direction", transaction.amountMinor < 0 ? "Money out" : "Money in")
+                HStack(spacing: 12) {
+                    Text("Status")
+                    Spacer(minLength: 16)
                     Label(transaction.pending ? "Pending" : "Completed", systemImage: transaction.pending ? "clock.fill" : "checkmark.circle.fill")
                         .foregroundStyle(transaction.pending ? .orange : .green)
                 }
+                .frame(minHeight: 24)
                 if let date = transaction.bookedDate {
-                    LabeledContent("Date", value: date.formatted(date: .long, time: .shortened))
+                    detailRow("Date", date.formatted(date: .long, time: .shortened))
                 }
             }
 
             Section("Account") {
-                LabeledContent("Account", value: account?.name ?? "Unknown account")
-                if let institution = account?.institution, !institution.isEmpty {
-                    LabeledContent("Institution", value: institution)
+                detailRow("Account", transaction.accountName ?? "Unknown account")
+                if let institution = transaction.institution, !institution.isEmpty {
+                    detailRow("Institution", institution)
                 }
-                LabeledContent("Currency", value: transaction.currency)
+                detailRow("Currency", transaction.currency)
             }
 
             Section {
                 NavigationLink {
-                    RecurringPaymentLinkView(transaction: transaction)
+                    RecurringPaymentLinkView(transaction: $transaction)
                 } label: {
-                    LabeledContent("Recurring bill", value: recurringPayment?.name ?? "Not linked")
-                }
-                if let suggestedPayment {
-                    Button {
-                        link(to: suggestedPayment.id)
-                    } label: {
-                        Label("Link suggested: \(suggestedPayment.name)", systemImage: "wand.and.stars")
-                    }
+                    detailRow("Recurring bill", transaction.recurringPaymentName ?? "Not linked")
                 }
             } header: {
                 Text("Subscription")
@@ -110,9 +99,9 @@ struct TransactionDetailView: View {
             }
 
             Section("Record information") {
-                LabeledContent("Source", value: transaction.category == "Screenshot Sync" ? "Screenshot import" : "Manual or synced")
+                detailRow("Source", transaction.category == "Screenshot Sync" ? "Screenshot import" : "Manual or synced")
                 if let updated = transaction.updatedDate {
-                    LabeledContent("Last updated", value: updated.formatted(date: .abbreviated, time: .shortened))
+                    detailRow("Last updated", updated.formatted(date: .abbreviated, time: .shortened))
                 }
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Transaction ID").font(.caption).foregroundStyle(.secondary)
@@ -124,22 +113,11 @@ struct TransactionDetailView: View {
                 Button("Edit transaction", systemImage: "pencil") { showingEditor = true }
                 Button("Delete transaction", systemImage: "trash", role: .destructive) { showDeleteConfirm = true }
             }
-            } else if finishedLoading {
-                ContentUnavailableView(
-                    "Transaction unavailable",
-                    systemImage: "exclamationmark.triangle",
-                    description: Text("This transaction may have been removed during sync.")
-                )
-            } else {
-                ProgressView("Loading transaction…")
-                    .frame(maxWidth: .infinity)
-            }
         }
         .navigationTitle("Transaction")
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear { loadTransaction() }
-        .sheet(isPresented: $showingEditor, onDismiss: loadTransaction) {
-            if let transaction { EditTransactionView(transaction: transaction) }
+        .sheet(isPresented: $showingEditor, onDismiss: refreshTransaction) {
+            EditTransactionView(transaction: transaction)
         }
         .confirmationDialog("Delete this transaction?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
             Button("Delete", role: .destructive) { delete() }
@@ -148,18 +126,23 @@ struct TransactionDetailView: View {
         }
     }
 
-    private func link(to paymentID: String?) {
-        guard let model = fetchTransaction() else { return }
-        model.recurringPaymentId = paymentID
-        model.updatedAt = ISO8601DateFormatter().string(from: Date())
-        enqueueFullTransaction(context: context, transactionID: model.id)
-        try? context.save()
-        loadTransaction()
+    private func detailRow(_ label: String, _ value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(label)
+                .foregroundStyle(.primary)
+            Spacer(minLength: 16)
+            Text(value)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.trailing)
+                .lineLimit(2)
+        }
+        .frame(minHeight: 24)
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     private func delete() {
         guard let transaction = fetchTransaction() else { return }
-        if let account {
+        if let account = fetchAccount(id: transaction.accountId) {
             account.amountMinor -= transaction.amountMinor
             account.updatedAt = ISO8601DateFormatter().string(from: Date())
             context.insert(PendingAccountMutation(entityId: account.id))
@@ -170,14 +153,26 @@ struct TransactionDetailView: View {
         dismiss()
     }
 
-    private func loadTransaction() {
-        transaction = fetchTransaction().map(TransactionSnapshot.init)
-        finishedLoading = true
+    private func refreshTransaction() {
+        guard let model = fetchTransaction() else { return }
+        transaction.title = model.title
+        transaction.amountMinor = model.amountMinor
+        transaction.bookedDate = model.bookedDate
+        transaction.pending = model.pending
+        transaction.category = model.category
+        transaction.recurringPaymentID = model.recurringPaymentId
+        transaction.updatedDate = model.updatedDate
     }
 
     private func fetchTransaction() -> CachedTransaction? {
-        let id = transactionID
+        let id = transaction.id
         var descriptor = FetchDescriptor<CachedTransaction>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        return try? context.fetch(descriptor).first
+    }
+
+    private func fetchAccount(id: String) -> CachedAccount? {
+        var descriptor = FetchDescriptor<CachedAccount>(predicate: #Predicate { $0.id == id })
         descriptor.fetchLimit = 1
         return try? context.fetch(descriptor).first
     }
@@ -288,7 +283,7 @@ private struct EditTransactionView: View {
 }
 
 private struct RecurringPaymentLinkView: View {
-    let transaction: TransactionSnapshot
+    @Binding var transaction: TransactionSnapshot
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     @Query(sort: \RecurringPayment.name) private var recurringPayments: [RecurringPayment]
@@ -364,6 +359,9 @@ private struct RecurringPaymentLinkView: View {
         guard let model = fetchTransaction() else { return }
         model.recurringPaymentId = paymentID
         model.updatedAt = ISO8601DateFormatter().string(from: Date())
+        transaction.recurringPaymentID = paymentID
+        transaction.recurringPaymentName = recurringPayments.first(where: { $0.id == paymentID })?.name
+        transaction.updatedDate = model.updatedDate
         enqueueFullTransaction(context: context, transactionID: model.id)
         try? context.save()
         dismiss()

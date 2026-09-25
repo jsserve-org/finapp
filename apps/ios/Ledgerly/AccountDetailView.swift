@@ -9,6 +9,7 @@ struct AccountDetailView: View {
     @Query(sort: \CachedTransaction.bookedAt, order: .reverse) private var transactions: [CachedTransaction]
     @Query private var recurringPayments: [RecurringPayment]
     @State private var confirmingDelete = false
+    @State private var selectedTransaction: TransactionSnapshot?
 
     init(accountID: String) {
         self.accountID = accountID
@@ -28,24 +29,31 @@ struct AccountDetailView: View {
                 }
                 Section("Transactions") {
                     ForEach(transactions) { transaction in
-                        NavigationLink { TransactionDetailView(transactionID: transaction.id) } label: {
-                            LabeledContent {
+                        let recurringPayment = recurringPayments.first { $0.id == transaction.recurringPaymentId }
+                        let snapshot = TransactionSnapshot(transaction, account: account, recurringPayment: recurringPayment)
+                        Button { selectedTransaction = snapshot } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: PaymentIcon.symbol(title: transaction.title, category: transaction.category, amountMinor: transaction.amountMinor))
+                                    .ledgerlyIcon(color: PaymentIcon.color(amountMinor: transaction.amountMinor))
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(transaction.title)
+                                        .font(.headline)
+                                        .foregroundStyle(.primary)
+                                    Text("\(PaymentIcon.directionLabel(amountMinor: transaction.amountMinor)) · \(transaction.category ?? "Uncategorized")")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer(minLength: 8)
                                 Text(money(transaction.amountMinor, transaction.currency))
                                     .fontWeight(.semibold)
                                     .foregroundStyle(PaymentIcon.color(amountMinor: transaction.amountMinor))
-                            } label: {
-                                Label {
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        Text(transaction.title).font(.headline)
-                                        Text("\(PaymentIcon.directionLabel(amountMinor: transaction.amountMinor)) · \(transaction.category ?? "Uncategorized")")
-                                            .font(.subheadline).foregroundStyle(.secondary)
-                                    }
-                                } icon: {
-                                    Image(systemName: PaymentIcon.symbol(title: transaction.title, category: transaction.category, amountMinor: transaction.amountMinor))
-                                        .ledgerlyIcon(color: PaymentIcon.color(amountMinor: transaction.amountMinor))
-                                }
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.tertiary)
                             }
+                            .contentShape(Rectangle())
                         }
+                        .buttonStyle(.plain)
                     }
                     if transactions.isEmpty {
                         ContentUnavailableView("No transactions", systemImage: AppIcon.empty)
@@ -55,6 +63,9 @@ struct AccountDetailView: View {
         }
         .navigationTitle(accounts.first?.name ?? "Account")
         .navigationBarTitleDisplayMode(.large)
+        .navigationDestination(item: $selectedTransaction) { snapshot in
+            TransactionDetailView(transaction: snapshot)
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Delete account", systemImage: "trash", role: .destructive) { confirmingDelete = true }
