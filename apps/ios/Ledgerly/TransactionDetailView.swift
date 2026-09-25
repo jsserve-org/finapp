@@ -1,22 +1,53 @@
 import SwiftData
 import SwiftUI
 
+private struct TransactionSnapshot: Identifiable {
+    let id: String
+    let accountID: String
+    let title: String
+    let amountMinor: Int
+    let currency: String
+    let bookedDate: Date?
+    let pending: Bool
+    let category: String?
+    let recurringPaymentID: String?
+    let version: Int
+    let updatedDate: Date?
+
+    init(_ transaction: CachedTransaction) {
+        id = transaction.id
+        accountID = transaction.accountId
+        title = transaction.title
+        amountMinor = transaction.amountMinor
+        currency = transaction.currency
+        bookedDate = transaction.bookedDate
+        pending = transaction.pending
+        category = transaction.category
+        recurringPaymentID = transaction.recurringPaymentId
+        version = transaction.version
+        updatedDate = transaction.updatedDate
+    }
+}
+
 struct TransactionDetailView: View {
     let transactionID: String
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
-    @Query private var transactions: [CachedTransaction]
     @Query(sort: \CachedAccount.name) private var accounts: [CachedAccount]
     @Query(sort: \RecurringPayment.name) private var recurringPayments: [RecurringPayment]
+    @State private var transaction: TransactionSnapshot?
+    @State private var finishedLoading = false
     @State private var showingEditor = false
     @State private var showDeleteConfirm = false
 
-    private var transaction: CachedTransaction? { transactions.first { $0.id == transactionID } }
-    private var account: CachedAccount? { transaction.flatMap { selected in accounts.first { $0.id == selected.accountId } } }
-    private var recurringPayment: RecurringPayment? { transaction.flatMap { selected in recurringPayments.first { $0.id == selected.recurringPaymentId } } }
+    private var account: CachedAccount? { transaction.flatMap { selected in accounts.first { $0.id == selected.accountID } } }
+    private var recurringPayment: RecurringPayment? { transaction.flatMap { selected in recurringPayments.first { $0.id == selected.recurringPaymentID } } }
     private var suggestedPayment: RecurringPayment? {
-        guard let transaction, transaction.recurringPaymentId == nil else { return nil }
-        return RecurringPaymentMatcher.bestMatch(for: transaction, payments: recurringPayments)?.payment
+        guard let transaction, transaction.recurringPaymentID == nil else { return nil }
+        return RecurringPaymentMatcher.bestMatch(
+            title: transaction.title, amountMinor: transaction.amountMinor, currency: transaction.currency,
+            accountID: transaction.accountID, category: transaction.category, payments: recurringPayments
+        )?.payment
     }
 
     var body: some View {
@@ -61,7 +92,7 @@ struct TransactionDetailView: View {
 
             Section {
                 NavigationLink {
-                    RecurringPaymentLinkView(transactionID: transaction.id)
+                    RecurringPaymentLinkView(transaction: transaction)
                 } label: {
                     LabeledContent("Recurring bill", value: recurringPayment?.name ?? "Not linked")
                 }
@@ -93,17 +124,21 @@ struct TransactionDetailView: View {
                 Button("Edit transaction", systemImage: "pencil") { showingEditor = true }
                 Button("Delete transaction", systemImage: "trash", role: .destructive) { showDeleteConfirm = true }
             }
-            } else {
+            } else if finishedLoading {
                 ContentUnavailableView(
                     "Transaction unavailable",
                     systemImage: "exclamationmark.triangle",
                     description: Text("This transaction may have been removed during sync.")
                 )
+            } else {
+                ProgressView("Loading transaction…")
+                    .frame(maxWidth: .infinity)
             }
         }
         .navigationTitle("Transaction")
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showingEditor) {
+        .onAppear { loadTransaction() }
+        .sheet(isPresented: $showingEditor, onDismiss: loadTransaction) {
             if let transaction { EditTransactionView(transaction: transaction) }
         }
         .confirmationDialog("Delete this transaction?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
@@ -114,15 +149,16 @@ struct TransactionDetailView: View {
     }
 
     private func link(to paymentID: String?) {
-        guard let transaction else { return }
-        transaction.recurringPaymentId = paymentID
-        transaction.updatedAt = ISO8601DateFormatter().string(from: Date())
-        enqueueFullTransaction(context: context, transactionID: transaction.id)
+        guard let model = fetchTransaction() else { return }
+        model.recurringPaymentId = paymentID
+        model.updatedAt = ISO8601DateFormatter().string(from: Date())
+        enqueueFullTransaction(context: context, transactionID: model.id)
         try? context.save()
+        loadTransaction()
     }
 
     private func delete() {
-        guard let transaction else { return }
+        guard let transaction = fetchTransaction() else { return }
         if let account {
             account.amountMinor -= transaction.amountMinor
             account.updatedAt = ISO8601DateFormatter().string(from: Date())
@@ -133,10 +169,22 @@ struct TransactionDetailView: View {
         try? context.save()
         dismiss()
     }
+
+    private func loadTransaction() {
+        transaction = fetchTransaction().map(TransactionSnapshot.init)
+        finishedLoading = true
+    }
+
+    private func fetchTransaction() -> CachedTransaction? {
+        let id = transactionID
+        var descriptor = FetchDescriptor<CachedTransaction>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        return try? context.fetch(descriptor).first
+    }
 }
 
 private struct EditTransactionView: View {
-    let transaction: CachedTransaction
+    let transaction: TransactionSnapshot
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @Query(sort: \CachedAccount.name) private var accounts: [CachedAccount]
@@ -149,14 +197,14 @@ private struct EditTransactionView: View {
     @State private var accountID: String
     @State private var pending: Bool
 
-    init(transaction: CachedTransaction) {
+    init(transaction: TransactionSnapshot) {
         self.transaction = transaction
         _title = State(initialValue: transaction.title)
         _category = State(initialValue: transaction.category ?? "")
         _amount = State(initialValue: NSDecimalNumber(value: Double(transaction.amountMinor).magnitude / 100).stringValue)
         _isMoneyOut = State(initialValue: transaction.amountMinor < 0)
         _date = State(initialValue: transaction.bookedDate ?? Date())
-        _accountID = State(initialValue: transaction.accountId)
+        _accountID = State(initialValue: transaction.accountID)
         _pending = State(initialValue: transaction.pending)
     }
 
@@ -201,14 +249,15 @@ private struct EditTransactionView: View {
     }
 
     private func save() {
-        guard let oldAccount = accounts.first(where: { $0.id == transaction.accountId }),
+        guard let model = fetchTransaction(),
+              let oldAccount = accounts.first(where: { $0.id == model.accountId }),
               let newAccount = accounts.first(where: { $0.id == accountID }) else { return }
         let newAmount = isMoneyOut ? -parsedAmount : parsedAmount
         if oldAccount.id == newAccount.id {
-            oldAccount.amountMinor += newAmount - transaction.amountMinor
+            oldAccount.amountMinor += newAmount - model.amountMinor
             context.insert(PendingAccountMutation(entityId: oldAccount.id))
         } else {
-            oldAccount.amountMinor -= transaction.amountMinor
+            oldAccount.amountMinor -= model.amountMinor
             newAccount.amountMinor += newAmount
             context.insert(PendingAccountMutation(entityId: oldAccount.id))
             context.insert(PendingAccountMutation(entityId: newAccount.id))
@@ -216,32 +265,36 @@ private struct EditTransactionView: View {
         let now = ISO8601DateFormatter().string(from: Date())
         oldAccount.updatedAt = now
         newAccount.updatedAt = now
-        transaction.title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        model.title = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedCategory = category.trimmingCharacters(in: .whitespacesAndNewlines)
-        transaction.category = trimmedCategory.isEmpty ? nil : trimmedCategory
-        transaction.amountMinor = newAmount
-        transaction.accountId = newAccount.id
-        transaction.bookedAt = ISO8601DateFormatter().string(from: date)
-        transaction.pending = pending
-        transaction.updatedAt = now
-        enqueueFullTransaction(context: context, transactionID: transaction.id)
-        autoLinkRecurringPayment(transaction, payments: recurringPayments, context: context)
+        model.category = trimmedCategory.isEmpty ? nil : trimmedCategory
+        model.amountMinor = newAmount
+        model.accountId = newAccount.id
+        model.bookedAt = ISO8601DateFormatter().string(from: date)
+        model.pending = pending
+        model.updatedAt = now
+        enqueueFullTransaction(context: context, transactionID: model.id)
+        autoLinkRecurringPayment(model, payments: recurringPayments, context: context)
         try? context.save()
         dismiss()
+    }
+
+    private func fetchTransaction() -> CachedTransaction? {
+        let id = transaction.id
+        var descriptor = FetchDescriptor<CachedTransaction>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        return try? context.fetch(descriptor).first
     }
 }
 
 private struct RecurringPaymentLinkView: View {
-    let transactionID: String
+    let transaction: TransactionSnapshot
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
-    @Query private var transactions: [CachedTransaction]
     @Query(sort: \RecurringPayment.name) private var recurringPayments: [RecurringPayment]
 
-    private var transaction: CachedTransaction? { transactions.first { $0.id == transactionID } }
     private var compatiblePayments: [RecurringPayment] {
-        guard let transaction else { return [] }
-        return RecurringPaymentMatcher.compatiblePayments(for: transaction, payments: recurringPayments)
+        RecurringPaymentMatcher.compatiblePayments(currency: transaction.currency, accountID: transaction.accountID, payments: recurringPayments)
     }
 
     var body: some View {
@@ -252,7 +305,7 @@ private struct RecurringPaymentLinkView: View {
                         title: "No recurring bill",
                         subtitle: "Keep this as a one-time transaction",
                         symbol: "minus",
-                        selected: transaction?.recurringPaymentId == nil
+                        selected: transaction.recurringPaymentID == nil
                     )
                 }
                 .buttonStyle(.plain)
@@ -265,7 +318,7 @@ private struct RecurringPaymentLinkView: View {
                             title: payment.name,
                             subtitle: "\(payment.frequencyLabel) · \(money(payment.amountMinor, payment.currency))",
                             symbol: PaymentIcon.symbol(title: payment.name, category: payment.category, amountMinor: -1),
-                            selected: transaction?.recurringPaymentId == payment.id
+                            selected: transaction.recurringPaymentID == payment.id
                         )
                     }
                     .buttonStyle(.plain)
@@ -273,7 +326,7 @@ private struct RecurringPaymentLinkView: View {
             } header: {
                 Text("Recurring bills")
             } footer: {
-                Text(transaction.map { "Showing bills that use \($0.currency) and this account." } ?? "This transaction is no longer available.")
+                Text("Showing bills that use \(transaction.currency) and this account.")
             }
         }
         .listSectionSpacing(.compact)
@@ -308,12 +361,19 @@ private struct RecurringPaymentLinkView: View {
     }
 
     private func select(_ paymentID: String?) {
-        guard let transaction else { return }
-        transaction.recurringPaymentId = paymentID
-        transaction.updatedAt = ISO8601DateFormatter().string(from: Date())
-        enqueueFullTransaction(context: context, transactionID: transaction.id)
+        guard let model = fetchTransaction() else { return }
+        model.recurringPaymentId = paymentID
+        model.updatedAt = ISO8601DateFormatter().string(from: Date())
+        enqueueFullTransaction(context: context, transactionID: model.id)
         try? context.save()
         dismiss()
+    }
+
+    private func fetchTransaction() -> CachedTransaction? {
+        let id = transaction.id
+        var descriptor = FetchDescriptor<CachedTransaction>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        return try? context.fetch(descriptor).first
     }
 }
 
