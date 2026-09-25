@@ -444,6 +444,19 @@ final class SyncEngineTests: XCTestCase {
         XCTAssertFalse(TransactionSearch.matches("train ticket", transaction: item, account: account, recurringPayment: nil))
     }
 
+    func testActivityDateFiltersUseTheSelectedWindow() {
+        let calendar = Calendar(identifier: .gregorian)
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let tenDaysAgo = calendar.date(byAdding: .day, value: -10, to: now)!
+        XCTAssertFalse(ActivityDateFilter.includes(tenDaysAgo, filter: .last7Days, customStart: now, customEnd: now, now: now, calendar: calendar))
+        XCTAssertTrue(ActivityDateFilter.includes(tenDaysAgo, filter: .last30Days, customStart: now, customEnd: now, now: now, calendar: calendar))
+
+        let customStart = calendar.date(byAdding: .day, value: -12, to: now)!
+        let customEnd = calendar.date(byAdding: .day, value: -8, to: now)!
+        XCTAssertTrue(ActivityDateFilter.includes(tenDaysAgo, filter: .custom, customStart: customStart, customEnd: customEnd, now: now, calendar: calendar))
+        XCTAssertTrue(ActivityDateFilter.includes(tenDaysAgo, filter: .custom, customStart: customEnd, customEnd: customStart, now: now, calendar: calendar))
+    }
+
     func testLinkingExistingReimbursementDoesNotChangeBalance() throws {
         let account = CachedAccount(name: "Checking", institution: "Bank", kind: "checking", amountMinor: 50_000, currency: "TWD")
         let expense = transaction(title: "School supplies", amountMinor: -2_000, currency: "TWD", accountID: account.id, category: "School")
