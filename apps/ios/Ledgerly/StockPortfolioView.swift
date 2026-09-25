@@ -33,13 +33,26 @@ struct StockPortfolioView: View {
     var body: some View {
         List {
             if holdings.isEmpty {
-                ContentUnavailableView {
-                    Label("No investments", systemImage: "chart.line.uptrend.xyaxis")
-                } description: {
-                    Text("Add a buy or sell trade. Ledgerly can link its cash movement to one of your accounts.")
-                } actions: {
-                    Button("Add trade", systemImage: "plus") { showingNewTrade = true }
+                Section {
+                    VStack(spacing: 14) {
+                        Image(systemName: "chart.line.uptrend.xyaxis")
+                            .font(.system(size: 34, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                        Text("No investments yet")
+                            .font(.headline)
+                        Text("Record your first buy or sell. Linking a cash account is optional.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                        Button { showingNewTrade = true } label: {
+                            Label("Add trade", systemImage: "plus")
+                                .frame(maxWidth: .infinity)
+                        }
                         .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 18)
                 }
             } else {
                 Section("Portfolio value") {

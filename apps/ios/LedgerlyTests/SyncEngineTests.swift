@@ -174,6 +174,35 @@ final class SyncEngineTests: XCTestCase {
         XCTAssertEqual(StockTradeMath.averageCost(oldQuantity: 1, oldAverageMinor: 10_00, boughtQuantity: 1, priceMinor: 12_00, feesMinor: 0), 11_00)
     }
 
+    func testAddingMoneyCreatesGreenTransactionAndUpdatesBalance() throws {
+        let account = CachedAccount(name: "Cash", institution: "Wallet", kind: "cash", amountMinor: 500_00, currency: "TWD")
+        context.insert(account)
+        AccountActionService.record(amountMinor: 200_00, description: "Cash deposit", category: "Deposit", date: Date(), direction: .moneyIn, account: account, context: context)
+
+        XCTAssertEqual(account.amountMinor, 700_00)
+        let transaction = try XCTUnwrap(context.fetch(FetchDescriptor<CachedTransaction>()).first)
+        XCTAssertEqual(transaction.amountMinor, 200_00)
+        XCTAssertEqual(transaction.source, "manual")
+    }
+
+    func testTransferMovesMoneyAndCreatesBothSides() throws {
+        let source = CachedAccount(name: "Cash", institution: "Wallet", kind: "cash", amountMinor: 500_00, currency: "TWD")
+        let destination = CachedAccount(name: "Checking", institution: "Bank", kind: "checking", amountMinor: 1_000_00, currency: "TWD")
+        context.insert(source); context.insert(destination)
+        AccountActionService.transfer(amountMinor: 100_00, description: "Move cash", date: Date(), source: source, destination: destination, context: context)
+
+        XCTAssertEqual(source.amountMinor, 400_00)
+        XCTAssertEqual(destination.amountMinor, 1_100_00)
+        let transactions = try context.fetch(FetchDescriptor<CachedTransaction>())
+        XCTAssertEqual(transactions.map(\.amountMinor).sorted(), [-100_00, 100_00])
+        XCTAssertTrue(transactions.allSatisfy { $0.category == "Transfer" && $0.source == "transfer" })
+        let outgoing = try XCTUnwrap(transactions.first { $0.transferDirection == "outgoing" })
+        let incoming = try XCTUnwrap(transactions.first { $0.transferDirection == "incoming" })
+        XCTAssertEqual(outgoing.transferAccountId, destination.id)
+        XCTAssertEqual(incoming.transferAccountId, source.id)
+        XCTAssertEqual(outgoing.transferId, incoming.transferId)
+    }
+
     // MARK: - Recurring payment matching
 
     func testRecurringMatcherAutoLinksExactMerchantAmountAndAccount() throws {

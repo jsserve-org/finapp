@@ -9,8 +9,13 @@ struct AccountDetailView: View {
     @Query(sort: \CachedTransaction.bookedAt, order: .reverse) private var transactions: [CachedTransaction]
     @Query private var recurringPayments: [RecurringPayment]
     @Query private var linkedHoldings: [StockHolding]
+    @Query private var allAccounts: [CachedAccount]
     @State private var confirmingDelete = false
     @State private var selectedTransaction: TransactionSnapshot?
+    @State private var showingMoneyIn = false
+    @State private var showingMoneyOut = false
+    @State private var showingTransfer = false
+    @State private var showingEdit = false
 
     init(accountID: String) {
         self.accountID = accountID
@@ -29,10 +34,22 @@ struct AccountDetailView: View {
                     LabeledContent("Institution", value: account.institution)
                     LabeledContent("Type", value: account.displayKind)
                 }
+                Section("Actions") {
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                        accountAction("Add money", symbol: "plus.circle.fill", color: .green) { showingMoneyIn = true }
+                        accountAction("Spend", symbol: "minus.circle.fill", color: .red) { showingMoneyOut = true }
+                        accountAction("Transfer", symbol: "arrow.left.arrow.right.circle.fill", color: .blue) { showingTransfer = true }
+                        accountAction("Edit", symbol: "pencil.circle.fill", color: .secondary) { showingEdit = true }
+                    }
+                    .padding(.vertical, 4)
+                }
                 Section("Transactions") {
                     ForEach(transactions) { transaction in
                         let recurringPayment = recurringPayments.first { $0.id == transaction.recurringPaymentId }
-                        let snapshot = TransactionSnapshot(transaction, account: account, recurringPayment: recurringPayment)
+                        let snapshot = TransactionSnapshot(
+                            transaction, account: account, recurringPayment: recurringPayment,
+                            transferAccount: allAccounts.first { $0.id == transaction.transferAccountId }
+                        )
                         Button { selectedTransaction = snapshot } label: {
                             HStack(spacing: 12) {
                                 Image(systemName: PaymentIcon.symbol(title: transaction.title, category: transaction.category, amountMinor: transaction.amountMinor))
@@ -75,9 +92,18 @@ struct AccountDetailView: View {
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button("Delete account", systemImage: "trash", role: .destructive) { confirmingDelete = true }
+                Menu {
+                    Button("Edit account", systemImage: "pencil") { showingEdit = true }
+                    Button("Delete account", systemImage: "trash", role: .destructive) { confirmingDelete = true }
+                } label: {
+                    Label("Account options", systemImage: "ellipsis.circle")
+                }
             }
         }
+        .sheet(isPresented: $showingMoneyIn) { if let account = accounts.first { AccountEntryView(account: account, direction: .moneyIn) } }
+        .sheet(isPresented: $showingMoneyOut) { if let account = accounts.first { AccountEntryView(account: account, direction: .moneyOut) } }
+        .sheet(isPresented: $showingTransfer) { if let account = accounts.first { AccountTransferView(source: account) } }
+        .sheet(isPresented: $showingEdit) { if let account = accounts.first { EditAccountView(account: account) } }
         .confirmationDialog(
             "Delete this account?",
             isPresented: $confirmingDelete,
@@ -91,6 +117,19 @@ struct AccountDetailView: View {
 
     private func money(_ amount: Int, _ currency: String) -> String {
         (Double(amount) / 100).formatted(.currency(code: currency).presentation(.isoCode))
+    }
+
+    private func accountAction(_ title: String, symbol: String, color: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 7) {
+                Image(systemName: symbol).font(.title2)
+                Text(title).font(.subheadline.weight(.semibold)).lineLimit(1)
+            }
+            .foregroundStyle(color)
+            .frame(maxWidth: .infinity, minHeight: 58)
+            .background(color.opacity(0.11), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .buttonStyle(.plain)
     }
 
     private func deleteAccount() {
