@@ -125,7 +125,6 @@ private struct RootTabView: View {
     private enum AddFlow: String, Identifiable { case bill, recurring, moneyIn, moneyOut; var id: String { rawValue } }
     @State private var selection = RootTab.overview
     @State private var previousSelection = RootTab.overview
-    @State private var showingAddMenu = false
     @State private var addFlow: AddFlow?
 
     var body: some View {
@@ -138,8 +137,12 @@ private struct RootTabView: View {
                 NativeAccountsView()
             }
 
-            Tab("Add", systemImage: "plus.circle.fill", value: RootTab.add) {
+            Tab(value: RootTab.add) {
                 Color.clear
+            } label: {
+                Label("Add", systemImage: "plus.circle.fill")
+                    .hidden()
+                    .accessibilityHidden(true)
             }
 
             Tab("Activity", systemImage: AppIcon.activity, value: RootTab.activity) {
@@ -154,19 +157,31 @@ private struct RootTabView: View {
         .onChange(of: selection) { oldValue, newValue in
             if newValue == .add {
                 selection = oldValue == .add ? previousSelection : oldValue
-                showingAddMenu = true
             } else {
                 previousSelection = newValue
             }
         }
-        .confirmationDialog("What would you like to add?", isPresented: $showingAddMenu, titleVisibility: .visible) {
-            Button("Add money", systemImage: "plus.circle.fill") { addFlow = .moneyIn }
-            Button("Spend money", systemImage: "minus.circle.fill") { addFlow = .moneyOut }
-            Button("One-time bill", systemImage: "doc.badge.plus") { addFlow = .bill }
-            Button("Recurring bill", systemImage: "repeat") { addFlow = .recurring }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Choose an action. Ledgerly will ask for the account before the amount.")
+        .overlay(alignment: .bottom) {
+            Menu {
+                Button("Add money", systemImage: "plus.circle.fill") { addFlow = .moneyIn }
+                Button("Spend money", systemImage: "minus.circle.fill") { addFlow = .moneyOut }
+                Divider()
+                Button("One-time bill", systemImage: "doc.badge.plus") { addFlow = .bill }
+                Button("Recurring bill", systemImage: "repeat") { addFlow = .recurring }
+            } label: {
+                VStack(spacing: 2) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 23, weight: .semibold))
+                    Text("Add")
+                        .font(.caption2)
+                }
+                .frame(width: 74, height: 50)
+                .contentShape(Rectangle())
+            }
+            .tint(.blue)
+            .accessibilityLabel("Add")
+            .accessibilityHint("Opens quick actions")
+            .padding(.bottom, 1)
         }
         .sheet(item: $addFlow) { flow in
             switch flow {
