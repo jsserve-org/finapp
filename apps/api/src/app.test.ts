@@ -13,6 +13,7 @@ describe("health", () => {
   it("protects sync routes", async () => {
     const response = await app.request("/v1/accounts");
     expect(response.status).toBe(401);
+    expect((await app.request("/v1/dashboard")).status).toBe(401);
   });
 
   it("protects bill creation and account lookup", async () => {

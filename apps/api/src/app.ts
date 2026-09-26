@@ -117,6 +117,8 @@ app.post("/v1/sync", async (c) => {
 
 app.get("/v1/accounts", async (c) => c.json(await convexQuery("bills:listAccounts", { tokenHash: await sha256(c.get("sessionToken")), now: Date.now() })));
 
+app.get("/v1/dashboard", async (c) => c.json(await convexQuery("dashboard:snapshot", { tokenHash: await sha256(c.get("sessionToken")), now: Date.now() })));
+
 app.get("/v1/api-keys", async (c) => c.json(await convexQuery("apiKeys:list", { tokenHash: await sha256(c.get("sessionToken")), now: Date.now() })));
 
 app.post("/v1/api-keys", zValidator("json", apiKeyName), async (c) => {

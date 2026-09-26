@@ -7,3 +7,6 @@
 [submodule "automations/tcstock"]
 	path = automations/tcstock
 	url = https://github.com/jsserve-org/finapp-tcstock.git
+[submodule "automations/trmnl"]
+	path = automations/trmnl
+	url = https://github.com/jsserve-org/finapp-trmnl.git

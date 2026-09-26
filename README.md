@@ -83,3 +83,7 @@ docker compose logs -f api convex
 Ledgerly does not create abstract “bank connections” for agents. Automations authenticate with an API key, read concrete account IDs from `GET /v1/accounts`, and send records to those IDs through the sync API. No demo-import endpoint or sample-data loader is included.
 
 See [BILL_API.md](BILL_API.md) for the authenticated one-time and recurring bill API intended for AI agents and mobile automation. The iOS app also publishes matching actions to Apple's Shortcuts app.
+
+## TRMNL e-ink dashboard
+
+The optional [TRMNL submodule](automations/trmnl) displays a private 7-inch net-worth slide with a history graph and spending categories. Create its API key in iPhone Settings and use a TRMNL private Webhook plugin. See the submodule README for the markup, setup, and privacy details. The worker calls the internal `GET /v1/dashboard` endpoint; no public API publishing is needed.
