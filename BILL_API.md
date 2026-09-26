@@ -16,6 +16,12 @@ curl -X POST "$LEDGERLY_API/v1/auth/login" \
 
 Send either the API key or login token as `Authorization: Bearer YOUR_TOKEN` on the requests below. Do not put it in source control or give it to an untrusted agent.
 
+## Respect user-edited categories
+
+Transactions returned by sync may include `"categoryUserEdited": true`. This is server-managed metadata indicating that the category was chosen in the Ledgerly app. Automations must treat that category as authoritative and should not attempt to recategorize it. The server also enforces this rule, so API-key updates can still refresh bank fields such as settlement status or description without replacing the user's category.
+
+Do not send or modify `categoryUserEdited` from an automation. It is set only by an authenticated user action.
+
 ## Find an account ID
 
 Ledgerly does not use a separate bank-connection ID. The `id` returned here is the exact `accountId` an automation should send. Match accounts by a configured, stable ID—not by list position or a guessed bank name.
@@ -70,4 +76,4 @@ curl -X POST "$LEDGERLY_API/v1/bills" \
 
 The optional UUID `id` makes retries safe: submitting the same ID twice creates the bill only once. Omit `accountId` only for recurring bills that are not tied to an account. Supported currencies are TWD, USD, JPY, PHP, EUR, GBP, CNY, HKD, SGD, KRW, AUD, CAD, THB, MYR, VND, INR, and IDR.
 
-On iPhone, Ledgerly also exposes **Add One-Time Bill** and **Add Recurring Bill** actions directly in the Shortcuts app, so a Shortcut does not need to store the API token itself.
+On iPhone, Ledgerly also exposes **Spend Money** and **Add Recurring Bill** actions directly in the Shortcuts app, so a Shortcut does not need to store the API token itself.

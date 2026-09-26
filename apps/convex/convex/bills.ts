@@ -36,6 +36,7 @@ export const create = mutation({
         bookedAt: bill.date,
         pending: false,
         category: bill.category,
+        categoryUserEdited: session.actor === "user",
         updatedAt: timestamp,
       };
       await ctx.db.insert("transactions", { userId: session.userId, externalId: bill.id, value: transaction, version: 1, deleted: false });

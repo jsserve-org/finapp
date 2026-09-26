@@ -168,12 +168,13 @@ final class SyncEngineTests: XCTestCase {
 
     func testApplyUpdateMergesIntoExistingRow() throws {
         try testApplyUpsertsAccountAndTransaction()
-        try engine.apply([change(7, entity: "transaction", id: "txn-1", value: #"{"id":"txn-1","accountId":"acc-1","description":"Coffee grande","amount":{"amountMinor":-450,"currency":"USD"},"bookedAt":"2026-09-21T10:00:00.000Z","pending":false,"category":"Food","updatedAt":"2026-09-21T11:00:00.000Z"}"#)], context: context)
+        try engine.apply([change(7, entity: "transaction", id: "txn-1", value: #"{"id":"txn-1","accountId":"acc-1","description":"Coffee grande","amount":{"amountMinor":-450,"currency":"USD"},"bookedAt":"2026-09-21T10:00:00.000Z","pending":false,"category":"Food","categoryUserEdited":true,"updatedAt":"2026-09-21T11:00:00.000Z"}"#)], context: context)
 
         let transactions = try context.fetch(FetchDescriptor<CachedTransaction>())
         XCTAssertEqual(transactions.count, 1, "upsert must not duplicate rows")
         XCTAssertEqual(transactions[0].title, "Coffee grande")
         XCTAssertEqual(transactions[0].category, "Food")
+        XCTAssertTrue(transactions[0].categoryUserEdited)
         XCTAssertEqual(transactions[0].version, 7)
     }
 

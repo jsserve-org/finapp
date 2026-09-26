@@ -54,6 +54,7 @@ enum TransactionMerger {
         let manual = candidate.manual
         let imported = candidate.imported
         if imported.category == nil || imported.category?.isEmpty == true { imported.category = manual.category }
+        if manual.categoryUserEdited { imported.categoryUserEdited = true }
         if imported.expensePurpose == nil { imported.expensePurpose = manual.expensePurpose }
         if imported.originalAmountMinor == nil {
             imported.originalAmountMinor = manual.originalAmountMinor
@@ -123,7 +124,7 @@ enum ReimbursementService {
             amount: Money(amountMinor: abs(original.amountMinor), currency: original.currency),
             bookedAt: now,
             pending: false,
-            category: "Reimbursement",
+            category: "Reimbursement", categoryUserEdited: true,
             source: "reimbursement",
             expensePurpose: original.expensePurpose,
             reimbursementTransactionId: original.id,
@@ -164,7 +165,7 @@ enum RefundService {
             id: UUID().uuidString.lowercased(), accountId: account.id,
             description: "Refund · \(expense.title)",
             amount: Money(amountMinor: abs(expense.amountMinor), currency: expense.currency),
-            bookedAt: now, pending: false, category: "Refund", source: "refund",
+            bookedAt: now, pending: false, category: "Refund", categoryUserEdited: true, source: "refund",
             refundedTransactionId: expense.id, updatedAt: now
         ), initialVersion: 0)
         context.insert(refund)
