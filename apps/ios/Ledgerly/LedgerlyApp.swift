@@ -126,6 +126,7 @@ private struct RootTabView: View {
     @State private var selection = RootTab.overview
     @State private var previousSelection = RootTab.overview
     @State private var addFlow: AddFlow?
+    @State private var showingDraggedQuickAdd = false
 
     var body: some View {
         TabView(selection: $selection) {
@@ -155,6 +156,7 @@ private struct RootTabView: View {
         .onChange(of: selection) { oldValue, newValue in
             if newValue == .add {
                 selection = oldValue == .add ? previousSelection : oldValue
+                showingDraggedQuickAdd = true
             } else {
                 previousSelection = newValue
             }
@@ -174,6 +176,12 @@ private struct RootTabView: View {
             .accessibilityLabel("Add")
             .accessibilityHint("Opens quick actions")
             .padding(.bottom, 1)
+        }
+        .confirmationDialog("Quick Add", isPresented: $showingDraggedQuickAdd, titleVisibility: .visible) {
+            Button("Add money", systemImage: "plus.circle.fill") { addFlow = .moneyIn }
+            Button("Spend money", systemImage: "minus.circle.fill") { addFlow = .moneyOut }
+            Button("Transfer money", systemImage: "arrow.left.arrow.right.circle.fill") { addFlow = .transfer }
+            Button("Recurring bill", systemImage: "repeat") { addFlow = .recurring }
         }
         .sheet(item: $addFlow) { flow in
             switch flow {
