@@ -12,6 +12,7 @@ struct TransactionSnapshot: Identifiable, Hashable {
     var bookedDate: Date?
     var pending: Bool
     var category: String?
+    var categoryUserEdited: Bool
     var recurringPaymentID: String?
     var updatedDate: Date?
     var accountName: String?
@@ -49,6 +50,7 @@ struct TransactionSnapshot: Identifiable, Hashable {
         bookedDate = transaction.bookedDate
         pending = transaction.pending
         category = transaction.category
+        categoryUserEdited = transaction.categoryUserEdited
         recurringPaymentID = transaction.recurringPaymentId
         updatedDate = transaction.updatedDate
         accountName = account?.name
@@ -120,6 +122,11 @@ struct TransactionDetailView: View {
                     detailRow("Bank settlement", transaction.isAwaitingSettlement ? "Waiting for bank" : absoluteMoney(transaction.amountMinor, transaction.currency))
                 }
                 detailRow("Category", transaction.category ?? "Uncategorized")
+                if transaction.categoryUserEdited {
+                    Label("Category chosen by you", systemImage: "person.crop.circle.badge.checkmark")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
                 detailRow("Purpose", purposeLabel(transaction.expensePurpose))
                 detailRow("Direction", transaction.presentedAmountMinor < 0 ? "Money out" : "Money in")
                 HStack(spacing: 12) {
@@ -347,6 +354,7 @@ struct TransactionDetailView: View {
         transaction.bookedDate = model.bookedDate
         transaction.pending = model.pending
         transaction.category = model.category
+        transaction.categoryUserEdited = model.categoryUserEdited
         transaction.recurringPaymentID = model.recurringPaymentId
         transaction.updatedDate = model.updatedDate
         transaction.source = model.source
@@ -796,7 +804,9 @@ private struct EditTransactionView: View {
         newAccount.updatedAt = now
         model.title = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedCategory = category.trimmingCharacters(in: .whitespacesAndNewlines)
-        model.category = trimmedCategory.isEmpty ? nil : trimmedCategory
+        let newCategory = trimmedCategory.isEmpty ? nil : trimmedCategory
+        model.categoryUserEdited = true
+        model.category = newCategory
         model.amountMinor = newAmount
         model.originalAmountMinor = hasOriginalAmount ? (isMoneyOut ? -parsedOriginalAmount : parsedOriginalAmount) : nil
         model.originalCurrency = hasOriginalAmount ? originalCurrency : nil

@@ -36,7 +36,7 @@ enum AccountActionService {
             id: UUID().uuidString.lowercased(), accountId: account.id,
             description: description, amount: Money(amountMinor: recordedAmount, currency: account.currency),
             originalAmount: originalAmount, bookedAt: timestamp,
-            pending: settlementPending, category: category, source: "manual", expensePurpose: expensePurpose,
+            pending: settlementPending, category: category, categoryUserEdited: true, source: "manual", expensePurpose: expensePurpose,
             reimbursementStatus: expectsReimbursement && direction == .moneyOut ? "pending" : nil,
             updatedAt: timestamp
         ), initialVersion: 0)
@@ -59,13 +59,13 @@ enum AccountActionService {
         let outgoing = CachedTransaction(dto: TransactionDTO(
             id: "\(transferID)-out", accountId: source.id, description: "\(description) to \(destination.name)",
             amount: Money(amountMinor: -amountMinor, currency: source.currency), bookedAt: timestamp,
-            pending: false, category: "Transfer", source: "transfer", transferId: transferID,
+            pending: false, category: "Transfer", categoryUserEdited: true, source: "transfer", transferId: transferID,
             transferAccountId: destination.id, transferDirection: "outgoing", updatedAt: timestamp
         ), initialVersion: 0)
         let incoming = CachedTransaction(dto: TransactionDTO(
             id: "\(transferID)-in", accountId: destination.id, description: "\(description) from \(source.name)",
             amount: Money(amountMinor: amountMinor, currency: source.currency), bookedAt: timestamp,
-            pending: false, category: "Transfer", source: "transfer", transferId: transferID,
+            pending: false, category: "Transfer", categoryUserEdited: true, source: "transfer", transferId: transferID,
             transferAccountId: source.id, transferDirection: "incoming", updatedAt: timestamp
         ), initialVersion: 0)
         context.insert(outgoing); context.insert(incoming)

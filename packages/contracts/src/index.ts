@@ -18,6 +18,7 @@ export type Transaction = {
   bookedAt: string;
   pending: boolean;
   category?: string;
+  categoryUserEdited?: boolean;
   recurringPaymentId?: string;
   source?: string;
   expensePurpose?: string;

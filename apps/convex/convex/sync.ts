@@ -1,6 +1,7 @@
 import { mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { addChange, requireSession } from "./lib";
+import { mergeTransactionValue } from "./transactionMerge";
 
 export const exchange = mutation({ args: { tokenHash: v.string(), cursor: v.string(), operations: v.array(v.any()), now: v.number() }, handler: async (ctx, args) => {
   const session = await requireSession(ctx, args.tokenHash, args.now);
@@ -82,15 +83,24 @@ export const exchange = mutation({ args: { tokenHash: v.string(), cursor: v.stri
     }
     const transaction = await ctx.db.query("transactions").withIndex("by_user_external", (q) => q.eq("userId", session.userId).eq("externalId", operation.entityId)).unique();
     if (!transaction && operation.entity === "transaction" && operation.action === "upsert" && operation.value?.id === operation.entityId && operation.value?.accountId && operation.value?.amount) {
-      await ctx.db.insert("transactions", { userId: session.userId, externalId: operation.entityId, value: operation.value, version: 1, deleted: false });
-      await addChange(ctx, session.userId, "transaction", operation.entityId, "upsert", operation.value);
+      const value = {
+        ...operation.value,
+        categoryUserEdited: session.actor === "user" && Object.hasOwn(operation.value, "category"),
+      };
+      await ctx.db.insert("transactions", { userId: session.userId, externalId: operation.entityId, value, version: 1, deleted: false });
+      await addChange(ctx, session.userId, "transaction", operation.entityId, "upsert", value);
       await ctx.db.insert("mutations", { userId: session.userId, mutationId: operation.mutationId });
       acceptedMutationIds.push(operation.mutationId);
       continue;
     }
     if (!transaction) continue;
     const deleted = operation.action === "delete";
-    const value = deleted ? null : { ...transaction.value, ...operation.value, updatedAt: new Date(args.now).toISOString() };
+    const value = deleted ? null : mergeTransactionValue(
+      transaction.value,
+      operation.value,
+      session.actor,
+      new Date(args.now).toISOString(),
+    );
     await ctx.db.patch(transaction._id, { value, deleted, version: transaction.version + 1 });
     await addChange(ctx, session.userId, "transaction", operation.entityId, operation.action, value);
     await ctx.db.insert("mutations", { userId: session.userId, mutationId: operation.mutationId });

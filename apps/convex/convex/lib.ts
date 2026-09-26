@@ -3,10 +3,10 @@ import type { Id } from "./_generated/dataModel";
 
 export async function requireSession(ctx: QueryCtx | MutationCtx, tokenHash: string, now: number) {
   const session = await ctx.db.query("sessions").withIndex("by_token", (q) => q.eq("tokenHash", tokenHash)).unique();
-  if (session && !session.revokedAt && session.expiresAt > now) return session;
+  if (session && !session.revokedAt && session.expiresAt > now) return { ...session, actor: "user" as const };
   const apiKey = await ctx.db.query("apiKeys").withIndex("by_token", (q) => q.eq("tokenHash", tokenHash)).unique();
   if (!apiKey || apiKey.revokedAt) throw new Error("UNAUTHORIZED");
-  return { userId: apiKey.userId, syncSessionId: `api-key:${apiKey._id}`, expiresAt: Number.MAX_SAFE_INTEGER };
+  return { userId: apiKey.userId, syncSessionId: `api-key:${apiKey._id}`, expiresAt: Number.MAX_SAFE_INTEGER, actor: "automation" as const };
 }
 
 export async function addChange(ctx: MutationCtx, userId: Id<"users">, entity: string, entityId: string, action: string, value: unknown) {

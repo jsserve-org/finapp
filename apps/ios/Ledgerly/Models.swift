@@ -28,6 +28,7 @@ struct TransactionDTO: Codable, Equatable, Identifiable {
     let bookedAt: String
     let pending: Bool
     let category: String?
+    let categoryUserEdited: Bool?
     let recurringPaymentId: String?
     let source: String?
     let expensePurpose: String?
@@ -40,10 +41,10 @@ struct TransactionDTO: Codable, Equatable, Identifiable {
     let transferDirection: String?
     let updatedAt: String
 
-    init(id: String, accountId: String, description: String, amount: Money, originalAmount: Money? = nil, bookedAt: String, pending: Bool, category: String?, recurringPaymentId: String? = nil, source: String? = nil, expensePurpose: String? = nil, reimbursementStatus: String? = nil, reimbursementTransactionId: String? = nil, refundTransactionId: String? = nil, refundedTransactionId: String? = nil, transferId: String? = nil, transferAccountId: String? = nil, transferDirection: String? = nil, updatedAt: String) {
+    init(id: String, accountId: String, description: String, amount: Money, originalAmount: Money? = nil, bookedAt: String, pending: Bool, category: String?, categoryUserEdited: Bool? = nil, recurringPaymentId: String? = nil, source: String? = nil, expensePurpose: String? = nil, reimbursementStatus: String? = nil, reimbursementTransactionId: String? = nil, refundTransactionId: String? = nil, refundedTransactionId: String? = nil, transferId: String? = nil, transferAccountId: String? = nil, transferDirection: String? = nil, updatedAt: String) {
         self.id = id; self.accountId = accountId; self.description = description; self.amount = amount
         self.originalAmount = originalAmount
-        self.bookedAt = bookedAt; self.pending = pending; self.category = category
+        self.bookedAt = bookedAt; self.pending = pending; self.category = category; self.categoryUserEdited = categoryUserEdited
         self.recurringPaymentId = recurringPaymentId; self.source = source; self.expensePurpose = expensePurpose
         self.reimbursementStatus = reimbursementStatus; self.reimbursementTransactionId = reimbursementTransactionId
         self.refundTransactionId = refundTransactionId; self.refundedTransactionId = refundedTransactionId
@@ -300,6 +301,7 @@ enum JSONValue: Codable, Equatable {
     var bookedAt: String
     var pending: Bool
     var category: String?
+    var categoryUserEdited: Bool = false
     var recurringPaymentId: String?
     var source: String?
     var expensePurpose: String?
@@ -324,6 +326,7 @@ enum JSONValue: Codable, Equatable {
         bookedAt = dto.bookedAt
         pending = dto.pending
         category = dto.category
+        categoryUserEdited = dto.categoryUserEdited ?? false
         recurringPaymentId = dto.recurringPaymentId
         source = dto.source
         expensePurpose = dto.expensePurpose
@@ -348,6 +351,7 @@ enum JSONValue: Codable, Equatable {
         bookedAt = dto.bookedAt
         pending = dto.pending
         category = dto.category
+        if let categoryUserEdited = dto.categoryUserEdited { self.categoryUserEdited = categoryUserEdited }
         recurringPaymentId = dto.recurringPaymentId
         source = dto.source
         expensePurpose = dto.expensePurpose
