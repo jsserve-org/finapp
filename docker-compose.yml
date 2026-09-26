@@ -57,6 +57,23 @@ services:
     init: true
     restart: unless-stopped
 
+  trmnl:
+    image: ${TRMNL_IMAGE:-ghcr.io/jsserve-org/finapp-trmnl:latest}
+    pull_policy: always
+    environment:
+      LEDGERLY_API_URL: http://api:3000
+      LEDGERLY_API_KEY: ${LEDGERLY_API_KEY:-}
+      TRMNL_WEBHOOK_URL: ${TRMNL_WEBHOOK_URL:-}
+      DISPLAY_CURRENCY: ${DISPLAY_CURRENCY:-USD}
+      UPDATE_MINUTES: ${UPDATE_MINUTES:-30}
+      DB_PATH: /data/trmnl.sqlite
+    volumes: ["trmnl-data:/data"]
+    depends_on:
+      api:
+        condition: service_healthy
+    profiles: ["trmnl"]
+    restart: unless-stopped
+
   convex-deploy:
     image: ${LEDGERLY_API_IMAGE:-ghcr.io/jsserve-org/finapp-api:latest}
     pull_policy: always
@@ -84,3 +101,4 @@ services:
 
 volumes:
   convex-data:
+  trmnl-data:
