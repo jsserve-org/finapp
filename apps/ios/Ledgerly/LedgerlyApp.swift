@@ -122,7 +122,7 @@ private struct LoginView: View {
 
 private struct RootTabView: View {
     private enum RootTab: Hashable { case overview, accounts, add, activity, settings }
-    private enum AddFlow: String, Identifiable { case recurring, moneyIn, moneyOut, transfer; var id: String { rawValue } }
+    private enum AddFlow: String, Identifiable { case quickSpend, recurring, moneyIn, moneyOut, transfer; var id: String { rawValue } }
     @State private var selection = RootTab.overview
     @State private var previousSelection = RootTab.overview
     @State private var addFlow: AddFlow?
@@ -163,6 +163,7 @@ private struct RootTabView: View {
         }
         .overlay(alignment: .bottom) {
             Menu {
+                Button("Quick spend", systemImage: "bolt.fill") { addFlow = .quickSpend }
                 Button("Add money", systemImage: "plus.circle.fill") { addFlow = .moneyIn }
                 Button("Spend money", systemImage: "minus.circle.fill") { addFlow = .moneyOut }
                 Button("Transfer money", systemImage: "arrow.left.arrow.right.circle.fill") { addFlow = .transfer }
@@ -172,12 +173,15 @@ private struct RootTabView: View {
                 Color.clear
                 .frame(width: 74, height: 50)
                 .contentShape(Rectangle())
+            } primaryAction: {
+                addFlow = .quickSpend
             }
             .accessibilityLabel("Add")
-            .accessibilityHint("Opens quick actions")
+            .accessibilityHint("Opens quick spend. Touch and hold for more actions")
             .padding(.bottom, 1)
         }
         .confirmationDialog("Quick Add", isPresented: $showingDraggedQuickAdd, titleVisibility: .visible) {
+            Button("Quick spend", systemImage: "bolt.fill") { addFlow = .quickSpend }
             Button("Add money", systemImage: "plus.circle.fill") { addFlow = .moneyIn }
             Button("Spend money", systemImage: "minus.circle.fill") { addFlow = .moneyOut }
             Button("Transfer money", systemImage: "arrow.left.arrow.right.circle.fill") { addFlow = .transfer }
@@ -185,6 +189,7 @@ private struct RootTabView: View {
         }
         .sheet(item: $addFlow) { flow in
             switch flow {
+            case .quickSpend: QuickSpendView()
             case .recurring: NewRecurringPaymentView()
             case .moneyIn: AccountEntryView(direction: .moneyIn)
             case .moneyOut: AccountEntryView(direction: .moneyOut)
