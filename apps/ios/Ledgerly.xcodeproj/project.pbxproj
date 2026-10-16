@@ -35,6 +35,7 @@
 		CA97A2EF1F499AC7C00B1EC7 /* AccountDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0106C64BF0BF3AFFB28671 /* AccountDetailView.swift */; };
 		D97B47F1B729F380F03D276D /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C47DE8DA5D1977EEE8DB432 /* KeychainStore.swift */; };
 		F00853AE958F2D78941F1003 /* APIKeysView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8E4CAC7A2A809EAAEBE71FD /* APIKeysView.swift */; };
+		F6A9329066866B96C200E684 /* QuickSpendView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05EB4B15F2ECD6A9F3473763 /* QuickSpendView.swift */; };
 		FF22C721D942DED66BB719E3 /* SyncEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0357F0A8C8E8410C8283C386 /* SyncEngineTests.swift */; };
 /* End PBXBuildFile section */
 
@@ -51,6 +52,7 @@
 /* Begin PBXFileReference section */
 		000E423B153CB897A82F955D /* TransactionCategory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionCategory.swift; sourceTree = "<group>"; };
 		0357F0A8C8E8410C8283C386 /* SyncEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncEngineTests.swift; sourceTree = "<group>"; };
+		05EB4B15F2ECD6A9F3473763 /* QuickSpendView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickSpendView.swift; sourceTree = "<group>"; };
 		1E37E7C942B2B07B38BB6D62 /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
 		234B6D3C7915CAF5C2DD6056 /* ServerCompatibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerCompatibility.swift; sourceTree = "<group>"; };
 		276C5023F83277240143C5AE /* LedgerlyTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = LedgerlyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -124,6 +126,7 @@
 				EDEEF15E27DB83D45F19BE51 /* Models.swift */,
 				66E1969D51CF787D24A489A0 /* NativeTabs.swift */,
 				C4A67EB3AC66E32417CA61DF /* PaymentIcon.swift */,
+				05EB4B15F2ECD6A9F3473763 /* QuickSpendView.swift */,
 				F6BFE0868670C415AB30F4A3 /* RecurringPaymentMatcher.swift */,
 				DFBC8BFF6BBF45BAC50DD36B /* ScreenshotSync.swift */,
 				ED7C885C03FE7BC27EC2A787 /* ScreenshotSyncSettingsView.swift */,
@@ -256,6 +259,7 @@
 				37499986F122BC64CE3A8C58 /* Models.swift in Sources */,
 				B80071EC414C2C333DAF9623 /* NativeTabs.swift in Sources */,
 				994C6023DF322D75578FE0C9 /* PaymentIcon.swift in Sources */,
+				F6A9329066866B96C200E684 /* QuickSpendView.swift in Sources */,
 				64BDC77AEBBB6E397B8555B3 /* RecurringPaymentMatcher.swift in Sources */,
 				A30BD357A21EB8542ED4DE30 /* ScreenshotSync.swift in Sources */,
 				3C95F58F42BCA8DDE9089E86 /* ScreenshotSyncSettingsView.swift in Sources */,
@@ -440,7 +444,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Ledgerly/Ledgerly.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 33;
+				CURRENT_PROJECT_VERSION = 34;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Ledgerly/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -448,7 +452,7 @@
 					"@executable_path/Frameworks",
 				);
 				LEDGERLY_BASE_URL = "http://localhost:3000";
-				MARKETING_VERSION = 0.6.12;
+				MARKETING_VERSION = 0.6.13;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ledgerly.app;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -461,7 +465,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Ledgerly/Ledgerly.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 33;
+				CURRENT_PROJECT_VERSION = 34;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Ledgerly/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -469,7 +473,7 @@
 					"@executable_path/Frameworks",
 				);
 				LEDGERLY_BASE_URL = "http://localhost:3000";
-				MARKETING_VERSION = 0.6.12;
+				MARKETING_VERSION = 0.6.13;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ledgerly.app;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
