@@ -173,11 +173,9 @@ private struct RootTabView: View {
                 Color.clear
                 .frame(width: 74, height: 50)
                 .contentShape(Rectangle())
-            } primaryAction: {
-                addFlow = .quickSpend
             }
             .accessibilityLabel("Add")
-            .accessibilityHint("Opens quick spend. Touch and hold for more actions")
+            .accessibilityHint("Opens quick actions")
             .padding(.bottom, 1)
         }
         .confirmationDialog("Quick Add", isPresented: $showingDraggedQuickAdd, titleVisibility: .visible) {
