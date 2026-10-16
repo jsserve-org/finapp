@@ -176,14 +176,15 @@ private struct RootTabView: View {
             }
             .accessibilityLabel("Add")
             .accessibilityHint("Opens quick actions")
+            // Anchored to the Add button so iOS 26 morphs it out of the tab bar instead of using a bottom sheet.
+            .confirmationDialog("Quick Add", isPresented: $showingDraggedQuickAdd, titleVisibility: .hidden) {
+                Button("Quick spend", systemImage: "bolt.fill") { addFlow = .quickSpend }
+                Button("Add money", systemImage: "plus.circle.fill") { addFlow = .moneyIn }
+                Button("Spend money", systemImage: "minus.circle.fill") { addFlow = .moneyOut }
+                Button("Transfer money", systemImage: "arrow.left.arrow.right.circle.fill") { addFlow = .transfer }
+                Button("Recurring bill", systemImage: "repeat") { addFlow = .recurring }
+            }
             .padding(.bottom, 1)
-        }
-        .confirmationDialog("Quick Add", isPresented: $showingDraggedQuickAdd, titleVisibility: .visible) {
-            Button("Quick spend", systemImage: "bolt.fill") { addFlow = .quickSpend }
-            Button("Add money", systemImage: "plus.circle.fill") { addFlow = .moneyIn }
-            Button("Spend money", systemImage: "minus.circle.fill") { addFlow = .moneyOut }
-            Button("Transfer money", systemImage: "arrow.left.arrow.right.circle.fill") { addFlow = .transfer }
-            Button("Recurring bill", systemImage: "repeat") { addFlow = .recurring }
         }
         .sheet(item: $addFlow) { flow in
             switch flow {
