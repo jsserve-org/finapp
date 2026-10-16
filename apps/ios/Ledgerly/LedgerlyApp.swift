@@ -120,13 +120,48 @@ private struct LoginView: View {
     }
 }
 
+private enum AddFlow: String, Identifiable { case quickSpend, recurring, moneyIn, moneyOut, transfer; var id: String { rawValue } }
+
+/// UIKit button so a drag onto the Add tab can open the same native menu as a tap (SwiftUI's Menu can't be opened from code).
+private struct AddMenuButton: UIViewRepresentable {
+    let openRequest: Int
+    let select: (AddFlow) -> Void
+
+    final class Coordinator { var lastOpenRequest = 0 }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeUIView(context: Context) -> UIButton {
+        let button = UIButton(type: .system)
+        button.showsMenuAsPrimaryAction = true
+        button.accessibilityLabel = "Add"
+        button.accessibilityHint = "Opens quick actions"
+        return button
+    }
+
+    func updateUIView(_ button: UIButton, context: Context) {
+        func item(_ title: String, _ symbol: String, _ flow: AddFlow) -> UIAction {
+            UIAction(title: title, image: UIImage(systemName: symbol)) { _ in select(flow) }
+        }
+        button.menu = UIMenu(children: [
+            item("Quick spend", "bolt.fill", .quickSpend),
+            item("Add money", "plus.circle.fill", .moneyIn),
+            item("Spend money", "minus.circle.fill", .moneyOut),
+            item("Transfer money", "arrow.left.arrow.right.circle.fill", .transfer),
+            UIMenu(options: .displayInline, children: [item("Recurring bill", "repeat", .recurring)]),
+        ])
+        guard openRequest != context.coordinator.lastOpenRequest else { return }
+        context.coordinator.lastOpenRequest = openRequest
+        DispatchQueue.main.async { button.performPrimaryAction() }
+    }
+}
+
 private struct RootTabView: View {
     private enum RootTab: Hashable { case overview, accounts, add, activity, settings }
-    private enum AddFlow: String, Identifiable { case quickSpend, recurring, moneyIn, moneyOut, transfer; var id: String { rawValue } }
     @State private var selection = RootTab.overview
     @State private var previousSelection = RootTab.overview
     @State private var addFlow: AddFlow?
-    @State private var showingDraggedQuickAdd = false
+    @State private var dragOpenRequest = 0
 
     var body: some View {
         TabView(selection: $selection) {
@@ -156,35 +191,15 @@ private struct RootTabView: View {
         .onChange(of: selection) { oldValue, newValue in
             if newValue == .add {
                 selection = oldValue == .add ? previousSelection : oldValue
-                showingDraggedQuickAdd = true
+                dragOpenRequest += 1
             } else {
                 previousSelection = newValue
             }
         }
         .overlay(alignment: .bottom) {
-            Menu {
-                Button("Quick spend", systemImage: "bolt.fill") { addFlow = .quickSpend }
-                Button("Add money", systemImage: "plus.circle.fill") { addFlow = .moneyIn }
-                Button("Spend money", systemImage: "minus.circle.fill") { addFlow = .moneyOut }
-                Button("Transfer money", systemImage: "arrow.left.arrow.right.circle.fill") { addFlow = .transfer }
-                Divider()
-                Button("Recurring bill", systemImage: "repeat") { addFlow = .recurring }
-            } label: {
-                Color.clear
+            AddMenuButton(openRequest: dragOpenRequest) { addFlow = $0 }
                 .frame(width: 74, height: 50)
-                .contentShape(Rectangle())
-            }
-            .accessibilityLabel("Add")
-            .accessibilityHint("Opens quick actions")
-            // Anchored to the Add button so iOS 26 morphs it out of the tab bar instead of using a bottom sheet.
-            .confirmationDialog("Quick Add", isPresented: $showingDraggedQuickAdd, titleVisibility: .hidden) {
-                Button("Quick spend", systemImage: "bolt.fill") { addFlow = .quickSpend }
-                Button("Add money", systemImage: "plus.circle.fill") { addFlow = .moneyIn }
-                Button("Spend money", systemImage: "minus.circle.fill") { addFlow = .moneyOut }
-                Button("Transfer money", systemImage: "arrow.left.arrow.right.circle.fill") { addFlow = .transfer }
-                Button("Recurring bill", systemImage: "repeat") { addFlow = .recurring }
-            }
-            .padding(.bottom, 1)
+                .padding(.bottom, 1)
         }
         .sheet(item: $addFlow) { flow in
             switch flow {

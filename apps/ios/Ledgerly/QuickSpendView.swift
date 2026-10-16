@@ -1,14 +1,16 @@
 import SwiftData
 import SwiftUI
 
-/// Two-page spending entry: enter the amount, then tap a category to save.
+/// Three-page spending entry like Spend money: pick the account, enter the amount, then tap a category to save.
 struct QuickSpendView: View {
     private enum Step: Int {
+        case account
         case amount
         case category
 
         var title: String {
             switch self {
+            case .account: "Choose account"
             case .amount: "Enter amount"
             case .category: "Choose category"
             }
@@ -29,7 +31,7 @@ struct QuickSpendView: View {
     @State private var amount = ""
     @State private var currency = SupportedCurrency.defaultCode
     @State private var expectsReimbursement = false
-    @State private var step: Step = .amount
+    @State private var step: Step = .account
     @State private var movesForward = true
     @State private var showingDetails = false
 
@@ -51,6 +53,7 @@ struct QuickSpendView: View {
             NavigationStack {
                 ZStack {
                     switch step {
+                    case .account: accountStep
                     case .amount: amountStep
                     case .category: categoryStep
                     }
@@ -61,13 +64,13 @@ struct QuickSpendView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        if step == .amount {
+                        if step == .account {
                             Button("Cancel") { dismiss() }
                         } else {
                             Button("Back", systemImage: "chevron.left") { goBack() }
                         }
                     }
-                    if step != .amount {
+                    if step != .account {
                         ToolbarItem(placement: .confirmationAction) { Button("Cancel") { dismiss() } }
                     }
                 }
@@ -80,21 +83,43 @@ struct QuickSpendView: View {
         }
     }
 
+    private var accountStep: some View {
+        Form {
+            Section {
+                FlowStepHeader(current: 1, total: 3, instruction: "Which account paid?")
+            }
+            .listRowBackground(Color.clear)
+            Section("Account") {
+                ForEach(accounts) { option in
+                    // Tapping an account moves straight on to the amount.
+                    Button {
+                        lastAccountID = option.id
+                        currency = option.currency
+                        goForward(to: .amount)
+                    } label: {
+                        accountRow(option, selected: option.id == account?.id)
+                    }
+                    .buttonStyle(.plain)
+                }
+                if accounts.isEmpty {
+                    ContentUnavailableView("No accounts", systemImage: "building.columns", description: Text("Create an account before recording money."))
+                }
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            FlowButton(title: "Enter amount", systemImage: "arrow.right", tint: .red, disabled: account == nil) {
+                goForward(to: .amount)
+            }
+        }
+    }
+
     private var amountStep: some View {
         Form {
             Section {
-                FlowStepHeader(current: 1, total: 2, instruction: "How much did you spend?")
+                FlowStepHeader(current: 2, total: 3, instruction: account?.name ?? "Amount")
                 MoneyAmountHeader(title: "Purchase amount", amount: $amount, currency: $currency, tint: .red, currencyLocked: true)
             }
             .listRowBackground(Color.clear)
-            Section("Paid with") {
-                Picker("Account", selection: $lastAccountID) {
-                    ForEach(accounts) { option in
-                        Text(option.name).tag(option.id)
-                    }
-                }
-                .onChange(of: lastAccountID) { if let account { currency = account.currency } }
-            }
         }
         .safeAreaInset(edge: .bottom) {
             FlowButton(title: "Choose category", systemImage: "arrow.right", tint: .red, disabled: parsedAmount <= 0 || account == nil) {
@@ -106,7 +131,7 @@ struct QuickSpendView: View {
     private var categoryStep: some View {
         Form {
             Section {
-                FlowStepHeader(current: 2, total: 2, instruction: "Tap a category to save")
+                FlowStepHeader(current: 3, total: 3, instruction: "Tap a category to save")
             }
             .listRowBackground(Color.clear)
             Section {
@@ -132,6 +157,21 @@ struct QuickSpendView: View {
                 Button("Add more details", systemImage: "square.and.pencil") { showingDetails = true }
             }
         }
+    }
+
+    private func accountRow(_ account: CachedAccount, selected: Bool) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: AppIcon.account(kind: account.kind)).ledgerlyIcon()
+            VStack(alignment: .leading, spacing: 2) {
+                Text(account.name).font(.headline).foregroundStyle(.primary)
+                Text("\(account.institution) · \((Double(account.amountMinor) / 100).formatted(.currency(code: account.currency).presentation(.isoCode)))")
+                    .font(.subheadline).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                .foregroundStyle(selected ? Color.red : Color.secondary.opacity(0.45))
+        }
+        .contentShape(Rectangle())
     }
 
     private func goBack() {
