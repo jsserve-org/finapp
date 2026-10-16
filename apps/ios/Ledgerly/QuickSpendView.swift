@@ -1,8 +1,20 @@
 import SwiftData
 import SwiftUI
 
-/// One-screen spending entry: type the amount, tap a category, done.
+/// Two-page spending entry: enter the amount, then tap a category to save.
 struct QuickSpendView: View {
+    private enum Step: Int {
+        case amount
+        case category
+
+        var title: String {
+            switch self {
+            case .amount: "Enter amount"
+            case .category: "Choose category"
+            }
+        }
+    }
+
     private static let categories = [
         "Dining", "Groceries", "Transport", "Shopping", "Bills", "Subscriptions",
         "Health", "School", "Travel", "Housing", "Other",
@@ -15,10 +27,11 @@ struct QuickSpendView: View {
     @AppStorage("ledgerly.quickSpend.accountID") private var lastAccountID = ""
     @AppStorage("ledgerly.quickSpend.lastCategory") private var lastCategory = "Dining"
     @State private var amount = ""
+    @State private var currency = SupportedCurrency.defaultCode
     @State private var expectsReimbursement = false
-    @State private var savedMessage: String?
+    @State private var step: Step = .amount
+    @State private var movesForward = true
     @State private var showingDetails = false
-    @FocusState private var amountIsFocused: Bool
 
     private var account: CachedAccount? {
         accounts.first { $0.id == lastAccountID }
@@ -26,7 +39,7 @@ struct QuickSpendView: View {
             ?? accounts.first
     }
 
-    /// The last category used comes first so a repeat lunch is the top-left tap.
+    /// The last category used comes first so a repeat lunch is the top row.
     private var orderedCategories: [String] {
         [lastCategory] + Self.categories.filter { $0 != lastCategory }
     }
@@ -36,101 +49,112 @@ struct QuickSpendView: View {
             AccountEntryView(account: account, direction: .moneyOut, amount: amount)
         } else {
             NavigationStack {
-                ScrollView {
-                    VStack(spacing: 18) {
-                        amountField
-                        Toggle("I expect reimbursement", systemImage: "arrow.uturn.backward.circle", isOn: $expectsReimbursement)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 10)
-                            .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 14))
-                        categoryGrid
+                ZStack {
+                    switch step {
+                    case .amount: amountStep
+                    case .category: categoryStep
                     }
-                    .padding()
                 }
-                .scrollDismissesKeyboard(.never)
-                .overlay { if let savedMessage { savedBanner(savedMessage) } }
-                .navigationTitle("Quick spend")
+                .id(step)
+                .transition(stepTransition)
+                .navigationTitle(step.title)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("More details") { showingDetails = true }
-                            .disabled(account == nil)
+                    ToolbarItem(placement: .cancellationAction) {
+                        if step == .amount {
+                            Button("Cancel") { dismiss() }
+                        } else {
+                            Button("Back", systemImage: "chevron.left") { goBack() }
+                        }
+                    }
+                    if step != .amount {
+                        ToolbarItem(placement: .confirmationAction) { Button("Cancel") { dismiss() } }
                     }
                 }
-                .sensoryFeedback(.success, trigger: savedMessage)
                 .task {
-                    await Task.yield()
-                    amountIsFocused = true
+                    guard let account else { return }
+                    lastAccountID = account.id
+                    currency = account.currency
                 }
             }
         }
     }
 
-    private var amountField: some View {
-        VStack(spacing: 8) {
-            TextField("0", text: $amount)
-                .font(.system(size: 52, weight: .semibold, design: .rounded))
-                .foregroundStyle(.red)
-                .multilineTextAlignment(.center)
-                .keyboardType(.decimalPad)
-                .focused($amountIsFocused)
-                .minimumScaleFactor(0.55)
-            Menu {
-                ForEach(accounts) { option in
-                    Button {
-                        lastAccountID = option.id
-                    } label: {
-                        Label(option.name, systemImage: option.id == account?.id ? "checkmark" : AppIcon.account(kind: option.kind))
+    private var amountStep: some View {
+        Form {
+            Section {
+                FlowStepHeader(current: 1, total: 2, instruction: "How much did you spend?")
+                MoneyAmountHeader(title: "Purchase amount", amount: $amount, currency: $currency, tint: .red, currencyLocked: true)
+            }
+            .listRowBackground(Color.clear)
+            Section("Paid with") {
+                Picker("Account", selection: $lastAccountID) {
+                    ForEach(accounts) { option in
+                        Text(option.name).tag(option.id)
                     }
                 }
-            } label: {
-                HStack(spacing: 5) {
-                    Text(account.map { "\($0.name) · \($0.currency)" } ?? "No account")
-                    Image(systemName: "chevron.up.chevron.down").font(.caption2)
-                }
+                .onChange(of: lastAccountID) { if let account { currency = account.currency } }
             }
-            .font(.subheadline.weight(.semibold))
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .tint(.secondary)
-            .accessibilityLabel("Account")
+        }
+        .safeAreaInset(edge: .bottom) {
+            FlowButton(title: "Choose category", systemImage: "arrow.right", tint: .red, disabled: parsedAmount <= 0 || account == nil) {
+                goForward(to: .category)
+            }
         }
     }
 
-    private var categoryGrid: some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 4), spacing: 10) {
-            ForEach(orderedCategories, id: \.self) { category in
-                Button { save(category: category) } label: {
-                    VStack(spacing: 6) {
-                        Image(systemName: PaymentIcon.symbol(title: "", category: category, amountMinor: -1))
-                            .font(.title3)
-                        Text(category)
-                            .font(.caption.weight(.medium))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
+    private var categoryStep: some View {
+        Form {
+            Section {
+                FlowStepHeader(current: 2, total: 2, instruction: "Tap a category to save")
+            }
+            .listRowBackground(Color.clear)
+            Section {
+                Toggle("I expect reimbursement", isOn: $expectsReimbursement)
+            }
+            Section("Category") {
+                ForEach(orderedCategories, id: \.self) { category in
+                    Button { save(category: category) } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: PaymentIcon.symbol(title: "", category: category, amountMinor: -1)).ledgerlyIcon(color: .red)
+                            Text(category).font(.headline).foregroundStyle(.primary)
+                            Spacer()
+                            if category == lastCategory {
+                                Text("Last used").font(.subheadline).foregroundStyle(.secondary)
+                            }
+                        }
+                        .contentShape(Rectangle())
                     }
-                    .frame(maxWidth: .infinity, minHeight: 64)
-                    .contentShape(Rectangle())
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.bordered)
-                .tint(category == lastCategory ? .red : .secondary)
-                .disabled(parsedAmount <= 0 || account == nil || savedMessage != nil)
+            }
+            Section {
+                Button("Add more details", systemImage: "square.and.pencil") { showingDetails = true }
             }
         }
     }
 
-    private func savedBanner(_ message: String) -> some View {
-        VStack(spacing: 10) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 54))
-                .foregroundStyle(.green)
-            Text(message).font(.headline)
-            Text("Nice, that's tracked.").font(.subheadline).foregroundStyle(.secondary)
-        }
-        .padding(28)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24))
-        .transition(reduceMotion ? .opacity : .scale.combined(with: .opacity))
+    private func goBack() {
+        guard let previous = Step(rawValue: step.rawValue - 1) else { return }
+        movesForward = false
+        withAnimation(stepAnimation) { step = previous }
+    }
+
+    private func goForward(to next: Step) {
+        movesForward = true
+        withAnimation(stepAnimation) { step = next }
+    }
+
+    private var stepAnimation: Animation? {
+        reduceMotion ? nil : .snappy(duration: 0.38, extraBounce: 0.04)
+    }
+
+    private var stepTransition: AnyTransition {
+        guard !reduceMotion else { return .opacity }
+        return .asymmetric(
+            insertion: .move(edge: movesForward ? .trailing : .leading).combined(with: .opacity),
+            removal: .move(edge: movesForward ? .leading : .trailing).combined(with: .opacity)
+        )
     }
 
     private var parsedAmount: Int {
@@ -139,7 +163,7 @@ struct QuickSpendView: View {
     }
 
     private func save(category: String) {
-        guard let account, parsedAmount > 0, savedMessage == nil else { return }
+        guard let account, parsedAmount > 0 else { return }
         AccountActionService.record(
             amountMinor: parsedAmount,
             description: category,
@@ -148,14 +172,7 @@ struct QuickSpendView: View {
             expensePurpose: "personal",
             expectsReimbursement: expectsReimbursement
         )
-        lastAccountID = account.id
         lastCategory = category
-        let formatted = (Double(parsedAmount) / 100).formatted(.currency(code: account.currency).presentation(.isoCode))
-        amountIsFocused = false
-        withAnimation(reduceMotion ? nil : .snappy) { savedMessage = "\(formatted) · \(category)" }
-        Task {
-            try? await Task.sleep(for: .milliseconds(700))
-            dismiss()
-        }
+        dismiss()
     }
 }
