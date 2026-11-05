@@ -256,7 +256,7 @@ struct NativeActivityView: View {
             }
             .sheet(isPresented: $showingSpendMoney) { AccountEntryView(direction: .moneyOut) }
             .sheet(isPresented: $showingNewRecurringPayment) { NewRecurringPaymentView() }
-            .sheet(item: $editingRecurringPayment) { NewRecurringPaymentView(payment: $0) }
+            .sheet(item: $editingRecurringPayment) { SubscriptionDetailView(payment: $0) }
             .sheet(isPresented: $showingCustomDates) {
                 ActivityCustomDateView(startDate: $customStartDate, endDate: $customEndDate) {
                     dateFilter = .custom
@@ -275,6 +275,7 @@ struct NativeActivityView: View {
                 .ledgerlyIcon()
             VStack(alignment: .leading, spacing: 3) {
                 Text(payment.name).font(.headline).lineLimit(1)
+                if !payment.isActive { Text("Paused").font(.caption).foregroundStyle(.secondary) }
                 Text("\(payment.frequencyLabel) · next due \(payment.nextDate.formatted(date: .abbreviated, time: .omitted))")
                     .font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
             }
@@ -324,15 +325,19 @@ struct NativeActivityView: View {
         for index in offsets {
             let payment = recurringPayments[index]
             let paymentID = payment.id
+            try? SubscriptionScheduler.removeEstimates(paymentID: paymentID, context: context)
             let linkedDescriptor = FetchDescriptor<CachedTransaction>(predicate: #Predicate { $0.recurringPaymentId == paymentID })
             let linkedTransactions = (try? context.fetch(linkedDescriptor)) ?? []
             for transaction in linkedTransactions {
+                if transaction.source == "subscription" && transaction.pending { continue }
                 transaction.recurringPaymentId = nil
+                transaction.recurringPaymentUnlinked = true
                 context.insert(PendingMutation(
                     entityId: transaction.id, action: "upsert", newDescription: nil, newCategory: nil,
                     newRecurringPaymentId: nil, updatesRecurringPayment: true, baseVersion: transaction.version
                 ))
             }
+            try? removePendingRecurringUpserts(paymentID: payment.id, context: context)
             context.insert(PendingRecurringMutation(entityId: payment.id, action: "delete"))
             context.delete(payment)
         }
@@ -425,4 +430,63 @@ enum TransactionSearch {
 
 private func money(_ amount: Int, _ currency: String) -> String {
     (Double(amount) / 100).formatted(.currency(code: currency).presentation(.isoCode))
+}
+
+struct SubscriptionDetailView: View {
+    @Environment(\.dismiss) private var dismiss
+    let payment: RecurringPayment
+    @Query private var transactions: [CachedTransaction]
+    @Query private var accounts: [CachedAccount]
+    @State private var editing = false
+    @State private var selectedTransaction: TransactionSnapshot?
+    @AppStorage("ledgerly.hideFinancialAmounts") private var hidesAmounts = false
+
+    init(payment: RecurringPayment) {
+        self.payment = payment
+        let id = payment.id
+        _transactions = Query(filter: #Predicate<CachedTransaction> { $0.recurringPaymentId == id }, sort: [SortDescriptor(\CachedTransaction.bookedAt, order: .reverse)])
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    LabeledContent("Status", value: payment.isActive ? "Active" : "Paused")
+                    LabeledContent("Repeats", value: payment.frequencyLabel)
+                    LabeledContent("Next record", value: payment.nextDate.formatted(date: .abbreviated, time: .omitted))
+                    LabeledContent("Pay from", value: accounts.first(where: { $0.id == payment.accountId })?.name ?? "Choose an account to enable automatic records")
+                } header: { Text("Subscription") } footer: {
+                    Text("Due dates create pending expense records. A matching recorded payment replaces the estimate. Pending records do not change your account balance.")
+                }
+                Section("All transactions (\(transactions.count))") {
+                    if transactions.isEmpty { Text("No transactions linked yet.").foregroundStyle(.secondary) }
+                    ForEach(transactions) { transaction in
+                        Button {
+                            selectedTransaction = TransactionSnapshot(transaction, account: accounts.first(where: { $0.id == transaction.accountId }), recurringPayment: payment)
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading) {
+                                    Text(transaction.title).foregroundStyle(.primary)
+                                    Text(transaction.bookedDate?.formatted(date: .abbreviated, time: .omitted) ?? "")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                    if transaction.source == "subscription" && transaction.pending { Text("Expected payment").font(.caption).foregroundStyle(.secondary) }
+                                }
+                                Spacer()
+                                Text(hidesAmounts ? "••••" : (Double(transaction.presentedAmountMinor) / 100).formatted(.currency(code: transaction.presentedCurrency).presentation(.isoCode)))
+                                    .foregroundStyle(.primary)
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle(payment.name)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
+                ToolbarItem(placement: .primaryAction) { Button("Edit") { editing = true } }
+            }
+            .navigationDestination(item: $selectedTransaction) { TransactionDetailView(transaction: $0) }
+            .sheet(isPresented: $editing) { NewRecurringPaymentView(payment: payment) }
+        }
+    }
 }

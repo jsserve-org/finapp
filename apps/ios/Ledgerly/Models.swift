@@ -40,6 +40,7 @@ struct TransactionDTO: Codable, Equatable, Identifiable {
     let transferAccountId: String?
     let transferDirection: String?
     let updatedAt: String
+    var balanceImpactMinor: Int? = nil
 
     init(id: String, accountId: String, description: String, amount: Money, originalAmount: Money? = nil, bookedAt: String, pending: Bool, category: String?, categoryUserEdited: Bool? = nil, recurringPaymentId: String? = nil, source: String? = nil, expensePurpose: String? = nil, reimbursementStatus: String? = nil, reimbursementTransactionId: String? = nil, refundTransactionId: String? = nil, refundedTransactionId: String? = nil, transferId: String? = nil, transferAccountId: String? = nil, transferDirection: String? = nil, updatedAt: String) {
         self.id = id; self.accountId = accountId; self.description = description; self.amount = amount
@@ -61,6 +62,7 @@ struct RecurringPaymentDTO: Codable, Equatable, Identifiable {
     let accountId: String?
     let category: String
     let isActive: Bool
+    var scheduleAnchorDay: Int? = nil
 }
 
 struct StockHoldingDTO: Codable, Equatable, Identifiable {
@@ -124,7 +126,14 @@ struct SyncOperation: Encodable {
         enum CodingKeys: String, CodingKey { case description; case category; case recurringPaymentId }
         func encode(to encoder: Encoder) throws {
             if let account { try account.encode(to: encoder); return }
-            if let transaction { try transaction.encode(to: encoder); return }
+            if let transaction {
+                try transaction.encode(to: encoder)
+                if includesRecurringPaymentId && transaction.recurringPaymentId == nil {
+                    var container = encoder.container(keyedBy: CodingKeys.self)
+                    try container.encodeNil(forKey: .recurringPaymentId)
+                }
+                return
+            }
             if let recurringPayment { try recurringPayment.encode(to: encoder); return }
             if let stockHolding { try stockHolding.encode(to: encoder); return }
             if let stockTrade { try stockTrade.encode(to: encoder); return }
@@ -304,6 +313,8 @@ enum JSONValue: Codable, Equatable {
     var categoryUserEdited: Bool = false
     var recurringPaymentId: String?
     var source: String?
+    var recurringPaymentUnlinked: Bool = false
+    var balanceImpactMinor: Int?
     var expensePurpose: String?
     var reimbursementStatus: String?
     var reimbursementTransactionId: String?
@@ -314,6 +325,12 @@ enum JSONValue: Codable, Equatable {
     var transferDirection: String?
     var version: Int
     var updatedAt: String
+
+    var tracksAccountBalance: Bool {
+        ["manual", "transfer", "screenshot", "refund", "reimbursement", "bill"].contains(source ?? "")
+    }
+
+    var appliedBalanceMinor: Int { balanceImpactMinor ?? (tracksAccountBalance ? amountMinor : 0) }
 
     init(dto: TransactionDTO, initialVersion: Int = 1) {
         id = dto.id
@@ -329,6 +346,7 @@ enum JSONValue: Codable, Equatable {
         categoryUserEdited = dto.categoryUserEdited ?? false
         recurringPaymentId = dto.recurringPaymentId
         source = dto.source
+        balanceImpactMinor = dto.balanceImpactMinor
         expensePurpose = dto.expensePurpose
         reimbursementStatus = dto.reimbursementStatus
         reimbursementTransactionId = dto.reimbursementTransactionId
@@ -354,6 +372,7 @@ enum JSONValue: Codable, Equatable {
         if let categoryUserEdited = dto.categoryUserEdited { self.categoryUserEdited = categoryUserEdited }
         recurringPaymentId = dto.recurringPaymentId
         source = dto.source
+        if let impact = dto.balanceImpactMinor { balanceImpactMinor = impact }
         expensePurpose = dto.expensePurpose
         reimbursementStatus = dto.reimbursementStatus
         reimbursementTransactionId = dto.reimbursementTransactionId
@@ -407,6 +426,7 @@ enum JSONValue: Codable, Equatable {
     var accountId: String?
     var category: String
     var isActive: Bool
+    var scheduleAnchorDay: Int = 0
 
     init(id: String = UUID().uuidString.lowercased(), name: String, amountMinor: Int, currency: String, frequency: String, nextDate: Date, accountId: String?, category: String, isActive: Bool = true) {
         self.id = id

@@ -12,6 +12,7 @@ export function mergeTransactionValue(
   if (actor === "automation") {
     delete next.categoryUserEdited;
     if (categoryWasUserEdited) delete next.category;
+    if (existing.recurringPaymentId === null) next.recurringPaymentId = null;
   }
 
   const categoryChangedByUser = actor === "user"

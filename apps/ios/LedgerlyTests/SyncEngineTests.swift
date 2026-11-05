@@ -18,6 +18,260 @@ final class SyncEngineTests: XCTestCase {
 
     // MARK: - JSONValue
 
+    func testPartialAccountChangePatchesCachedAccountInsteadOfFailingSync() throws {
+        let account = CachedAccount(name: "EasyCard", institution: "EasyCard", kind: "prepaid", amountMinor: 10000, currency: "TWD")
+        context.insert(account)
+        let partial = JSONValue.object([
+            "id": .string(account.id),
+            "balance": .object(["amountMinor": .number(5000), "currency": .string("TWD")]),
+            "updatedAt": .string("2026-11-06T00:00:00Z"),
+        ])
+        let unknown = JSONValue.object(["id": .string("missing"), "balance": .object(["amountMinor": .number(1), "currency": .string("TWD")]), "updatedAt": .string("2026-11-06T00:00:00Z")])
+        try engine.apply([
+            SyncChange(sequence: 1, entity: "account", entityId: account.id, action: "upsert", value: partial),
+            SyncChange(sequence: 2, entity: "account", entityId: "missing", action: "upsert", value: unknown),
+        ], context: context)
+        XCTAssertEqual(account.name, "EasyCard")
+        XCTAssertEqual(account.amountMinor, 5000)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<CachedAccount>()), 1)
+    }
+
+    func testDeletingImportedTransactionDoesNotInventAccountBalance() throws {
+        let account = CachedAccount(name: "Bank", institution: "Bank", kind: "checking", amountMinor: 100000, currency: "TWD")
+        context.insert(account)
+        let transaction = CachedTransaction(dto: TransactionDTO(id: "bank-import", accountId: account.id, description: "Bank expense", amount: Money(amountMinor: -20000, currency: "TWD"), bookedAt: "2026-01-31T00:00:00Z", pending: false, category: nil, updatedAt: "2026-01-31T00:00:00Z"))
+        context.insert(transaction)
+        try AccountActionService.delete(transaction, context: context)
+        XCTAssertEqual(account.amountMinor, 100000)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<PendingAccountMutation>()), 0)
+    }
+
+    func testSettledForeignPurchaseRetainsZeroAppliedBalanceImpact() throws {
+        let account = CachedAccount(name: "Bank", institution: "Bank", kind: "checking", amountMinor: 100000, currency: "TWD")
+        context.insert(account)
+        AccountActionService.record(amountMinor: 1500, description: "Netflix", category: "Entertainment", date: Date(), direction: .moneyOut, account: account, context: context, purchaseCurrency: "USD")
+        let transaction = try XCTUnwrap(context.fetch(FetchDescriptor<CachedTransaction>()).first)
+        XCTAssertEqual(transaction.balanceImpactMinor, 0)
+        let dto = TransactionDTO(id: transaction.id, accountId: account.id, description: "Netflix", amount: Money(amountMinor: -48000, currency: "TWD"), bookedAt: transaction.bookedAt, pending: false, category: nil, source: "manual", updatedAt: transaction.updatedAt)
+        transaction.apply(dto, version: 2)
+        try AccountActionService.delete(transaction, context: context)
+        XCTAssertEqual(account.amountMinor, 100000)
+    }
+
+    func testRemovingSubscriptionEstimatesPreservesActualPaymentsAndClearsTheirCreates() throws {
+        let bill = RecurringPayment(name: "Netflix", amountMinor: 1500, currency: "USD", frequency: "monthly", nextDate: Date(), accountId: "cash", category: "Entertainment")
+        context.insert(bill)
+        for source in ["subscription", "manual"] {
+            let transaction = CachedTransaction(dto: TransactionDTO(id: source, accountId: "cash", description: "Netflix", amount: Money(amountMinor: source == "manual" ? -1500 : 0, currency: "USD"), bookedAt: "2026-01-31T00:00:00Z", pending: source == "subscription", category: nil, recurringPaymentId: bill.id, source: source, updatedAt: "2026-01-31T00:00:00Z"))
+            context.insert(transaction)
+            context.insert(PendingTransactionCreate(entityId: source))
+        }
+        try SubscriptionScheduler.removeEstimates(paymentID: bill.id, context: context)
+        try context.save()
+        XCTAssertEqual(try context.fetch(FetchDescriptor<CachedTransaction>()).map(\.id), ["manual"])
+        XCTAssertEqual(try context.fetch(FetchDescriptor<PendingTransactionCreate>()).map(\.entityId), ["manual"])
+        XCTAssertTrue(try context.fetch(FetchDescriptor<PendingMutation>()).contains { $0.entityId == "subscription" && $0.action == "delete" })
+    }
+
+    func testAutomaticSubscriptionAmbiguityUsesSameStrictCandidatesAsServer() {
+        let named = RecurringPayment(name: "Netflix", amountMinor: 1500, currency: "USD", frequency: "monthly", nextDate: Date(), accountId: "cash", category: "Entertainment")
+        let unassigned = RecurringPayment(name: "Netflix", amountMinor: 1500, currency: "USD", frequency: "monthly", nextDate: Date(), accountId: nil, category: "Entertainment")
+        XCTAssertTrue(RecurringPaymentMatcher.bestMatch(title: "Netflix", amountMinor: -1500, currency: "USD", accountID: "cash", category: "Entertainment", payments: [named, unassigned])?.shouldAutoLink ?? false)
+        let other = RecurringPayment(name: "Netflix", amountMinor: 1500, currency: "USD", frequency: "monthly", nextDate: Date(), accountId: "cash", category: "Shopping")
+        XCTAssertFalse(RecurringPaymentMatcher.bestMatch(title: "Netflix", amountMinor: -1500, currency: "USD", accountID: "cash", category: "Entertainment", payments: [named, other])?.shouldAutoLink ?? true)
+    }
+
+    func testAccountDeletionRemovesAllHistoryBeyondDisplayedPageAndPendingCreates() throws {
+        for index in 0..<501 {
+            let transaction = CachedTransaction(dto: TransactionDTO(id: "history-\(index)", accountId: "deleted-account", description: "Entry", amount: Money(amountMinor: -100, currency: "TWD"), bookedAt: "2026-01-01T00:00:00Z", pending: false, category: nil, updatedAt: "2026-01-01T00:00:00Z"))
+            context.insert(transaction)
+            context.insert(PendingTransactionCreate(entityId: transaction.id))
+        }
+        context.insert(CachedTransaction(dto: TransactionDTO(id: "retained", accountId: "other", description: "Keep", amount: Money(amountMinor: -100, currency: "TWD"), bookedAt: "2026-01-01T00:00:00Z", pending: false, category: nil, updatedAt: "2026-01-01T00:00:00Z")))
+        try AccountActionService.removeAccountTransactions(accountID: "deleted-account", context: context)
+        try context.save()
+        XCTAssertEqual(try context.fetch(FetchDescriptor<CachedTransaction>()).map(\.id), ["retained"])
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<PendingTransactionCreate>()), 0)
+    }
+
+    func testSyncPullsAllChangePagesAndPersistsOneFinalCursor() async throws {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [PagedSyncURLProtocol.self]
+        let session = URLSession(configuration: config)
+        defer { session.invalidateAndCancel() }
+        let client = APIClient(baseURL: URL(string: "https://ledgerly.test")!, session: session)
+        _ = try await SyncEngine(api: client).runSync(context: context)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<CachedAccount>()), 501)
+        let cursors = try context.fetch(FetchDescriptor<SyncSetting>()).filter { $0.key == "cursor" }
+        XCTAssertEqual(cursors.count, 1)
+        XCTAssertEqual(cursors.first?.value, "501")
+    }
+
+    func testExplicitServerUnlinkSurvivesMatchingAndClearedOutbox() throws {
+        let bill = RecurringPayment(name: "Netflix", amountMinor: 1500, currency: "USD", frequency: "monthly", nextDate: Date.distantFuture, accountId: "cash", category: "Entertainment")
+        context.insert(bill)
+        let value: JSONValue = .object([
+            "id": .string("real"), "accountId": .string("cash"), "description": .string("Netflix.com"),
+            "amount": .object(["amountMinor": .number(-1500), "currency": .string("USD")]),
+            "bookedAt": .string("2026-01-31T00:00:00Z"), "pending": .bool(false),
+            "category": .string("Entertainment"), "recurringPaymentId": .null,
+            "updatedAt": .string("2026-01-31T00:00:00Z")
+        ])
+        try engine.apply([SyncChange(sequence: 1, entity: "transaction", entityId: "real", action: "upsert", value: value)], context: context)
+        let transaction = try XCTUnwrap(context.fetch(FetchDescriptor<CachedTransaction>()).first)
+        XCTAssertTrue(transaction.recurringPaymentUnlinked)
+        XCTAssertNil(transaction.recurringPaymentId)
+        try SubscriptionScheduler.generateDue(context: context)
+        XCTAssertNil(transaction.recurringPaymentId)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<PendingTransactionCreate>()), 0)
+        let dto = TransactionDTO(id: "real", accountId: "cash", description: "Netflix", amount: Money(amountMinor: -1500, currency: "USD"), bookedAt: "2026-01-31T00:00:00Z", pending: false, category: nil, updatedAt: "2026-01-31T00:00:00Z")
+        let data = try JSONEncoder().encode(SyncOperation.OperationValue(includesRecurringPaymentId: true, transaction: dto))
+        let encoded = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertTrue(encoded["recurringPaymentId"] is NSNull)
+    }
+
+    func testSubscriptionAutoLinkRejectsDifferentAmountEvenWithMerchantAndCategory() throws {
+        let bill = RecurringPayment(name: "Netflix", amountMinor: 1500, currency: "USD", frequency: "monthly", nextDate: Date(), accountId: "cash", category: "Entertainment")
+        let match = RecurringPaymentMatcher.bestMatch(title: "Netflix.com", amountMinor: -999999, currency: "USD", accountID: "cash", category: "Entertainment", payments: [bill])
+        XCTAssertFalse(match?.shouldAutoLink ?? true)
+    }
+
+    func testSubscriptionCalendarPreservesTimeAndFractionalSeconds() throws {
+        let due = try XCTUnwrap(LedgerlyISODate.parse("2024-02-29T15:59:59.125Z"))
+        for (frequency, expected) in [("monthly", "2024-03-29T15:59:59.125Z"), ("yearly", "2025-02-28T15:59:59.125Z"), ("everyTwoYears", "2026-02-28T15:59:59.125Z")] {
+            let next = try XCTUnwrap(SubscriptionScheduler.nextDate(after: due, frequency: frequency, anchorDay: 29))
+            XCTAssertEqual(next.timeIntervalSince1970, try XCTUnwrap(LedgerlyISODate.parse(expected)).timeIntervalSince1970, accuracy: 0.000001)
+        }
+        XCTAssertTrue(SubscriptionScheduler.includesPayment(try XCTUnwrap(LedgerlyISODate.parse("2024-03-15T00:00:00Z")), due: due, frequency: "monthly", anchorDay: 29))
+    }
+
+    func testRecurringMatcherDoesNotAutoLinkDifferentMerchantsWithSameAmountAndCategory() {
+        let bill = RecurringPayment(name: "Netflix", amountMinor: 1500, currency: "USD", frequency: "monthly", nextDate: Date(), accountId: "account", category: "Entertainment")
+        let match = RecurringPaymentMatcher.bestMatch(title: "DisneyPlus.com", amountMinor: -1500, currency: "USD", accountID: "account", category: "Entertainment", payments: [bill])
+        XCTAssertNotNil(match)
+        XCTAssertFalse(match?.shouldAutoLink ?? true)
+        XCTAssertTrue(RecurringPaymentMatcher.bestMatch(title: "Netflix.com", amountMinor: -1500, currency: "USD", accountID: "account", category: "Entertainment", payments: [bill])?.shouldAutoLink ?? false)
+    }
+
+    func testMalformedLocalSubscriptionFrequencyDoesNotQueueRepeatedUpserts() throws {
+        let account = CachedAccount(name: "Cash", institution: "Manual", kind: "cash", amountMinor: 1000, currency: "TWD")
+        let due = Date(timeIntervalSince1970: 1000)
+        let bill = RecurringPayment(name: "Bad schedule", amountMinor: 100, currency: "TWD", frequency: "invalid", nextDate: due, accountId: account.id, category: "Bills")
+        context.insert(account); context.insert(bill)
+        try SubscriptionScheduler.generateDue(context: context)
+        try SubscriptionScheduler.generateDue(context: context)
+        XCTAssertEqual(bill.nextDate, due)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<PendingRecurringMutation>()), 0)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<CachedTransaction>()), 0)
+    }
+
+    func testSubscriptionBillingWindowIncludesEarlyAndLatePaymentsButNotNextCycle() throws {
+        let due = try XCTUnwrap(LedgerlyISODate.parse("2026-01-31T00:00:00+08:00"))
+        for text in ["2026-01-26T00:00:00+08:00", "2026-02-05T00:00:00+08:00"] {
+            let booked = try XCTUnwrap(LedgerlyISODate.parse(text))
+            XCTAssertTrue(SubscriptionScheduler.includesPayment(booked, due: due, frequency: "monthly", anchorDay: 31))
+        }
+        let nextCycle = try XCTUnwrap(LedgerlyISODate.parse("2026-02-20T00:00:00+08:00"))
+        XCTAssertFalse(SubscriptionScheduler.includesPayment(nextCycle, due: due, frequency: "monthly", anchorDay: 31))
+    }
+
+    func testEarlySubscriptionPaymentPreventsEstimateAndInvalidAnchorNormalizes() throws {
+        let account = CachedAccount(name: "Cash", institution: "Manual", kind: "cash", amountMinor: 10000, currency: "TWD")
+        let due = try XCTUnwrap(LedgerlyISODate.parse("2026-01-31T00:00:00+08:00"))
+        let bill = RecurringPayment(name: "Netflix", amountMinor: 1500, currency: "TWD", frequency: "monthly", nextDate: due, accountId: account.id, category: "Entertainment")
+        bill.scheduleAnchorDay = -1
+        let real = CachedTransaction(dto: TransactionDTO(id: "early", accountId: account.id, description: "Netflix.com", amount: Money(amountMinor: -1500, currency: "TWD"), bookedAt: "2026-01-30T00:00:00+08:00", pending: false, category: "Entertainment", updatedAt: "2026-01-30T00:00:00+08:00"))
+        context.insert(account); context.insert(bill); context.insert(real)
+        try SubscriptionScheduler.generateDue(context: context, now: due)
+        try SubscriptionScheduler.generateDue(context: context, now: due)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<CachedTransaction>()), 1)
+        XCTAssertEqual(real.recurringPaymentId, bill.id)
+        XCTAssertEqual(bill.scheduleAnchorDay, 31)
+        XCTAssertEqual(bill.nextDate, LedgerlyISODate.parse("2026-02-28T00:00:00+08:00"))
+    }
+
+    func testSubscriptionsGenerateOnceCatchUpAndKeepMonthEndAnchorWithoutChangingCash() throws {
+        let account = CachedAccount(name: "Cash", institution: "Manual", kind: "cash", amountMinor: 10000, currency: "TWD")
+        let due = try XCTUnwrap(LedgerlyISODate.parse("2026-01-31T00:00:00+08:00"))
+        let now = try XCTUnwrap(LedgerlyISODate.parse("2026-02-28T01:00:00+08:00"))
+        let bill = RecurringPayment(name: "Netflix", amountMinor: 1500, currency: "USD", frequency: "monthly", nextDate: due, accountId: account.id, category: "Entertainment")
+        context.insert(account); context.insert(bill)
+        try SubscriptionScheduler.generateDue(context: context, now: now)
+        try SubscriptionScheduler.generateDue(context: context, now: now)
+        let entries = try context.fetch(FetchDescriptor<CachedTransaction>())
+        XCTAssertEqual(entries.count, 2)
+        XCTAssertTrue(entries.allSatisfy { $0.recurringPaymentId == bill.id && $0.source == "subscription" && $0.pending && $0.presentedAmountMinor == -1500 })
+        XCTAssertEqual(account.amountMinor, 10000)
+        XCTAssertEqual(bill.nextDate, LedgerlyISODate.parse("2026-03-31T00:00:00+08:00"))
+        bill.isActive = false
+        try SubscriptionScheduler.generateDue(context: context, now: now.addingTimeInterval(365 * 86400))
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<CachedTransaction>()), 2)
+    }
+
+    func testActualSubscriptionPaymentReplacesExpectedRecord() throws {
+        let account = CachedAccount(name: "Cash", institution: "Manual", kind: "cash", amountMinor: 10000, currency: "TWD")
+        let now = try XCTUnwrap(LedgerlyISODate.parse("2026-10-29T00:00:00Z"))
+        let bill = RecurringPayment(name: "Netflix", amountMinor: 1500, currency: "TWD", frequency: "monthly", nextDate: now, accountId: account.id, category: "Entertainment")
+        context.insert(account); context.insert(bill)
+        try SubscriptionScheduler.generateDue(context: context, now: now)
+        let real = CachedTransaction(dto: TransactionDTO(id: "actual-payment", accountId: account.id, description: "Netflix.com", amount: Money(amountMinor: -1500, currency: "TWD"), bookedAt: "2026-10-29T01:00:00Z", pending: false, category: "Entertainment", updatedAt: "2026-10-29T01:00:00Z"))
+        context.insert(real)
+        XCTAssertTrue(autoLinkRecurringPayment(real, payments: [bill], context: context))
+        try context.save()
+        let entries = try context.fetch(FetchDescriptor<CachedTransaction>())
+        XCTAssertEqual(entries.map(\.id), ["actual-payment"])
+        XCTAssertEqual(real.recurringPaymentId, bill.id)
+        try SubscriptionScheduler.generateDue(context: context, now: now)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<CachedTransaction>()), 1)
+    }
+
+    func testDeletedTransactionOutboxCleanupPreservesOtherRecordsAndDeletes() throws {
+        context.insert(PendingTransactionCreate(entityId: "deleted"))
+        context.insert(PendingTransactionCreate(entityId: "retained"))
+        context.insert(PendingMutation(entityId: "deleted", action: "upsert", newDescription: "Old edit", newCategory: nil, baseVersion: 0))
+        context.insert(PendingMutation(entityId: "deleted", action: "delete", newDescription: nil, newCategory: nil, baseVersion: 0))
+        context.insert(PendingMutation(entityId: "retained", action: "upsert", newDescription: "Keep", newCategory: nil, baseVersion: 0))
+        try context.save()
+        try AccountActionService.removePendingTransactionWrites(ids: ["deleted"], context: context)
+        try context.save()
+        let creates = try context.fetch(FetchDescriptor<PendingTransactionCreate>())
+        XCTAssertEqual(creates.map(\.entityId), ["retained"])
+        let mutations = try context.fetch(FetchDescriptor<PendingMutation>())
+        XCTAssertEqual(mutations.count, 2)
+        XCTAssertTrue(mutations.contains { $0.entityId == "deleted" && $0.action == "delete" })
+        XCTAssertTrue(mutations.contains { $0.entityId == "retained" && $0.action == "upsert" })
+    }
+
+    func testMoneyInputRejectsMalformedAndOverflowingAmounts() {
+        for input in ["1.2.3", "abc", "12abc", "1.234", "", "999999999999999999999999"] {
+            XCTAssertNil(MoneyInput.minorUnits(input), input)
+        }
+        XCTAssertEqual(MoneyInput.minorUnits("1.20"), 120)
+        XCTAssertEqual(MoneyInput.minorUnits("1,20"), 120)
+        XCTAssertEqual(MoneyInput.minorUnits("-5"), -500)
+        XCTAssertEqual(MoneyInput.minorUnits("0"), 0)
+    }
+
+    func testDeletingEitherTransferLegReversesBothAccountsAndQueuesBothDeletes() throws {
+        for deleteIncoming in [false, true] {
+            let source = CachedAccount(name: "Source", institution: "Manual", kind: "checking", amountMinor: 10000, currency: "TWD")
+            let destination = CachedAccount(name: "Destination", institution: "Manual", kind: "cash", amountMinor: 5000, currency: "TWD")
+            context.insert(source)
+            context.insert(destination)
+            AccountActionService.transfer(amountMinor: 500, description: "Transfer", date: Date(), source: source, destination: destination, context: context)
+            let entries = try context.fetch(FetchDescriptor<CachedTransaction>())
+            let entry = try XCTUnwrap(entries.first(where: { $0.accountId == (deleteIncoming ? destination.id : source.id) }))
+            let entryIDs = Set(entries.map(\.id))
+            try AccountActionService.delete(entry, context: context)
+            XCTAssertEqual(source.amountMinor, 10000)
+            XCTAssertEqual(destination.amountMinor, 5000)
+            XCTAssertTrue(try context.fetch(FetchDescriptor<CachedTransaction>()).isEmpty)
+            XCTAssertTrue(try context.fetch(FetchDescriptor<PendingTransactionCreate>()).isEmpty)
+            let deletedIDs = Set(try context.fetch(FetchDescriptor<PendingMutation>()).filter { $0.action == "delete" }.map(\.entityId))
+            XCTAssertTrue(entryIDs.isSubset(of: deletedIDs))
+        }
+    }
+
     func testAccountIconsAreValidAndMatchAccountMeaning() {
         let expected = [
             "checking": "building.columns.fill",
@@ -323,6 +577,45 @@ final class SyncEngineTests: XCTestCase {
 
     // MARK: - Recurring payment matching
 
+    func testRecurringMatcherLinksForeignPurchaseAwaitingSettlementAndSkipsPausedBills() throws {
+        let timestamp = "2026-10-29T00:00:00Z"
+        let purchase = CachedTransaction(dto: TransactionDTO(id: "foreign", accountId: "account-1", description: "Netflix", amount: Money(amountMinor: 0, currency: "TWD"), originalAmount: Money(amountMinor: -1500, currency: "USD"), bookedAt: timestamp, pending: true, category: "Entertainment", updatedAt: timestamp))
+        let bill = RecurringPayment(name: "Netflix", amountMinor: 1500, currency: "USD", frequency: "monthly", nextDate: Date(), accountId: "account-1", category: "Entertainment", isActive: false)
+        context.insert(purchase)
+        context.insert(bill)
+        XCTAssertFalse(autoLinkRecurringPayment(purchase, payments: [bill], context: context))
+        bill.isActive = true
+        XCTAssertTrue(autoLinkRecurringPayment(purchase, payments: [bill], context: context))
+        XCTAssertEqual(purchase.recurringPaymentId, bill.id)
+        XCTAssertEqual(purchase.amountMinor, 0)
+    }
+
+    func testRecurringSyncAcceptsISOAndReferenceDateAndPreservesPausedState() throws {
+        for date in [#""2026-10-05T00:00:00.000Z""#, "812851200"] {
+            try engine.apply([change(1, entity: "recurringPayment", id: "bill-date", value: "{\"id\":\"bill-date\",\"name\":\"Rent\",\"amountMinor\":100,\"currency\":\"TWD\",\"frequency\":\"monthly\",\"nextDate\":\(date),\"category\":\"Bills\",\"isActive\":false}")], context: context)
+            let bill = try XCTUnwrap(context.fetch(FetchDescriptor<RecurringPayment>()).first)
+            XCTAssertFalse(bill.isActive)
+            if date.hasPrefix("\"") {
+                XCTAssertEqual(bill.nextDate, LedgerlyISODate.parse("2026-10-05T00:00:00Z"))
+            } else {
+                XCTAssertEqual(bill.nextDate.timeIntervalSinceReferenceDate, 812851200)
+            }
+        }
+    }
+
+    func testDeletingRecurringUpsertsPreservesDeleteAndOtherBills() throws {
+        context.insert(PendingRecurringMutation(entityId: "removed", action: "upsert"))
+        context.insert(PendingRecurringMutation(entityId: "removed", action: "delete"))
+        context.insert(PendingRecurringMutation(entityId: "other", action: "upsert"))
+        try context.save()
+        try removePendingRecurringUpserts(paymentID: "removed", context: context)
+        try context.save()
+        let pending = try context.fetch(FetchDescriptor<PendingRecurringMutation>())
+        XCTAssertEqual(pending.count, 2)
+        XCTAssertTrue(pending.contains { $0.entityId == "removed" && $0.action == "delete" })
+        XCTAssertTrue(pending.contains { $0.entityId == "other" && $0.action == "upsert" })
+    }
+
     func testRecurringMatcherAutoLinksExactMerchantAmountAndAccount() throws {
         let account = CachedAccount(name: "Checking", institution: "Test Bank", kind: "checking", amountMinor: 50_000, currency: "TWD")
         context.insert(account)
@@ -501,6 +794,9 @@ final class SyncEngineTests: XCTestCase {
         context.insert(account)
         let timestamp = ISO8601DateFormatter().string(from: Date())
         context.insert(CachedTransaction(dto: TransactionDTO(id: "transaction-1", accountId: account.id, description: "Coffee", amount: Money(amountMinor: -150, currency: "TWD"), originalAmount: Money(amountMinor: -700, currency: "JPY"), bookedAt: timestamp, pending: false, category: "Dining", recurringPaymentId: "recurring-1", updatedAt: timestamp)))
+        let original = try XCTUnwrap(context.fetch(FetchDescriptor<CachedTransaction>()).first)
+        original.balanceImpactMinor = 0
+        original.recurringPaymentUnlinked = true
         context.insert(RecurringPayment(id: "recurring-1", name: "Rent", amountMinor: 18_000_00, currency: "TWD", frequency: "monthly", nextDate: Date(), accountId: account.id, category: "Housing"))
         try context.save()
 
@@ -516,6 +812,8 @@ final class SyncEngineTests: XCTestCase {
         XCTAssertEqual(try destination.fetchCount(FetchDescriptor<RecurringPayment>()), 1)
         XCTAssertEqual(try destination.fetch(FetchDescriptor<CachedTransaction>()).first?.recurringPaymentId, "recurring-1")
         XCTAssertEqual(try destination.fetch(FetchDescriptor<CachedTransaction>()).first?.originalCurrency, "JPY")
+        XCTAssertEqual(try destination.fetch(FetchDescriptor<CachedTransaction>()).first?.balanceImpactMinor, 0)
+        XCTAssertEqual(try destination.fetch(FetchDescriptor<CachedTransaction>()).first?.recurringPaymentUnlinked, true)
     }
 
 
@@ -636,4 +934,44 @@ final class SyncEngineTests: XCTestCase {
             pending: false, category: category, source: source, updatedAt: timestamp
         ))
     }
+}
+
+private final class PagedSyncURLProtocol: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool { request.url?.host == "ledgerly.test" }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        do {
+            let data: Data
+            if request.url?.path == "/v1/config" {
+                data = Data(#"{"registrationEnabled":false,"convexUrl":"https://convex.test","serverVersion":"1","syncProtocolVersion":2}"#.utf8)
+            } else {
+                var body = request.httpBody
+                if body == nil, let stream = request.httpBodyStream {
+                    stream.open(); defer { stream.close() }
+                    var collected = Data()
+                    var buffer = [UInt8](repeating: 0, count: 4096)
+                    while stream.hasBytesAvailable {
+                        let count = stream.read(&buffer, maxLength: buffer.count)
+                        if count <= 0 { break }
+                        collected.append(buffer, count: count)
+                    }
+                    body = collected
+                }
+                let payload = try JSONSerialization.jsonObject(with: body ?? Data("{}".utf8)) as? [String: Any]
+                let start = payload?["cursor"] as? String == "500" ? 500 : 0
+                let end = start == 0 ? 500 : 501
+                let changes = (start..<end).map { index in
+                    SyncChange(sequence: index + 1, entity: "account", entityId: "page-\(index)", action: "upsert", value: .object([
+                        "id": .string("page-\(index)"), "name": .string("Cash"), "institution": .string("Manual"), "kind": .string("cash"),
+                        "balance": .object(["amountMinor": .number(0), "currency": .string("TWD")]), "updatedAt": .string("2026-01-01T00:00:00Z")
+                    ]))
+                }
+                data = try JSONEncoder().encode(SyncResponse(cursor: String(end), changes: changes, acceptedMutationIds: []))
+            }
+            client?.urlProtocol(self, didReceive: HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: data)
+            client?.urlProtocolDidFinishLoading(self)
+        } catch { client?.urlProtocol(self, didFailWithError: error) }
+    }
+    override func stopLoading() {}
 }

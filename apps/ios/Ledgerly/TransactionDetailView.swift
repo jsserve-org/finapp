@@ -334,14 +334,8 @@ struct TransactionDetailView: View {
 
     private func delete() {
         guard let transaction = fetchTransaction() else { return }
-        if let account = fetchAccount(id: transaction.accountId) {
-            account.amountMinor -= transaction.amountMinor
-            account.updatedAt = ISO8601DateFormatter().string(from: Date())
-            context.insert(PendingAccountMutation(entityId: account.id))
-        }
-        context.insert(PendingMutation(entityId: transaction.id, action: "delete", newDescription: nil, newCategory: nil, baseVersion: transaction.version))
-        context.delete(transaction)
-        try? context.save()
+        do { try AccountActionService.delete(transaction, context: context) }
+        catch { context.rollback(); return }
         dismiss()
     }
 
@@ -720,12 +714,10 @@ private struct EditTransactionView: View {
 
     private var compatibleAccounts: [CachedAccount] { accounts.filter { $0.currency == transaction.currency } }
     private var parsedAmount: Int {
-        let decimal = Decimal(string: amount.replacingOccurrences(of: ",", with: ".")) ?? 0
-        return NSDecimalNumber(decimal: decimal * 100).intValue
+        MoneyInput.minorUnits(amount) ?? 0
     }
     private var parsedOriginalAmount: Int {
-        let decimal = Decimal(string: originalAmount.replacingOccurrences(of: ",", with: ".")) ?? 0
-        return NSDecimalNumber(decimal: decimal * 100).intValue
+        MoneyInput.minorUnits(originalAmount) ?? 0
     }
 
     var body: some View {
@@ -790,12 +782,14 @@ private struct EditTransactionView: View {
               let oldAccount = accounts.first(where: { $0.id == model.accountId }),
               let newAccount = accounts.first(where: { $0.id == accountID }) else { return }
         let newAmount = isMoneyOut ? -parsedAmount : parsedAmount
-        if oldAccount.id == newAccount.id {
-            oldAccount.amountMinor += newAmount - model.amountMinor
+        let previousImpact = model.appliedBalanceMinor
+        let nextImpact = model.tracksAccountBalance ? newAmount : 0
+        if oldAccount.id == newAccount.id && previousImpact != nextImpact {
+            oldAccount.amountMinor += nextImpact - previousImpact
             context.insert(PendingAccountMutation(entityId: oldAccount.id))
-        } else {
-            oldAccount.amountMinor -= model.amountMinor
-            newAccount.amountMinor += newAmount
+        } else if oldAccount.id != newAccount.id && (previousImpact != 0 || nextImpact != 0) {
+            oldAccount.amountMinor -= previousImpact
+            newAccount.amountMinor += nextImpact
             context.insert(PendingAccountMutation(entityId: oldAccount.id))
             context.insert(PendingAccountMutation(entityId: newAccount.id))
         }
@@ -808,6 +802,7 @@ private struct EditTransactionView: View {
         model.categoryUserEdited = true
         model.category = newCategory
         model.amountMinor = newAmount
+        model.balanceImpactMinor = nextImpact
         model.originalAmountMinor = hasOriginalAmount ? (isMoneyOut ? -parsedOriginalAmount : parsedOriginalAmount) : nil
         model.originalCurrency = hasOriginalAmount ? originalCurrency : nil
         model.accountId = newAccount.id
@@ -923,11 +918,16 @@ private struct RecurringPaymentLinkView: View {
     private func select(_ paymentID: String?) {
         guard let model = fetchTransaction() else { return }
         model.recurringPaymentId = paymentID
+        model.recurringPaymentUnlinked = paymentID == nil
         model.updatedAt = ISO8601DateFormatter().string(from: Date())
         transaction.recurringPaymentID = paymentID
         transaction.recurringPaymentName = recurringPayments.first(where: { $0.id == paymentID })?.name
         transaction.updatedDate = model.updatedDate
         enqueueFullTransaction(context: context, transactionID: model.id)
+        context.insert(PendingMutation(
+            entityId: model.id, action: "upsert", newDescription: nil, newCategory: nil,
+            newRecurringPaymentId: paymentID, updatesRecurringPayment: true, baseVersion: model.version
+        ))
         try? context.save()
         dismiss()
     }

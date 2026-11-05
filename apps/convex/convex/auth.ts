@@ -28,7 +28,7 @@ export const createSession = mutation({ args: { userId: v.id("users"), tokenHash
 
 export const validateSession = query({ args: { tokenHash: v.string(), now: v.number() }, handler: async (ctx, args) => {
   const session = await ctx.db.query("sessions").withIndex("by_token", (q) => q.eq("tokenHash", args.tokenHash)).unique();
-  if (session && !session.revokedAt && session.expiresAt > args.now) {
+  if (session && !session.revokedAt && session.expiresAt > Date.now()) {
     const user = await ctx.db.get(session.userId);
     return user ? { userId: user._id, username: user.username, syncSessionId: session.syncSessionId, context: session.context } : null;
   }

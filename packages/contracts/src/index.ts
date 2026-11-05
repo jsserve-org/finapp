@@ -41,7 +41,7 @@ export type SyncOperation = {
   baseVersion: number;
 };
 
-export type SyncRequest = { cursor?: string; operations: SyncOperation[] };
+export type SyncRequest = { protocolVersion: number; cursor?: string; operations: SyncOperation[] };
 export type SyncChange = {
   sequence: number;
   entity: "account" | "transaction" | "recurringPayment" | "stockHolding" | "stockTrade";

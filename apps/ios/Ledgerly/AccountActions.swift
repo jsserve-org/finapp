@@ -1,6 +1,17 @@
 import SwiftData
 import SwiftUI
 
+enum MoneyInput {
+    static func minorUnits(_ input: String) -> Int? {
+        let text = input.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: ",", with: ".")
+        guard text.range(of: #"^[+-]?(?:[0-9]+(?:\.[0-9]{0,2})?|\.[0-9]{1,2})$"#, options: .regularExpression) != nil,
+              let decimal = Decimal(string: text, locale: Locale(identifier: "en_US_POSIX")) else { return nil }
+        let minor = decimal * 100
+        guard minor >= Decimal(Int.min), minor <= Decimal(Int.max) else { return nil }
+        return NSDecimalNumber(decimal: minor).intValue
+    }
+}
+
 enum AccountEntryDirection: Equatable {
     case moneyIn
     case moneyOut
@@ -13,6 +24,45 @@ enum AccountEntryDirection: Equatable {
 }
 
 enum AccountActionService {
+    @MainActor
+    static func removeAccountTransactions(accountID: String, context: ModelContext) throws {
+        let entries = try context.fetch(FetchDescriptor<CachedTransaction>(predicate: #Predicate { $0.accountId == accountID }))
+        try removePendingTransactionWrites(ids: Set(entries.map(\.id)), context: context)
+        entries.forEach(context.delete)
+    }
+
+    @MainActor
+    static func removePendingTransactionWrites(ids: Set<String>, context: ModelContext) throws {
+        for marker in try context.fetch(FetchDescriptor<PendingTransactionCreate>()) where ids.contains(marker.entityId) {
+            context.delete(marker)
+        }
+        for mutation in try context.fetch(FetchDescriptor<PendingMutation>()) where ids.contains(mutation.entityId) && mutation.action == "upsert" {
+            context.delete(mutation)
+        }
+    }
+
+    @MainActor
+    static func delete(_ transaction: CachedTransaction, context: ModelContext) throws {
+        let entries: [CachedTransaction]
+        if let transferID = transaction.transferId {
+            entries = try context.fetch(FetchDescriptor<CachedTransaction>(predicate: #Predicate { $0.transferId == transferID }))
+        } else {
+            entries = [transaction]
+        }
+        let accounts = try context.fetch(FetchDescriptor<CachedAccount>())
+        try removePendingTransactionWrites(ids: Set(entries.map(\.id)), context: context)
+        for entry in entries {
+            if entry.appliedBalanceMinor != 0, let account = accounts.first(where: { $0.id == entry.accountId }) {
+                account.amountMinor -= entry.appliedBalanceMinor
+                account.updatedAt = ISO8601DateFormatter().string(from: Date())
+                context.insert(PendingAccountMutation(entityId: account.id))
+            }
+            context.insert(PendingMutation(entityId: entry.id, action: "delete", newDescription: nil, newCategory: nil, baseVersion: entry.version))
+            context.delete(entry)
+        }
+        try context.save()
+    }
+
     @MainActor
     static func record(
         amountMinor: Int,
@@ -40,6 +90,7 @@ enum AccountActionService {
             reimbursementStatus: expectsReimbursement && direction == .moneyOut ? "pending" : nil,
             updatedAt: timestamp
         ), initialVersion: 0)
+        transaction.balanceImpactMinor = recordedAmount
         context.insert(transaction)
         context.insert(PendingTransactionCreate(entityId: transaction.id))
         let recurringPayments = (try? context.fetch(FetchDescriptor<RecurringPayment>())) ?? []
@@ -193,6 +244,9 @@ struct AccountEntryView: View {
                     tint: direction.color,
                     currencyLocked: direction == .moneyIn
                 )
+                if !amount.isEmpty && parsedAmount <= 0 {
+                    Text("Enter a valid amount greater than zero, with at most two decimal places.").font(.caption).foregroundStyle(.red)
+                }
             }
             .listRowBackground(Color.clear)
         }
@@ -302,8 +356,7 @@ struct AccountEntryView: View {
     }
 
     private var parsedAmount: Int {
-        let decimal = Decimal(string: amount.replacingOccurrences(of: ",", with: ".")) ?? 0
-        return NSDecimalNumber(decimal: decimal * 100).intValue
+        MoneyInput.minorUnits(amount) ?? 0
     }
 
     private var settlementPending: Bool {
@@ -453,6 +506,9 @@ struct AccountTransferView: View {
             Section {
                 FlowStepHeader(current: 3, total: 4, instruction: transferRoute)
                 MoneyAmountHeader(title: "Transfer amount", amount: $amount, currency: $currency, tint: .blue, currencyLocked: true)
+                if !amount.isEmpty && parsedAmount <= 0 {
+                    Text("Enter a valid amount greater than zero, with at most two decimal places.").font(.caption).foregroundStyle(.red)
+                }
             }
             .listRowBackground(Color.clear)
         }
@@ -545,8 +601,7 @@ struct AccountTransferView: View {
     }
 
     private var parsedAmount: Int {
-        let decimal = Decimal(string: amount.replacingOccurrences(of: ",", with: ".")) ?? 0
-        return NSDecimalNumber(decimal: decimal * 100).intValue
+        MoneyInput.minorUnits(amount) ?? 0
     }
 
     private func transfer() {

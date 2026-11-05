@@ -59,24 +59,24 @@ struct AccountDetailView: View {
                         )
                         Button { selectedTransaction = snapshot } label: {
                             HStack(spacing: 12) {
-                                Image(systemName: PaymentIcon.symbol(title: transaction.title, category: transaction.category, amountMinor: transaction.amountMinor))
-                                    .ledgerlyIcon(color: PaymentIcon.color(amountMinor: transaction.amountMinor))
+                                Image(systemName: PaymentIcon.symbol(title: transaction.title, category: transaction.category, amountMinor: transaction.presentedAmountMinor))
+                                    .ledgerlyIcon(color: PaymentIcon.color(amountMinor: transaction.presentedAmountMinor))
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(transaction.title)
                                         .font(.headline)
                                         .foregroundStyle(.primary)
                                         .lineLimit(1)
-                                    Text("\(PaymentIcon.directionLabel(amountMinor: transaction.amountMinor)) · \(transaction.category ?? "Uncategorized")")
+                                    Text("\(transaction.source == "subscription" && transaction.pending ? "Expected payment" : PaymentIcon.directionLabel(amountMinor: transaction.presentedAmountMinor)) · \(transaction.category ?? "Uncategorized")")
                                         .font(.subheadline)
                                         .foregroundStyle(.secondary)
                                         .lineLimit(1)
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 VStack(alignment: .trailing, spacing: 2) {
-                                    Text(money(transaction.amountMinor, transaction.currency))
+                                    Text(money(transaction.presentedAmountMinor, transaction.presentedCurrency))
                                         .fontWeight(.semibold)
-                                        .foregroundStyle(PaymentIcon.color(amountMinor: transaction.amountMinor))
-                                    if let originalAmountMinor = transaction.originalAmountMinor,
+                                        .foregroundStyle(PaymentIcon.color(amountMinor: transaction.presentedAmountMinor))
+                                    if !transaction.isAwaitingSettlement, let originalAmountMinor = transaction.originalAmountMinor,
                                        let originalCurrency = transaction.originalCurrency {
                                         Text("Originally \(money(originalAmountMinor, originalCurrency))")
                                             .font(.caption2)
@@ -150,9 +150,17 @@ struct AccountDetailView: View {
     private func deleteAccount() {
         guard let account = accounts.first else { return }
         let accountID = account.id
+        do {
+            try AccountActionService.removeAccountTransactions(accountID: accountID, context: context)
+            for mutation in try context.fetch(FetchDescriptor<PendingAccountMutation>()) where mutation.entityId == accountID && mutation.action == "upsert" {
+                context.delete(mutation)
+            }
+        } catch { context.rollback(); return }
         context.insert(PendingAccountMutation(entityId: accountID, action: "delete"))
-        transactions.forEach(context.delete)
-        recurringPayments.forEach(context.delete)
+        for payment in recurringPayments {
+            try? removePendingRecurringUpserts(paymentID: payment.id, context: context)
+            context.delete(payment)
+        }
         for holding in linkedHoldings {
             holding.linkedAccountId = nil
             holding.updatedAt = ISO8601DateFormatter().string(from: Date())

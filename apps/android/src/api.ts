@@ -24,7 +24,7 @@ export async function syncNow(): Promise<SyncResponse> {
   const response = await fetch(`${apiUrl}/v1/sync`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ cursor: cursor(), operations: pendingOperations() }),
+    body: JSON.stringify({ protocolVersion: 2, cursor: cursor(), operations: pendingOperations() }),
   });
   if (!response.ok) throw new Error(`Sync failed (${response.status})`);
   const body = await response.json() as SyncResponse;

@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import { config } from "./config";
+import { syncRequest } from "./syncRequest";
 import { convexMutation, convexQuery, normalizedURL, sha256 } from "./convex";
 
 type Session = { userId: string; username: string; syncSessionId: string };
@@ -32,13 +33,13 @@ const apiKeyName = z.object({ name: z.string().trim().min(1).max(80) });
 const bill = z.discriminatedUnion("type", [
   z.object({
     id: z.string().uuid().optional(), type: z.literal("oneTime"), name: z.string().trim().min(1).max(120),
-    amountMinor: z.number().int().positive(), currency, settlementAmountMinor: z.number().int().positive().optional(), date: z.string().datetime(),
+    amountMinor: z.number().int().positive(), currency, settlementAmountMinor: z.number().int().positive().optional(), date: z.string().datetime({ offset: true }),
     accountId: z.string().min(1), category: z.string().trim().min(1).max(80).default("Bills"),
   }),
   z.object({
     id: z.string().uuid().optional(), type: z.literal("recurring"), name: z.string().trim().min(1).max(120),
     amountMinor: z.number().int().positive(), currency, frequency: z.enum(["weekly", "everyTwoWeeks", "monthly", "yearly", "everyTwoYears"]),
-    nextDate: z.string().datetime(), accountId: z.string().min(1).optional(), category: z.string().trim().min(1).max(80).default("Bills"),
+    nextDate: z.string().datetime({ offset: true }), accountId: z.string().min(1).optional(), category: z.string().trim().min(1).max(80).default("Bills"),
   }),
 ]);
 
@@ -107,8 +108,8 @@ app.post("/v1/auth/logout", async (c) => {
   return c.body(null, 204);
 });
 
-app.post("/v1/sync", async (c) => {
-  const body = await c.req.json().catch(() => ({ operations: [] }));
+app.post("/v1/sync", zValidator("json", syncRequest), async (c) => {
+  const body = c.req.valid("json");
   if (body.protocolVersion !== config.SYNC_PROTOCOL_VERSION) {
     throw new HTTPException(426, { message: `Update Ledgerly: this server requires sync protocol ${config.SYNC_PROTOCOL_VERSION}` });
   }
@@ -153,7 +154,9 @@ app.post("/v1/bills", zValidator("json", bill), async (c) => {
 });
 
 app.onError((error, c) => {
+  if (error.message.includes("INVALID_SYNC_VALUE")) return c.json({ error: "Invalid sync record", message: error.message }, 400);
   if (error instanceof HTTPException) return error.getResponse();
+  if (error instanceof Error && error.message.includes("FORBIDDEN_API_KEY_MANAGEMENT")) return c.json({ error: "API key management requires a user session" }, 403);
   console.error(JSON.stringify({ event: "request_error", message: error instanceof Error ? error.message : "unknown" }));
   return c.json({ error: "internal_error" }, 500);
 });

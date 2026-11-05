@@ -157,6 +157,7 @@ private struct AddMenuButton: UIViewRepresentable {
 }
 
 private struct RootTabView: View {
+    @Environment(\.modelContext) private var context
     private enum RootTab: Hashable { case overview, accounts, add, activity, settings }
     @State private var selection = RootTab.overview
     @State private var previousSelection = RootTab.overview
@@ -210,10 +211,17 @@ private struct RootTabView: View {
             case .transfer: AccountTransferView()
             }
         }
-        .task { openPendingAddFlow() }
+        .task { openPendingAddFlow(); generateLocalSubscriptions() }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             openPendingAddFlow()
+            generateLocalSubscriptions()
         }
+        .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in generateLocalSubscriptions() }
+    }
+
+    private func generateLocalSubscriptions() {
+        guard UserDefaults.standard.bool(forKey: "ledgerly.localOnly") else { return }
+        try? SubscriptionScheduler.generateDue(context: context)
     }
 
     private func openPendingAddFlow() {
@@ -243,6 +251,10 @@ struct NewAccountView: View {
                 }
                 Section("Opening balance") {
                     TextField("0.00", text: $balance).keyboardType(.decimalPad)
+                    if openingBalanceMinor == nil {
+                        Text("Enter a valid opening balance with at most two decimal places.")
+                            .font(.caption).foregroundStyle(.red)
+                    }
                     Picker("Currency", selection: $currency) {
                         ForEach(SupportedCurrency.all) { option in
                             Text("\(option.code) — \(option.name)").tag(option.code)
@@ -261,14 +273,23 @@ struct NewAccountView: View {
             .navigationTitle("New account").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) { Button("Save") { save() }.disabled(name.trimmingCharacters(in: .whitespaces).isEmpty) }
+                ToolbarItem(placement: .confirmationAction) { Button("Save") { save() }.disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || openingBalanceMinor == nil) }
             }
         }
     }
 
+    private var openingBalanceMinor: Int? {
+        let text = balance.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: ",", with: ".")
+        if text.isEmpty { return 0 }
+        guard text.range(of: #"^[+-]?(?:[0-9]+(?:\.[0-9]{0,2})?|\.[0-9]{1,2})$"#, options: .regularExpression) != nil,
+              let decimal = Decimal(string: text, locale: Locale(identifier: "en_US_POSIX")) else { return nil }
+        let minor = decimal * 100
+        guard minor >= Decimal(Int.min), minor <= Decimal(Int.max) else { return nil }
+        return NSDecimalNumber(decimal: minor).intValue
+    }
+
     private func save() {
-        let decimal = Decimal(string: balance.replacingOccurrences(of: ",", with: ".")) ?? 0
-        let minor = NSDecimalNumber(decimal: decimal * 100).intValue
+        guard let minor = openingBalanceMinor, !name.trimmingCharacters(in: .whitespaces).isEmpty else { return }
         let account = CachedAccount(name: name.trimmingCharacters(in: .whitespaces), institution: institution.trimmingCharacters(in: .whitespaces).isEmpty ? "Manual" : institution.trimmingCharacters(in: .whitespaces), kind: kind, amountMinor: minor, currency: currency)
         context.insert(account)
         context.insert(PendingAccountMutation(entityId: account.id))
@@ -302,6 +323,7 @@ struct NewRecurringPaymentView: View {
     @State private var nextDate = Date()
     @State private var accountId = ""
     @State private var category = "Bills"
+    @State private var isActive = true
     @State private var step: Step = .account
     @State private var movesForward = true
     private let existingPayment: RecurringPayment?
@@ -321,6 +343,7 @@ struct NewRecurringPaymentView: View {
             _nextDate = State(initialValue: payment.nextDate)
             _accountId = State(initialValue: payment.accountId ?? "")
             _category = State(initialValue: payment.category)
+            _isActive = State(initialValue: payment.isActive)
         }
     }
 
@@ -380,6 +403,7 @@ struct NewRecurringPaymentView: View {
             Section { MoneyAmountHeader(title: "Amount", amount: $amount, currency: $currency) }
             Section("Bill") { TextField("Name", text: $name); TransactionCategoryPicker(selection: $category) }
             Section("Repeats") { frequencyPicker; DatePicker("Next payment", selection: $nextDate, displayedComponents: .date) }
+            Section { Toggle("Active", isOn: $isActive) }
             Section("Account") {
                 Picker("Pay from", selection: $accountId) {
                     Text("Not selected").tag("")
@@ -446,7 +470,7 @@ struct NewRecurringPaymentView: View {
                 LabeledContent("Schedule", value: frequencies.first(where: { $0.0 == frequency })?.1 ?? frequency)
             }
             Section("Bill") { TextField("Name", text: $name); TransactionCategoryPicker(selection: $category) }
-            Section { Text("Ledgerly tracks this schedule. It does not move money or charge the account.").font(.subheadline).foregroundStyle(.secondary) }
+            Section { Text("Due dates create pending expense records and link matching payments. Choose an account to enable automatic records. Ledgerly does not move money or charge the account.").font(.subheadline).foregroundStyle(.secondary) }
         }
         .safeAreaInset(edge: .bottom) {
             FlowButton(title: "Add recurring bill", systemImage: "repeat", tint: .blue, disabled: !canSave, action: save)
@@ -497,17 +521,23 @@ struct NewRecurringPaymentView: View {
     }
 
     private var parsedAmount: Int {
-        let decimal = Decimal(string: amount.replacingOccurrences(of: ",", with: ".")) ?? 0
-        return NSDecimalNumber(decimal: decimal * 100).intValue
+        MoneyInput.minorUnits(amount) ?? 0
     }
 
     private func save() {
+        guard canSave else { return }
         let bill = existingPayment ?? RecurringPayment(name: name, amountMinor: parsedAmount, currency: currency, frequency: frequency, nextDate: nextDate, accountId: nil, category: category)
+        if existingPayment != nil && (bill.nextDate != nextDate || bill.frequency != frequency || bill.amountMinor != parsedAmount || bill.currency != currency || bill.accountId != (accountId.isEmpty ? nil : accountId)) {
+            try? SubscriptionScheduler.removeEstimates(paymentID: bill.id, context: context)
+        }
         bill.name = name.trimmingCharacters(in: .whitespaces)
         bill.amountMinor = parsedAmount
         bill.currency = currency
         bill.frequency = frequency
-        bill.nextDate = nextDate
+        let resuming = !bill.isActive && isActive && bill.nextDate == nextDate && nextDate < Date()
+        if bill.nextDate != nextDate || resuming { bill.scheduleAnchorDay = 0 }
+        bill.nextDate = resuming ? Date() : nextDate
+        bill.isActive = isActive
         bill.accountId = accountId.isEmpty ? nil : accountId
         bill.category = category.trimmingCharacters(in: .whitespaces).isEmpty ? "Bills" : category.trimmingCharacters(in: .whitespaces)
         if existingPayment == nil { context.insert(bill) }
@@ -520,6 +550,7 @@ struct NewRecurringPaymentView: View {
         }
         for transaction in transactions where transaction.recurringPaymentId == nil { autoLinkRecurringPayment(transaction, payments: [bill], context: context) }
         try? context.save()
+        if UserDefaults.standard.bool(forKey: "ledgerly.localOnly") { try? SubscriptionScheduler.generateDue(context: context) }
         onSave?(bill)
         dismiss()
     }
