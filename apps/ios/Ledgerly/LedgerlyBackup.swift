@@ -39,6 +39,8 @@ struct LedgerlyBackup: Codable {
         let transferDirection: String?
         let version: Int
         let updatedAt: String
+        var balanceImpactMinor: Int? = nil
+        var recurringPaymentUnlinked: Bool? = nil
     }
 
     struct Recurring: Codable {
@@ -117,7 +119,7 @@ enum LedgerlyBackupService {
             LedgerlyBackup.Account(id: $0.id, name: $0.name, institution: $0.institution, kind: $0.kind, amountMinor: $0.amountMinor, currency: $0.currency, version: $0.version, updatedAt: $0.updatedAt)
         }
         let transactions = try context.fetch(FetchDescriptor<CachedTransaction>()).map {
-            LedgerlyBackup.Transaction(id: $0.id, accountId: $0.accountId, title: $0.title, amountMinor: $0.amountMinor, currency: $0.currency, originalAmountMinor: $0.originalAmountMinor, originalCurrency: $0.originalCurrency, bookedAt: $0.bookedAt, pending: $0.pending, category: $0.category, categoryUserEdited: $0.categoryUserEdited, recurringPaymentId: $0.recurringPaymentId, source: $0.source, expensePurpose: $0.expensePurpose, reimbursementStatus: $0.reimbursementStatus, reimbursementTransactionId: $0.reimbursementTransactionId, refundTransactionId: $0.refundTransactionId, refundedTransactionId: $0.refundedTransactionId, transferId: $0.transferId, transferAccountId: $0.transferAccountId, transferDirection: $0.transferDirection, version: $0.version, updatedAt: $0.updatedAt)
+            LedgerlyBackup.Transaction(id: $0.id, accountId: $0.accountId, title: $0.title, amountMinor: $0.amountMinor, currency: $0.currency, originalAmountMinor: $0.originalAmountMinor, originalCurrency: $0.originalCurrency, bookedAt: $0.bookedAt, pending: $0.pending, category: $0.category, categoryUserEdited: $0.categoryUserEdited, recurringPaymentId: $0.recurringPaymentId, source: $0.source, expensePurpose: $0.expensePurpose, reimbursementStatus: $0.reimbursementStatus, reimbursementTransactionId: $0.reimbursementTransactionId, refundTransactionId: $0.refundTransactionId, refundedTransactionId: $0.refundedTransactionId, transferId: $0.transferId, transferAccountId: $0.transferAccountId, transferDirection: $0.transferDirection, version: $0.version, updatedAt: $0.updatedAt, balanceImpactMinor: $0.balanceImpactMinor, recurringPaymentUnlinked: $0.recurringPaymentUnlinked)
         }
         let recurring = try context.fetch(FetchDescriptor<RecurringPayment>()).map {
             LedgerlyBackup.Recurring(id: $0.id, name: $0.name, amountMinor: $0.amountMinor, currency: $0.currency, frequency: $0.frequency, nextDate: $0.nextDate, accountId: $0.accountId, category: $0.category, isActive: $0.isActive)
@@ -156,9 +158,12 @@ enum LedgerlyBackupService {
             let originalAmount = item.originalAmountMinor.flatMap { amount in
                 item.originalCurrency.map { Money(amountMinor: amount, currency: $0) }
             }
-            let dto = TransactionDTO(id: item.id, accountId: item.accountId, description: item.title, amount: Money(amountMinor: item.amountMinor, currency: item.currency), originalAmount: originalAmount, bookedAt: item.bookedAt, pending: item.pending, category: item.category, categoryUserEdited: item.categoryUserEdited, recurringPaymentId: item.recurringPaymentId, source: item.source, expensePurpose: item.expensePurpose, reimbursementStatus: item.reimbursementStatus, reimbursementTransactionId: item.reimbursementTransactionId, refundTransactionId: item.refundTransactionId, refundedTransactionId: item.refundedTransactionId, transferId: item.transferId, transferAccountId: item.transferAccountId, transferDirection: item.transferDirection, updatedAt: item.updatedAt)
-            if let existing = transactionsByID[item.id] { existing.apply(dto, version: item.version) }
-            else { context.insert(CachedTransaction(dto: dto, initialVersion: item.version)) }
+            var dto = TransactionDTO(id: item.id, accountId: item.accountId, description: item.title, amount: Money(amountMinor: item.amountMinor, currency: item.currency), originalAmount: originalAmount, bookedAt: item.bookedAt, pending: item.pending, category: item.category, categoryUserEdited: item.categoryUserEdited, recurringPaymentId: item.recurringPaymentId, source: item.source, expensePurpose: item.expensePurpose, reimbursementStatus: item.reimbursementStatus, reimbursementTransactionId: item.reimbursementTransactionId, refundTransactionId: item.refundTransactionId, refundedTransactionId: item.refundedTransactionId, transferId: item.transferId, transferAccountId: item.transferAccountId, transferDirection: item.transferDirection, updatedAt: item.updatedAt)
+            dto.balanceImpactMinor = item.balanceImpactMinor
+            let transaction = transactionsByID[item.id] ?? CachedTransaction(dto: dto, initialVersion: item.version)
+            if transactionsByID[item.id] == nil { context.insert(transaction) }
+            else { transaction.apply(dto, version: item.version) }
+            transaction.recurringPaymentUnlinked = item.recurringPaymentUnlinked ?? false
         }
         for item in backup.recurringPayments {
             if let existing = recurringByID[item.id] {

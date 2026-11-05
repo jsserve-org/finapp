@@ -6,6 +6,7 @@ export const list = query({
   args: { tokenHash: v.string(), now: v.number() },
   handler: async (ctx, args) => {
     const identity = await requireSession(ctx, args.tokenHash, args.now);
+    if (identity.actor !== "user") throw new Error("FORBIDDEN_API_KEY_MANAGEMENT");
     const keys = await ctx.db.query("apiKeys").withIndex("by_user", (q) => q.eq("userId", identity.userId)).collect();
     return keys.filter((key) => !key.revokedAt).map((key) => ({
       id: key._id,
@@ -20,14 +21,16 @@ export const create = mutation({
   args: { tokenHash: v.string(), now: v.number(), name: v.string(), keyHash: v.string(), prefix: v.string() },
   handler: async (ctx, args) => {
     const identity = await requireSession(ctx, args.tokenHash, args.now);
+    if (identity.actor !== "user") throw new Error("FORBIDDEN_API_KEY_MANAGEMENT");
+    const createdAt = Date.now();
     const id = await ctx.db.insert("apiKeys", {
       userId: identity.userId,
       name: args.name,
       prefix: args.prefix,
       tokenHash: args.keyHash,
-      createdAt: args.now,
+      createdAt,
     });
-    return { id, name: args.name, prefix: args.prefix, createdAt: args.now };
+    return { id, name: args.name, prefix: args.prefix, createdAt };
   },
 });
 
@@ -35,8 +38,9 @@ export const revoke = mutation({
   args: { tokenHash: v.string(), now: v.number(), id: v.id("apiKeys") },
   handler: async (ctx, args) => {
     const identity = await requireSession(ctx, args.tokenHash, args.now);
+    if (identity.actor !== "user") throw new Error("FORBIDDEN_API_KEY_MANAGEMENT");
     const key = await ctx.db.get(args.id);
     if (!key || key.userId !== identity.userId) throw new Error("API_KEY_NOT_FOUND");
-    await ctx.db.patch(args.id, { revokedAt: args.now });
+    await ctx.db.patch(args.id, { revokedAt: Date.now() });
   },
 });

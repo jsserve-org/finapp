@@ -198,8 +198,7 @@ struct QuickSpendView: View {
     }
 
     private var parsedAmount: Int {
-        let decimal = Decimal(string: amount.replacingOccurrences(of: ",", with: ".")) ?? 0
-        return NSDecimalNumber(decimal: decimal * 100).intValue
+        MoneyInput.minorUnits(amount) ?? 0
     }
 
     private func save(category: String) {

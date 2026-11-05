@@ -1,6 +1,7 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { addChange, requireSession } from "./lib";
+import { validateSyncValue } from "./syncValue";
 
 export const listAccounts = query({
   args: { tokenHash: v.string(), now: v.number() },
@@ -18,6 +19,9 @@ export const create = mutation({
     const bill = args.bill;
     const existingMutation = await ctx.db.query("mutations").withIndex("by_user_mutation", (q) => q.eq("userId", session.userId).eq("mutationId", bill.id)).unique();
     if (existingMutation) return { id: bill.id, created: false };
+    const table = bill.type === "oneTime" ? "transactions" : "recurringPayments";
+    const existingRecord = await ctx.db.query(table).withIndex("by_user_external", (q) => q.eq("userId", session.userId).eq("externalId", bill.id)).unique();
+    if (existingRecord) return { id: bill.id, created: false };
 
     if (bill.type === "oneTime") {
       const account = await ctx.db.query("accounts").withIndex("by_user_external", (q) => q.eq("userId", session.userId).eq("externalId", bill.accountId)).unique();
@@ -35,10 +39,13 @@ export const create = mutation({
         ...(isForeignCurrency ? { originalAmount: { amountMinor: -bill.amountMinor, currency: bill.currency } } : {}),
         bookedAt: bill.date,
         pending: false,
+        source: "bill",
+        balanceImpactMinor: -settlementAmountMinor,
         category: bill.category,
         categoryUserEdited: session.actor === "user",
         updatedAt: timestamp,
       };
+      validateSyncValue("transaction", bill.id, transaction);
       await ctx.db.insert("transactions", { userId: session.userId, externalId: bill.id, value: transaction, version: 1, deleted: false });
       await addChange(ctx, session.userId, "transaction", bill.id, "upsert", transaction);
       const accountValue = { ...account.value, balance: { ...account.value.balance, amountMinor: account.value.balance.amountMinor - settlementAmountMinor }, updatedAt: timestamp };
@@ -60,6 +67,7 @@ export const create = mutation({
         category: bill.category,
         isActive: true,
       };
+      validateSyncValue("recurringPayment", bill.id, payment);
       await ctx.db.insert("recurringPayments", { userId: session.userId, externalId: bill.id, value: payment, version: 1, deleted: false });
       await addChange(ctx, session.userId, "recurringPayment", bill.id, "upsert", payment);
     }

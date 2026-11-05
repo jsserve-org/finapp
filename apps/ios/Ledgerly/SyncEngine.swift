@@ -29,24 +29,34 @@ struct SyncEngine {
             if mutation.action == "delete" {
                 return SyncOperation(mutationId: mutation.mutationId, entity: "account", action: "delete", entityId: mutation.entityId, value: nil, baseVersion: 0)
             }
-            guard let account = try fetchAccount(id: mutation.entityId, context: context) else { return nil }
+            guard let account = try fetchAccount(id: mutation.entityId, context: context) else {
+                context.delete(mutation)
+                return nil
+            }
             let dto = AccountDTO(id: account.id, name: account.name, institution: account.institution, kind: account.kind, balance: Money(amountMinor: account.amountMinor, currency: account.currency), updatedAt: account.updatedAt)
             return SyncOperation(mutationId: mutation.mutationId, entity: "account", action: "upsert", entityId: account.id, value: .init(account: dto), baseVersion: 0)
         }
         let transactionOperations: [SyncOperation] = try pendingTransactions.compactMap { mutation in
-            guard let transaction = try fetchTransaction(id: mutation.entityId, context: context) else { return nil }
+            guard let transaction = try fetchTransaction(id: mutation.entityId, context: context) else {
+                context.delete(mutation)
+                return nil
+            }
             let originalAmount = transaction.originalAmountMinor.flatMap { amount in
                 transaction.originalCurrency.map { Money(amountMinor: amount, currency: $0) }
             }
-            let dto = TransactionDTO(id: transaction.id, accountId: transaction.accountId, description: transaction.title, amount: Money(amountMinor: transaction.amountMinor, currency: transaction.currency), originalAmount: originalAmount, bookedAt: transaction.bookedAt, pending: transaction.pending, category: transaction.category, categoryUserEdited: transaction.categoryUserEdited, recurringPaymentId: transaction.recurringPaymentId, source: transaction.source, expensePurpose: transaction.expensePurpose, reimbursementStatus: transaction.reimbursementStatus, reimbursementTransactionId: transaction.reimbursementTransactionId, refundTransactionId: transaction.refundTransactionId, refundedTransactionId: transaction.refundedTransactionId, transferId: transaction.transferId, transferAccountId: transaction.transferAccountId, transferDirection: transaction.transferDirection, updatedAt: transaction.updatedAt)
-            return SyncOperation(mutationId: mutation.mutationId, action: "upsert", entityId: transaction.id, value: .init(transaction: dto), baseVersion: 0)
+            var dto = TransactionDTO(id: transaction.id, accountId: transaction.accountId, description: transaction.title, amount: Money(amountMinor: transaction.amountMinor, currency: transaction.currency), originalAmount: originalAmount, bookedAt: transaction.bookedAt, pending: transaction.pending, category: transaction.category, categoryUserEdited: transaction.categoryUserEdited, recurringPaymentId: transaction.recurringPaymentId, source: transaction.source, expensePurpose: transaction.expensePurpose, reimbursementStatus: transaction.reimbursementStatus, reimbursementTransactionId: transaction.reimbursementTransactionId, refundTransactionId: transaction.refundTransactionId, refundedTransactionId: transaction.refundedTransactionId, transferId: transaction.transferId, transferAccountId: transaction.transferAccountId, transferDirection: transaction.transferDirection, updatedAt: transaction.updatedAt)
+            dto.balanceImpactMinor = transaction.balanceImpactMinor
+            return SyncOperation(mutationId: mutation.mutationId, action: "upsert", entityId: transaction.id, value: .init(includesRecurringPaymentId: transaction.recurringPaymentUnlinked, transaction: dto), baseVersion: 0)
         }
         let recurringOperations: [SyncOperation] = try pendingRecurring.compactMap { mutation in
             if mutation.action == "delete" {
                 return SyncOperation(mutationId: mutation.mutationId, entity: "recurringPayment", action: "delete", entityId: mutation.entityId, value: nil, baseVersion: 0)
             }
-            guard let payment = try fetchRecurringPayment(id: mutation.entityId, context: context) else { return nil }
-            let dto = RecurringPaymentDTO(id: payment.id, name: payment.name, amountMinor: payment.amountMinor, currency: payment.currency, frequency: payment.frequency, nextDate: payment.nextDate, accountId: payment.accountId, category: payment.category, isActive: payment.isActive)
+            guard let payment = try fetchRecurringPayment(id: mutation.entityId, context: context) else {
+                context.delete(mutation)
+                return nil
+            }
+            let dto = RecurringPaymentDTO(id: payment.id, name: payment.name, amountMinor: payment.amountMinor, currency: payment.currency, frequency: payment.frequency, nextDate: payment.nextDate, accountId: payment.accountId, category: payment.category, isActive: payment.isActive, scheduleAnchorDay: payment.scheduleAnchorDay > 0 ? payment.scheduleAnchorDay : nil)
             return SyncOperation(mutationId: mutation.mutationId, entity: "recurringPayment", action: "upsert", entityId: payment.id, value: .init(recurringPayment: dto), baseVersion: 0)
         }
         let stockOperations: [SyncOperation] = try pendingStocks.compactMap { mutation in
@@ -87,23 +97,43 @@ struct SyncEngine {
                 context.delete(mutation)
                 accepted += 1
             }
-            try apply(result.changes, context: context)
-            saveCursor(result.cursor, settings: settings, context: context)
-            try context.save()
+            try await applyPages(startingWith: result, context: context)
             return accepted
         }
 
         let result = try await api.sync(cursor: cursor)
-        try apply(result.changes, context: context)
-        saveCursor(result.cursor, settings: settings, context: context)
-        try context.save()
+        try await applyPages(startingWith: result, context: context)
         return 0
+    }
+
+    private func applyPages(startingWith first: SyncResponse, context: ModelContext) async throws {
+        var page = first
+        while true {
+            try apply(page.changes, context: context)
+            saveCursor(page.cursor, settings: try context.fetch(FetchDescriptor<SyncSetting>()), context: context)
+            try context.save()
+            guard page.changes.count == 500 else { return }
+            let next = try await api.sync(cursor: page.cursor)
+            guard next.cursor != page.cursor else { return }
+            page = next
+        }
     }
 
     /// Pure cache-application step, shared by both sync paths.
     func apply(_ changes: [SyncChange], context: ModelContext) throws {
         let encoder = JSONEncoder()
         let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let value = try decoder.singleValueContainer()
+            if let seconds = try? value.decode(Double.self) {
+                return Date(timeIntervalSinceReferenceDate: seconds)
+            }
+            let text = try value.decode(String.self)
+            guard let date = LedgerlyISODate.parse(text) else {
+                throw DecodingError.dataCorruptedError(in: value, debugDescription: "Invalid sync date")
+            }
+            return date
+        }
         var transactionsToMatch: [CachedTransaction] = []
         var recurringPaymentsChanged = false
 
@@ -151,7 +181,10 @@ struct SyncEngine {
 
             switch change.entity {
             case "account":
-                let dto = try decoder.decode(AccountDTO.self, from: data)
+                // Older servers stored partial account upserts (e.g. EasyCard's balance-only
+                // update), so treat the change as a patch on top of the cached account.
+                let existing = accountsByID[entityID].map { AccountDTO(id: $0.id, name: $0.name, institution: $0.institution, kind: $0.kind, balance: Money(amountMinor: $0.amountMinor, currency: $0.currency), updatedAt: $0.updatedAt) }
+                guard let dto = try decodeAccount(value, over: existing, encoder: encoder, decoder: decoder) else { continue }
                 if let item = accountsByID[entityID] {
                     item.apply(dto, version: change.sequence)
                 } else {
@@ -161,11 +194,16 @@ struct SyncEngine {
                 }
             case "transaction":
                 let dto = try decoder.decode(TransactionDTO.self, from: data)
+                let explicitlyUnlinked: Bool
+                if case .object(let fields) = value { explicitlyUnlinked = fields["recurringPaymentId"] == .null }
+                else { explicitlyUnlinked = false }
                 if let item = transactionsByID[entityID] {
                     item.apply(dto, version: change.sequence)
+                    if explicitlyUnlinked || dto.recurringPaymentId != nil { item.recurringPaymentUnlinked = explicitlyUnlinked }
                     transactionsToMatch.append(item)
                 } else {
                     let item = CachedTransaction(dto: dto, initialVersion: change.sequence)
+                    item.recurringPaymentUnlinked = explicitlyUnlinked
                     context.insert(item)
                     transactionsByID[entityID] = item
                     transactionsToMatch.append(item)
@@ -182,10 +220,12 @@ struct SyncEngine {
                     item.accountId = dto.accountId
                     item.category = dto.category
                     item.isActive = dto.isActive
+                    item.scheduleAnchorDay = dto.scheduleAnchorDay ?? 0
                 } else {
                     let item = RecurringPayment(id: dto.id, name: dto.name, amountMinor: dto.amountMinor, currency: dto.currency, frequency: dto.frequency, nextDate: dto.nextDate, accountId: dto.accountId, category: dto.category, isActive: dto.isActive)
                     context.insert(item)
                     recurringByID[entityID] = item
+                    item.scheduleAnchorDay = dto.scheduleAnchorDay ?? 0
                 }
             case "stockHolding":
                 let dto = try decoder.decode(StockHoldingDTO.self, from: data)
@@ -258,6 +298,21 @@ struct SyncEngine {
         var descriptor = FetchDescriptor<StockHolding>(predicate: #Predicate { $0.id == id })
         descriptor.fetchLimit = 1
         return try context.fetch(descriptor).first
+    }
+
+    /// Overlays a (possibly partial) account change onto the cached account.
+    /// Returns nil for a partial change with nothing cached to fill the gaps.
+    func decodeAccount(_ value: JSONValue, over existing: AccountDTO?, encoder: JSONEncoder, decoder: JSONDecoder) throws -> AccountDTO? {
+        var merged = value
+        if let existing, case .object(let fields) = value,
+           case .object(let base) = try decoder.decode(JSONValue.self, from: encoder.encode(existing)) {
+            merged = .object(base.merging(fields) { _, new in new })
+        }
+        do {
+            return try decoder.decode(AccountDTO.self, from: encoder.encode(merged))
+        } catch DecodingError.keyNotFound {
+            return nil
+        }
     }
 
     private func fetchStockTrade(id: String, context: ModelContext) throws -> StockTrade? {

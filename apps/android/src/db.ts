@@ -10,9 +10,20 @@ export function initializeDatabase() {
     CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS outbox (mutation_id TEXT PRIMARY KEY, value TEXT NOT NULL);
   `);
+  database.withTransactionSync(() => {
+    const legacy = readCache<StoredRecurringPayment>("recurring");
+    for (const payment of legacy) {
+      const nextDate = recurringDate(payment.nextDate);
+      if (!nextDate) continue;
+      const normalized = { ...payment, nextDate };
+      database.runSync("INSERT OR IGNORE INTO cache(kind, id, value) VALUES ('recurringPayment', ?, ?)", payment.id, JSON.stringify(normalized));
+      queueRecurringPayment(normalized);
+      database.runSync("DELETE FROM cache WHERE kind = 'recurring' AND id = ?", payment.id);
+    }
+  });
 }
 
-export function readCache<T>(kind: "account" | "transaction" | "recurring"): T[] {
+export function readCache<T>(kind: "account" | "transaction" | "recurring" | "recurringPayment"): T[] {
   return database.getAllSync<{ value: string }>("SELECT value FROM cache WHERE kind = ?", kind).map((row) => JSON.parse(row.value) as T);
 }
 
@@ -40,10 +51,29 @@ export type RecurringPayment = {
   category: string;
   isActive: boolean;
 };
-export const cachedRecurringPayments = () => readCache<RecurringPayment>("recurring");
+type StoredRecurringPayment = Omit<RecurringPayment, "nextDate"> & { nextDate: string | number };
+function recurringDate(value: string | number): string | undefined {
+  const timestamp = typeof value === "number" ? Date.UTC(2001, 0, 1) + value * 1000 : Date.parse(value);
+  const date = new Date(timestamp);
+  return Number.isFinite(date.getTime()) ? date.toISOString() : undefined;
+}
+export const cachedRecurringPayments = () => readCache<StoredRecurringPayment>("recurringPayment").map((payment) => ({
+  ...payment,
+  nextDate: recurringDate(payment.nextDate) ?? "",
+}));
+function queueRecurringPayment(payment: RecurringPayment) {
+  const nextDate = recurringDate(payment.nextDate);
+  if (!nextDate) throw new Error("Recurring payment has an invalid next date");
+  const value = { ...payment, nextDate: (Date.parse(nextDate) - Date.UTC(2001, 0, 1)) / 1000 };
+  const operation = { mutationId: `mutation-${payment.id}`, entity: "recurringPayment", action: "upsert", entityId: payment.id, value, baseVersion: 0 };
+  database.runSync("INSERT OR IGNORE INTO outbox(mutation_id, value) VALUES (?, ?)", operation.mutationId, JSON.stringify(operation));
+}
 export function createRecurringPayment(input: Omit<RecurringPayment, "id" | "isActive">) {
   const payment: RecurringPayment = { ...input, id: `recurring-${Date.now()}-${Math.random().toString(36).slice(2)}`, isActive: true };
-  database.runSync("INSERT INTO cache(kind, id, value) VALUES ('recurring', ?, ?)", payment.id, JSON.stringify(payment));
+  database.withTransactionSync(() => {
+    database.runSync("INSERT INTO cache(kind, id, value) VALUES ('recurringPayment', ?, ?)", payment.id, JSON.stringify(payment));
+    queueRecurringPayment(payment);
+  });
   return payment;
 }
 export function createLocalAccount(input: { name: string; institution: string; kind: Account["kind"]; amountMinor: number; currency: string }) {

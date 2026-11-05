@@ -149,22 +149,24 @@ struct LedgerlyPrivacyRoot<Content: View>: View {
     @ViewBuilder let content: () -> Content
 
     var body: some View {
-        ZStack {
-            content()
-                .privacySensitive()
-                .allowsHitTesting(!security.isLocked && !security.privacyShieldVisible)
-                .accessibilityHidden(security.isLocked || security.privacyShieldVisible)
-            if security.isLocked && !security.privacyShieldVisible {
-                AppLockView()
-                    .transition(.opacity)
-                    .zIndex(2)
+        content()
+            .privacySensitive()
+            .allowsHitTesting(!security.isLocked && !security.privacyShieldVisible)
+            .accessibilityHidden(security.isLocked || security.privacyShieldVisible)
+            .overlay {
+                if security.isLocked && !security.privacyShieldVisible {
+                    AppLockView()
+                        .transition(.opacity)
+                        .zIndex(2)
+                }
             }
-            if security.privacyShieldVisible {
-                PrivacyShieldView()
-                    .transition(.opacity)
-                    .zIndex(3)
+            .overlay {
+                if security.privacyShieldVisible {
+                    PrivacyShieldView()
+                        .transition(.opacity)
+                        .zIndex(3)
+                }
             }
-        }
         .onChange(of: scenePhase) { _, phase in
             switch phase {
             case .active: security.becameActive()
@@ -173,7 +175,10 @@ struct LedgerlyPrivacyRoot<Content: View>: View {
             @unknown default: security.resignedActive()
             }
         }
-        .task { updateSecurityWindow() }
+        .task {
+            if scenePhase == .active { security.becameActive() }
+            updateSecurityWindow()
+        }
         .onChange(of: security.isLocked) { _, _ in updateSecurityWindow() }
         .onChange(of: security.privacyShieldVisible) { _, _ in updateSecurityWindow() }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in security.resignedActive() }
