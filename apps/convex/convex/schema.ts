@@ -10,7 +10,7 @@ export default defineSchema({
   recurringPayments: defineTable({ userId: v.id("users"), externalId: v.string(), value: v.any(), version: v.number(), deleted: v.boolean() }).index("by_user", ["userId"]).index("by_user_external", ["userId", "externalId"]),
   stockHoldings: defineTable({ userId: v.id("users"), externalId: v.string(), value: v.any(), version: v.number(), deleted: v.boolean() }).index("by_user", ["userId"]).index("by_user_external", ["userId", "externalId"]),
   stockTrades: defineTable({ userId: v.id("users"), externalId: v.string(), value: v.any(), version: v.number(), deleted: v.boolean() }).index("by_user", ["userId"]).index("by_user_external", ["userId", "externalId"]),
-  changes: defineTable({ userId: v.id("users"), sequence: v.number(), entity: v.string(), entityId: v.string(), action: v.string(), value: v.any() }).index("by_user_sequence", ["userId", "sequence"]),
+  changes: defineTable({ userId: v.id("users"), sequence: v.number(), entity: v.string(), entityId: v.string(), action: v.string(), value: v.any() }).index("by_user_sequence", ["userId", "sequence"]).index("by_user_entity", ["userId", "entity", "entityId", "sequence"]),
   mutations: defineTable({ userId: v.id("users"), mutationId: v.string() }).index("by_user_mutation", ["userId", "mutationId"]),
   connections: defineTable({ userId: v.id("users"), externalId: v.string(), state: v.string(), lastSuccessAt: v.optional(v.string()), lastError: v.optional(v.string()), nextCheckAt: v.string() }).index("by_user", ["userId"]).index("by_user_external", ["userId", "externalId"]),
 });

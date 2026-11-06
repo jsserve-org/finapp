@@ -177,80 +177,85 @@ struct SyncEngine {
                 continue
             }
             guard let value = change.value else { continue }
-            let data = try encoder.encode(value)
+            do {
+                let data = try encoder.encode(value)
 
-            switch change.entity {
-            case "account":
-                // Older servers stored partial account upserts (e.g. EasyCard's balance-only
-                // update), so treat the change as a patch on top of the cached account.
-                let existing = accountsByID[entityID].map { AccountDTO(id: $0.id, name: $0.name, institution: $0.institution, kind: $0.kind, balance: Money(amountMinor: $0.amountMinor, currency: $0.currency), updatedAt: $0.updatedAt) }
-                guard let dto = try decodeAccount(value, over: existing, encoder: encoder, decoder: decoder) else { continue }
-                if let item = accountsByID[entityID] {
-                    item.apply(dto, version: change.sequence)
-                } else {
-                    let item = CachedAccount(dto: dto, initialVersion: change.sequence)
-                    context.insert(item)
-                    accountsByID[entityID] = item
+                switch change.entity {
+                case "account":
+                    // Older servers stored partial account upserts (e.g. EasyCard's balance-only
+                    // update), so treat the change as a patch on top of the cached account.
+                    let existing = accountsByID[entityID].map { AccountDTO(id: $0.id, name: $0.name, institution: $0.institution, kind: $0.kind, balance: Money(amountMinor: $0.amountMinor, currency: $0.currency), updatedAt: $0.updatedAt) }
+                    guard let dto = try decodeAccount(value, over: existing, encoder: encoder, decoder: decoder) else { continue }
+                    if let item = accountsByID[entityID] {
+                        item.apply(dto, version: change.sequence)
+                    } else {
+                        let item = CachedAccount(dto: dto, initialVersion: change.sequence)
+                        context.insert(item)
+                        accountsByID[entityID] = item
+                    }
+                case "transaction":
+                    let dto = try decoder.decode(TransactionDTO.self, from: data)
+                    let explicitlyUnlinked: Bool
+                    if case .object(let fields) = value { explicitlyUnlinked = fields["recurringPaymentId"] == .null }
+                    else { explicitlyUnlinked = false }
+                    if let item = transactionsByID[entityID] {
+                        item.apply(dto, version: change.sequence)
+                        if explicitlyUnlinked || dto.recurringPaymentId != nil { item.recurringPaymentUnlinked = explicitlyUnlinked }
+                        transactionsToMatch.append(item)
+                    } else {
+                        let item = CachedTransaction(dto: dto, initialVersion: change.sequence)
+                        item.recurringPaymentUnlinked = explicitlyUnlinked
+                        context.insert(item)
+                        transactionsByID[entityID] = item
+                        transactionsToMatch.append(item)
+                    }
+                case "recurringPayment":
+                    recurringPaymentsChanged = true
+                    let dto = try decoder.decode(RecurringPaymentDTO.self, from: data)
+                    if let item = recurringByID[entityID] {
+                        item.name = dto.name
+                        item.amountMinor = dto.amountMinor
+                        item.currency = dto.currency
+                        item.frequency = dto.frequency
+                        item.nextDate = dto.nextDate
+                        item.accountId = dto.accountId
+                        item.category = dto.category
+                        item.isActive = dto.isActive
+                        item.scheduleAnchorDay = dto.scheduleAnchorDay ?? 0
+                    } else {
+                        let item = RecurringPayment(id: dto.id, name: dto.name, amountMinor: dto.amountMinor, currency: dto.currency, frequency: dto.frequency, nextDate: dto.nextDate, accountId: dto.accountId, category: dto.category, isActive: dto.isActive)
+                        context.insert(item)
+                        recurringByID[entityID] = item
+                        item.scheduleAnchorDay = dto.scheduleAnchorDay ?? 0
+                    }
+                case "stockHolding":
+                    let dto = try decoder.decode(StockHoldingDTO.self, from: data)
+                    if let item = holdingsByID[entityID] {
+                        item.symbol = dto.symbol; item.name = dto.name; item.quantity = dto.quantity
+                        item.averageCostMinor = dto.averageCostMinor; item.currentPriceMinor = dto.currentPriceMinor
+                        item.currency = dto.currency; item.linkedAccountId = dto.linkedAccountId; item.updatedAt = dto.updatedAt
+                    } else {
+                        let item = StockHolding(id: dto.id, symbol: dto.symbol, name: dto.name, quantity: dto.quantity, averageCostMinor: dto.averageCostMinor, currentPriceMinor: dto.currentPriceMinor, currency: dto.currency, linkedAccountId: dto.linkedAccountId, updatedAt: dto.updatedAt)
+                        context.insert(item)
+                        holdingsByID[entityID] = item
+                    }
+                case "stockTrade":
+                    let dto = try decoder.decode(StockTradeDTO.self, from: data)
+                    if let item = tradesByID[entityID] {
+                        item.holdingId = dto.holdingId; item.symbol = dto.symbol; item.side = dto.side
+                        item.quantity = dto.quantity; item.priceMinor = dto.priceMinor; item.feesMinor = dto.feesMinor
+                        item.currency = dto.currency; item.tradedAt = dto.tradedAt; item.linkedAccountId = dto.linkedAccountId
+                    } else {
+                        let item = StockTrade(id: dto.id, holdingId: dto.holdingId, symbol: dto.symbol, side: dto.side, quantity: dto.quantity, priceMinor: dto.priceMinor, feesMinor: dto.feesMinor, currency: dto.currency, tradedAt: dto.tradedAt, linkedAccountId: dto.linkedAccountId)
+                        context.insert(item)
+                        tradesByID[entityID] = item
+                    }
+                default:
+                    continue
                 }
-            case "transaction":
-                let dto = try decoder.decode(TransactionDTO.self, from: data)
-                let explicitlyUnlinked: Bool
-                if case .object(let fields) = value { explicitlyUnlinked = fields["recurringPaymentId"] == .null }
-                else { explicitlyUnlinked = false }
-                if let item = transactionsByID[entityID] {
-                    item.apply(dto, version: change.sequence)
-                    if explicitlyUnlinked || dto.recurringPaymentId != nil { item.recurringPaymentUnlinked = explicitlyUnlinked }
-                    transactionsToMatch.append(item)
-                } else {
-                    let item = CachedTransaction(dto: dto, initialVersion: change.sequence)
-                    item.recurringPaymentUnlinked = explicitlyUnlinked
-                    context.insert(item)
-                    transactionsByID[entityID] = item
-                    transactionsToMatch.append(item)
-                }
-            case "recurringPayment":
-                recurringPaymentsChanged = true
-                let dto = try decoder.decode(RecurringPaymentDTO.self, from: data)
-                if let item = recurringByID[entityID] {
-                    item.name = dto.name
-                    item.amountMinor = dto.amountMinor
-                    item.currency = dto.currency
-                    item.frequency = dto.frequency
-                    item.nextDate = dto.nextDate
-                    item.accountId = dto.accountId
-                    item.category = dto.category
-                    item.isActive = dto.isActive
-                    item.scheduleAnchorDay = dto.scheduleAnchorDay ?? 0
-                } else {
-                    let item = RecurringPayment(id: dto.id, name: dto.name, amountMinor: dto.amountMinor, currency: dto.currency, frequency: dto.frequency, nextDate: dto.nextDate, accountId: dto.accountId, category: dto.category, isActive: dto.isActive)
-                    context.insert(item)
-                    recurringByID[entityID] = item
-                    item.scheduleAnchorDay = dto.scheduleAnchorDay ?? 0
-                }
-            case "stockHolding":
-                let dto = try decoder.decode(StockHoldingDTO.self, from: data)
-                if let item = holdingsByID[entityID] {
-                    item.symbol = dto.symbol; item.name = dto.name; item.quantity = dto.quantity
-                    item.averageCostMinor = dto.averageCostMinor; item.currentPriceMinor = dto.currentPriceMinor
-                    item.currency = dto.currency; item.linkedAccountId = dto.linkedAccountId; item.updatedAt = dto.updatedAt
-                } else {
-                    let item = StockHolding(id: dto.id, symbol: dto.symbol, name: dto.name, quantity: dto.quantity, averageCostMinor: dto.averageCostMinor, currentPriceMinor: dto.currentPriceMinor, currency: dto.currency, linkedAccountId: dto.linkedAccountId, updatedAt: dto.updatedAt)
-                    context.insert(item)
-                    holdingsByID[entityID] = item
-                }
-            case "stockTrade":
-                let dto = try decoder.decode(StockTradeDTO.self, from: data)
-                if let item = tradesByID[entityID] {
-                    item.holdingId = dto.holdingId; item.symbol = dto.symbol; item.side = dto.side
-                    item.quantity = dto.quantity; item.priceMinor = dto.priceMinor; item.feesMinor = dto.feesMinor
-                    item.currency = dto.currency; item.tradedAt = dto.tradedAt; item.linkedAccountId = dto.linkedAccountId
-                } else {
-                    let item = StockTrade(id: dto.id, holdingId: dto.holdingId, symbol: dto.symbol, side: dto.side, quantity: dto.quantity, priceMinor: dto.priceMinor, feesMinor: dto.feesMinor, currency: dto.currency, tradedAt: dto.tradedAt, linkedAccountId: dto.linkedAccountId)
-                    context.insert(item)
-                    tradesByID[entityID] = item
-                }
-            default:
-                continue
+            } catch let error as DecodingError {
+                // A legacy malformed record must not block newer changes in this page.
+                NSLog("Skipping unreadable sync change %d (%@ %@): %@", change.sequence, change.entity, entityID, String(describing: error))
             }
         }
         if recurringPaymentsChanged {
