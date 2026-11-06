@@ -36,6 +36,17 @@ final class SyncEngineTests: XCTestCase {
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<CachedAccount>()), 1)
     }
 
+    func testMalformedRecordDoesNotBlockLaterChanges() throws {
+        let account = CachedAccount(name: "Bank", institution: "Bank", kind: "checking", amountMinor: 100, currency: "TWD")
+        context.insert(account)
+        try engine.apply([
+            SyncChange(sequence: 1, entity: "transaction", entityId: "broken", action: "upsert", value: .object(["id": .string("broken")])),
+            SyncChange(sequence: 2, entity: "account", entityId: account.id, action: "delete", value: nil),
+        ], context: context)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<CachedAccount>()), 0)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<CachedTransaction>()), 0)
+    }
+
     func testDeletingImportedTransactionDoesNotInventAccountBalance() throws {
         let account = CachedAccount(name: "Bank", institution: "Bank", kind: "checking", amountMinor: 100000, currency: "TWD")
         context.insert(account)

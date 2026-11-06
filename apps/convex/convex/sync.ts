@@ -4,6 +4,7 @@ import { addChange, requireSession } from "./lib";
 import { mergeTransactionValue } from "./transactionMerge";
 import { generateForUser, linkPayment, recurringDate } from "./recurring";
 import { validateSyncValue } from "./syncValue";
+import { repairAccounts, repairChanges } from "./repair";
 
 const operationValidator = v.object({
   mutationId: v.string(),
@@ -16,6 +17,7 @@ const operationValidator = v.object({
 
 export const exchange = mutation({ args: { tokenHash: v.string(), cursor: v.string(), operations: v.array(operationValidator), now: v.number() }, handler: async (ctx, args) => {
   const session = await requireSession(ctx, args.tokenHash, args.now);
+  await repairAccounts(ctx, session.userId);
   const acceptedMutationIds: string[] = [];
   for (const operation of args.operations.slice(0, 100)) {
     const prior = await ctx.db.query("mutations").withIndex("by_user_mutation", (q) => q.eq("userId", session.userId).eq("mutationId", operation.mutationId)).unique();
@@ -181,5 +183,6 @@ export const exchange = mutation({ args: { tokenHash: v.string(), cursor: v.stri
   await generateForUser(ctx, session.userId, Date.now());
   const after = Number(args.cursor) || 0;
   const changes = await ctx.db.query("changes").withIndex("by_user_sequence", (q) => q.eq("userId", session.userId).gt("sequence", after)).take(500);
+  await repairChanges(ctx, session.userId, changes);
   return { cursor: String(changes.at(-1)?.sequence ?? after), changes: changes.map(({ sequence, entity, entityId, action, value }) => ({ sequence, entity, entityId, action, value })), acceptedMutationIds };
 } });
