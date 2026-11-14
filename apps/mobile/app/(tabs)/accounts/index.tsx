@@ -62,7 +62,7 @@ export default function AccountsScreen() {
           {accounts.length === 0 ? (
             <>
               <EmptyState icon="account" title="No accounts" message="Create an account on this device. Sync is optional." />
-              <Row icon="plus" title="Create account" onPress={() => router.push("/account/new" as never)} />
+              <Row title="Create account" titleColor={palette.blue} showChevron={false} onPress={() => router.push("/account/new" as never)} />
             </>
           ) : (
             accounts.map((account) => (
@@ -73,6 +73,7 @@ export default function AccountsScreen() {
                 subtitle={`${account.institution} · ${accountKindLabel(account.kind)}`}
                 value={shown(account.balance.amountMinor, account.balance.currency)}
                 valueColor={palette.label}
+                strongValue
                 onPress={() => router.push({ pathname: "/accounts/[id]", params: { id: account.id } } as never)}
               />
             ))

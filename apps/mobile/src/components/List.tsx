@@ -37,7 +37,7 @@ export function Section({
   const palette = useTheme();
   const items = Children.toArray(children).filter(Boolean);
   return (
-    <View style={[{ gap: 8 }, style]}>
+    <View style={[{ gap: 8, marginBottom: 6 }, style]}>
       {(title || headerAccessory) && (
         <View style={styles.headerRow}>
           {title ? <Text style={[styles.header, { color: palette.label }]}>{title}</Text> : <View />}
@@ -79,6 +79,7 @@ export function Row({
   trailing,
   showChevron = true,
   titleColor,
+  strongValue,
 }: {
   title: string;
   subtitle?: string;
@@ -93,13 +94,14 @@ export function Row({
   trailing?: React.ReactNode;
   showChevron?: boolean;
   titleColor?: string;
+  strongValue?: boolean;
 }) {
   const palette = useTheme();
   const content = (
     <View style={[styles.row, disabled && { opacity: 0.45 }]}>
       {icon ? <Icon name={icon} size={metrics.icon} color={iconColor ?? palette.blue} /> : null}
       <View style={styles.grow}>
-        <Text numberOfLines={1} style={[styles.title, { color: titleColor ?? (destructive ? palette.red : palette.label) }]}>
+        <Text numberOfLines={1} style={[styles.title, subtitle != null && { fontWeight: "600" }, { color: titleColor ?? (destructive ? palette.red : palette.label) }]}>
           {title}
         </Text>
         {subtitle ? (
@@ -109,7 +111,7 @@ export function Row({
         ) : null}
       </View>
       {value ? (
-        <Text numberOfLines={1} style={[styles.value, { color: valueColor ?? palette.secondaryLabel }]}>
+        <Text numberOfLines={1} style={[styles.value, strongValue && { fontWeight: "600" }, { color: valueColor ?? palette.secondaryLabel }]}>
           {value}
         </Text>
       ) : null}
@@ -164,6 +166,17 @@ export function ValueRow({
       >
         {value}
       </Text>
+    </View>
+  );
+}
+
+/** Label secondary, value semibold primary — the Insights summary row. */
+export function StatRow({ label, value, valueColor }: { label: string; value: string; valueColor?: string }) {
+  const palette = useTheme();
+  return (
+    <View style={[styles.row, styles.minRow]}>
+      <Text style={[styles.title, { color: palette.secondaryLabel, flex: 1 }]}>{label}</Text>
+      <Text style={[styles.value, { fontWeight: "600", color: valueColor ?? palette.label }]}>{value}</Text>
     </View>
   );
 }

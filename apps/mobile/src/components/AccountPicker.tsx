@@ -29,9 +29,7 @@ export function AccountPicker({
           const selected = account.id === selectedId;
           return (
             <Pressable key={account.id} onPress={() => onSelect(account)} style={styles.row}>
-              <View style={[styles.icon, { backgroundColor: palette.fill }]}>
-                <Icon name={accountIcon(account.kind)} size={17} color={tone} />
-              </View>
+              <Icon name={accountIcon(account.kind)} size={21} color={tone} />
               <View style={{ flex: 1, gap: 2 }}>
                 <Text style={[styles.title, { color: palette.label }]}>{account.name}</Text>
                 <Text style={[styles.subtitle, { color: palette.secondaryLabel }]} numberOfLines={1}>
@@ -49,7 +47,6 @@ export function AccountPicker({
 
 const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 11 },
-  icon: { width: 32, height: 32, borderRadius: 9, alignItems: "center", justifyContent: "center" },
   title: { fontSize: 17, fontWeight: "500" },
   subtitle: { fontSize: 13 },
   empty: { padding: 16, fontSize: 15 },

@@ -118,7 +118,7 @@ export default function TransactionDetailScreen() {
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.hero}>
           <Icon name={paymentIconFor(transaction.description, transaction.category, amountMinor)} size={38} color={tone} />
-          <Text style={[styles.direction, { color: tone }]}>{amountMinor >= 0 ? "Money in" : "Money out"}</Text>
+          <Text style={[styles.direction, { color: tone }]}>{amountMinor >= 0 ? "Received" : "Spent"}</Text>
           <Text style={[styles.amount, { color: tone }]}>{formatMoney(Math.abs(amountMinor), currency)}</Text>
         </View>
 

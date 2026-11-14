@@ -62,6 +62,7 @@ const iconMap = {
   transferCategory: { sf: "arrow.left.arrow.right", ion: "swap-horizontal" },
   info: { sf: "info.circle.fill", ion: "information-circle" },
   person: { sf: "person.crop.circle.fill", ion: "person-circle" },
+  iphone: { sf: "iphone", ion: "phone-portrait" },
 } satisfies Record<string, { sf: SFSymbol; ion: IoniconName }>;
 
 export type IconName = keyof typeof iconMap;

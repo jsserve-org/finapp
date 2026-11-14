@@ -65,7 +65,7 @@ export default function SettingsScreen() {
           {localOnly ? (
             <>
               <InfoRow label="Where" value="On this iPhone" />
-              <Row icon="server" title="Set up sync" onPress={() => void configureSync()} />
+              <Row icon="server" title="Set up sync" showChevron={false} onPress={() => void configureSync()} />
             </>
           ) : (
             <>

@@ -1,12 +1,15 @@
 import { Stack } from "expo-router";
 import { BlurView } from "expo-blur";
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Keyboard, Platform, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../theme";
 
 /**
  * Modal sheet scaffold: native header, scrollable grouped content, and a
  * pinned action bar that mirrors the iOS app's `safeAreaInset` buttons.
+ * The footer lifts above the keyboard because KeyboardAvoidingView does not
+ * resize a page-sheet modal on iOS 26.
  */
 export function SheetScreen({
   title,
@@ -23,6 +26,19 @@ export function SheetScreen({
 }) {
   const palette = useTheme();
   const insets = useSafeAreaInsets();
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const show = Keyboard.addListener(showEvent, (event) => setKeyboardHeight(event.endCoordinates.height));
+    const hide = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
   return (
     <View style={{ flex: 1, backgroundColor: palette.background }}>
       <Stack.Screen
@@ -34,7 +50,7 @@ export function SheetScreen({
           headerRight: headerRight ? () => headerRight : undefined,
         }}
       />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <View style={{ flex: 1, paddingBottom: keyboardHeight > 0 ? Math.max(0, keyboardHeight - insets.bottom) : 0 }}>
         <ScrollView
           contentInsetAdjustmentBehavior="automatic"
           contentContainerStyle={styles.content}
@@ -45,7 +61,7 @@ export function SheetScreen({
           {children}
         </ScrollView>
         {footer ? (
-          <View style={[styles.footer, { borderColor: palette.separator, paddingBottom: insets.bottom + 14 }]}>
+          <View style={[styles.footer, { borderColor: palette.separator, paddingBottom: keyboardHeight > 0 ? 14 : insets.bottom + 14 }]}>
             {Platform.OS === "ios" ? (
               <BlurView intensity={90} tint="systemChromeMaterial" style={StyleSheet.absoluteFill} />
             ) : (
@@ -54,12 +70,12 @@ export function SheetScreen({
             {footer}
           </View>
         ) : null}
-      </KeyboardAvoidingView>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  content: { padding: 16, paddingTop: 16, gap: 20, paddingBottom: 28 },
+  content: { padding: 16, paddingTop: 20, gap: 20, paddingBottom: 28 },
   footer: { paddingHorizontal: 16, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
 });

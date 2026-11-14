@@ -77,7 +77,7 @@ export default function LoginScreen() {
             </Text>
             {!register ? (
               <Row
-                icon="person"
+                icon="iphone"
                 title="Continue on this iPhone"
                 titleColor={palette.blue}
                 showChevron={false}

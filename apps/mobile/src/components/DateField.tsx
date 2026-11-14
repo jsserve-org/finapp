@@ -29,6 +29,7 @@ export function DateField({
         style={styles.field}
       >
         <Text style={[styles.label, { color: palette.label }]}>{label}</Text>
+        <View style={{ flex: 1 }} />
         <Text style={{ color: palette.secondaryLabel, fontSize: 17 }}>{formatDate(value)}</Text>
         <Icon name="chevronRight" size={12} color={palette.tertiaryLabel} />
       </Pressable>

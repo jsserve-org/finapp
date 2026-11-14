@@ -115,7 +115,9 @@ export function CurrencyRow({ currency, onChange }: { currency: string; onChange
     <>
       <Pressable onPress={() => setPicking(true)} style={styles.field}>
         <Text style={[styles.fieldLabel, { color: palette.label }]}>Currency</Text>
+        <View style={{ flex: 1 }} />
         <Text style={{ color: palette.secondaryLabel, fontSize: 17 }}>{`${currency} — ${name}`}</Text>
+        <Icon name="chevronRight" size={12} color={palette.tertiaryLabel} />
       </Pressable>
       <CurrencyModal
         visible={picking}
@@ -184,6 +186,7 @@ export function CategoryPicker({
     <>
       <Pressable onPress={() => setVisible(true)} style={styles.field}>
         <Text style={[styles.fieldLabel, { color: palette.label }]}>{label}</Text>
+        <View style={{ flex: 1 }} />
         <Text style={{ color: palette.secondaryLabel, fontSize: 17 }}>{value || "Uncategorized"}</Text>
         <Icon name="chevronRight" size={12} color={palette.tertiaryLabel} />
       </Pressable>

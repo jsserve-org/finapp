@@ -162,10 +162,11 @@ export default function MoneySheet() {
           </Section>
           {direction === "moneyOut" ? (
             <Section title="For" footer={settlementPending ? `Ledgerly records the purchase now. Your later bank import provides the final ${account?.balance.currency ?? "account"} charge.` : undefined}>
-              <Row title="Personal" accessory={purpose === "personal" ? <Icon name="checkmark" size={16} color={palette.blue} /> : undefined} onPress={() => setPurpose("personal")} />
-              <Row title="School" accessory={purpose === "school" ? <Icon name="checkmark" size={16} color={palette.blue} /> : undefined} onPress={() => setPurpose("school")} />
-              <Row title="Someone else" accessory={purpose === "someoneElse" ? <Icon name="checkmark" size={16} color={palette.blue} /> : undefined} onPress={() => setPurpose("someoneElse")} />
+              <Row title="Personal" accessory={purpose === "personal" ? <Icon name="checkmark" size={16} color={palette.blue} /> : undefined} showChevron={false} onPress={() => setPurpose("personal")} />
+              <Row title="School" accessory={purpose === "school" ? <Icon name="checkmark" size={16} color={palette.blue} /> : undefined} showChevron={false} onPress={() => setPurpose("school")} />
+              <Row title="Someone else" accessory={purpose === "someoneElse" ? <Icon name="checkmark" size={16} color={palette.blue} /> : undefined} showChevron={false} onPress={() => setPurpose("someoneElse")} />
               <Row
+                showChevron={false}
                 title="I expect reimbursement"
                 accessory={
                   <View style={[styles.switch, { backgroundColor: expectsReimbursement ? palette.green : palette.fill }]}>

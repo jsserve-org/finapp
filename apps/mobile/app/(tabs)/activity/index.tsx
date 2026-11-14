@@ -168,6 +168,7 @@ export default function ActivityScreen() {
                 subtitle={`${bill.isActive ? "" : "Paused · "}${frequencyLabel(bill.frequency)} · next ${formatDate(bill.nextDate, "short")}`}
                 value={shown(-bill.amountMinor, bill.currency)}
                 valueColor={palette.label}
+                strongValue
                 onPress={() => router.push({ pathname: "/activity/bill/[id]", params: { id: bill.id } } as never)}
               />
             ))
@@ -209,6 +210,7 @@ export default function ActivityScreen() {
                   subtitle={`${amountMinor >= 0 ? "Received" : "Spent"} · ${transaction.category ?? "Uncategorized"}${awaitingSettlement ? " · bank charge pending" : ""}${bill ? ` · ${bill.name}` : ""}`}
                   value={shown(amountMinor, currency)}
                   valueColor={amountMinor >= 0 ? palette.green : palette.label}
+                  strongValue
                   onPress={() => router.push({ pathname: "/activity/transaction/[id]", params: { id: transaction.id } } as never)}
                 />
               );

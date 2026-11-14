@@ -122,7 +122,7 @@ export default function AccountDetailScreen() {
             {action("Transfer", "transfer", palette.blue, () =>
               router.push({ pathname: "/add/transfer", params: { accountId: account.id } } as never),
             )}
-            {action("Edit", "edit", palette.secondaryLabel, () =>
+            {action("Edit", "edit", "#8E8E93", () =>
               router.push({ pathname: "/account/[id]/edit", params: { id: account.id } } as never),
             )}
           </View>
@@ -143,6 +143,7 @@ export default function AccountDetailScreen() {
                   subtitle={`${transaction.source === "subscription" && transaction.pending ? "Expected payment" : amountMinor >= 0 ? "Received" : "Spent"} · ${transaction.category ?? "Uncategorized"}${awaitingSettlement ? " · bank charge pending" : ""}`}
                   value={formatMoney(amountMinor, currency)}
                   valueColor={amountMinor >= 0 ? palette.green : palette.red}
+                  strongValue
                   onPress={() => router.push({ pathname: "/accounts/transaction/[id]", params: { id: transaction.id } } as never)}
                 />
               );
@@ -159,5 +160,5 @@ const styles = StyleSheet.create({
   content: { padding: 16, paddingTop: 0, gap: 22, paddingBottom: 120 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 12, padding: 12 },
   tile: { width: "48%", minHeight: 58, borderRadius: 12, alignItems: "center", justifyContent: "center", gap: 7, flexGrow: 1, paddingHorizontal: 8 },
-  tileLabel: { fontSize: 13, fontWeight: "600" },
+  tileLabel: { fontSize: 15, fontWeight: "600" },
 });

@@ -8,7 +8,7 @@ import { useCacheVersion, useHiddenAmounts } from "../../../src/store";
 import { useSession } from "../../../src/session";
 import { useSync } from "../../../src/sync";
 import { useTheme } from "../../../src/theme";
-import { EmptyState, Row, Section, Screen, ValueRow } from "../../../src/components/List";
+import { EmptyState, Row, Section, Screen, StatRow } from "../../../src/components/List";
 import { Icon, paymentIconFor } from "../../../src/components/Icon";
 
 export default function InsightsScreen() {
@@ -94,9 +94,9 @@ export default function InsightsScreen() {
               return (
                 <View key={currency} style={styles.summaryBlock}>
                   <Text style={[styles.currency, { color: palette.label }]}>{currency}</Text>
-                  <ValueRow label="Net worth" value={shown(netWorth, currency)} emphasis />
-                  <ValueRow label="Money in" value={shown(inflow, currency)} valueColor={palette.green} />
-                  <ValueRow label="Money out" value={shown(outflow, currency)} valueColor={palette.red} />
+                  <StatRow label="Net worth" value={shown(netWorth, currency)} />
+                  <StatRow label="Money in" value={shown(inflow, currency)} valueColor={palette.green} />
+                  <StatRow label="Money out" value={shown(outflow, currency)} valueColor={palette.red} />
                 </View>
               );
             })

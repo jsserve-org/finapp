@@ -78,6 +78,7 @@ export default function BillDetailScreen() {
                 subtitle={`${formatDate(transaction.bookedAt, "short")}${transaction.source === "subscription" && transaction.pending ? " · Expected payment" : ""}`}
                 value={shown(transaction.amount.amountMinor, transaction.amount.currency)}
                 valueColor={palette.label}
+                strongValue
                 onPress={() =>
                   router.push({ pathname: "/activity/transaction/[id]", params: { id: transaction.id } } as never)
                 }
