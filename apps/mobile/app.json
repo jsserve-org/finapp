@@ -15,7 +15,7 @@
     },
     "ios": {
       "bundleIdentifier": "com.ledgerly.app",
-      "buildNumber": "47",
+      "buildNumber": "48",
       "supportsTablet": false,
       "infoPlist": {
         "NSLocalNetworkUsageDescription": "Ledgerly connects to your self-hosted server on the local network to sync your financial data.",

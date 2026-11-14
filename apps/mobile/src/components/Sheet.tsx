@@ -26,17 +26,21 @@ export function SheetScreen({
 }) {
   const palette = useTheme();
   const insets = useSafeAreaInsets();
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  // The keyboard can already be up when the sheet mounts (an amount field is
+  // focused by the user very quickly), so seed the height from the last frame
+  // and keep every show/frame/hide notification in sync.
+  const [keyboardHeight, setKeyboardHeight] = useState(() => Keyboard.metrics()?.height ?? 0);
 
   useEffect(() => {
-    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
-    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
-    const show = Keyboard.addListener(showEvent, (event) => setKeyboardHeight(event.endCoordinates.height));
-    const hide = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
-    return () => {
-      show.remove();
-      hide.remove();
-    };
+    const update = (height: number) => setKeyboardHeight(height);
+    const subscriptions = [
+      Keyboard.addListener("keyboardWillShow", (event) => update(event.endCoordinates.height)),
+      Keyboard.addListener("keyboardDidShow", (event) => update(event.endCoordinates.height)),
+      Keyboard.addListener("keyboardWillChangeFrame", (event) => update(event.endCoordinates.height)),
+      Keyboard.addListener("keyboardWillHide", () => update(0)),
+      Keyboard.addListener("keyboardDidHide", () => update(0)),
+    ];
+    return () => subscriptions.forEach((subscription) => subscription.remove());
   }, []);
 
   return (
