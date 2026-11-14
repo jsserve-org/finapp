@@ -1,6 +1,9 @@
-/** UUIDs for locally created records. Falls back to Math.random where `crypto.randomUUID` is missing. */
+/** UUIDs for locally created records. Hermes has no `crypto` global, so we always have a fallback. */
 export function uuid(): string {
-  const cryptoObject = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
+  const cryptoObject =
+    typeof globalThis !== "undefined"
+      ? (globalThis as { crypto?: { randomUUID?: () => string } }).crypto
+      : undefined;
   if (cryptoObject?.randomUUID) return cryptoObject.randomUUID();
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (character) => {
     const value = Math.floor(Math.random() * 16);

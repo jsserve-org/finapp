@@ -1,5 +1,6 @@
 import * as SQLite from "expo-sqlite";
 import { recurringDateToISO } from "./format";
+import { uuid } from "./ids";
 import type {
   Account,
   RecurringPayment,
@@ -137,7 +138,7 @@ export function enqueue(operation: Omit<QueuedOperation, "mutationId" | "created
        action = excluded.action,
        value = excluded.value,
        base_version = excluded.base_version`,
-    operation.mutationId ?? crypto.randomUUID(),
+    operation.mutationId ?? uuid(),
     operation.entity,
     operation.action,
     operation.entityId,
