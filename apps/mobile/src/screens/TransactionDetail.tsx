@@ -203,7 +203,7 @@ export default function TransactionDetailScreen() {
               subtitle={`next ${formatDate(linkedBill.nextDate)}`}
               value={formatMoney(-linkedBill.amountMinor, linkedBill.currency)}
               valueColor={palette.label}
-              onPress={() => router.push({ pathname: "/(tabs)/(activity)/bill/[id]", params: { id: linkedBill.id } } as never)}
+              onPress={() => router.push({ pathname: "/activity/bill/[id]", params: { id: linkedBill.id } } as never)}
             />
             {!editing ? (
               <Row

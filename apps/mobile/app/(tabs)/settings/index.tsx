@@ -76,8 +76,8 @@ export default function SettingsScreen() {
           ) : (
             <>
               <InfoRow label="Account" value={username ?? "—"} />
-              <Row icon="server" title="Server" subtitle={apiUrl} onPress={() => router.push("/(tabs)/settings/server" as never)} />
-              <Row icon="key" title="API keys" subtitle="For agents and automations" onPress={() => router.push("/(tabs)/settings/api-keys" as never)} />
+              <Row icon="server" title="Server" subtitle={apiUrl} onPress={() => router.push("/settings/server" as never)} />
+              <Row icon="key" title="API keys" subtitle="For agents and automations" onPress={() => router.push("/settings/api-keys" as never)} />
               <InfoRow label="Status" value={health ?? (isOffline ? "Offline" : "Up to date")} />
               <InfoRow label="Last sync" value={lastSyncedAt ? formatDate(lastSyncedAt) : "—"} />
               <InfoRow label="Pending changes" value={String(pendingCount)} />

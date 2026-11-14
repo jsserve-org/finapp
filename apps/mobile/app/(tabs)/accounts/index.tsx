@@ -84,7 +84,7 @@ export default function AccountsScreen() {
                 subtitle={`${account.institution} · ${accountKindLabel(account.kind)}`}
                 value={hidden ? "••••" : formatMoney(account.balance.amountMinor, account.balance.currency)}
                 valueColor={palette.label}
-                onPress={() => router.push({ pathname: "/(tabs)/(accounts)/[id]", params: { id: account.id } } as never)}
+                onPress={() => router.push({ pathname: "/accounts/[id]", params: { id: account.id } } as never)}
               />
             ))
           )}

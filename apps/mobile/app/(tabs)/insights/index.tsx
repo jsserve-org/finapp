@@ -140,7 +140,7 @@ export default function InsightsScreen() {
                 valueColor={palette.label}
                 onPress={() =>
                   router.push({
-                    pathname: "/(tabs)/(insights)/category/[category]",
+                    pathname: "/insights/category/[category]",
                     params: {
                       category: item.category,
                       currency: item.currency,
@@ -158,7 +158,7 @@ export default function InsightsScreen() {
             icon="investment"
             title="Portfolio"
             subtitle={data.holdings.length === 0 ? "Add your first stock trade" : `${data.holdings.length} holdings`}
-            onPress={() => router.push("/(tabs)/(insights)/portfolio" as never)}
+            onPress={() => router.push("/insights/portfolio" as never)}
           />
           {portfolioTotals(data.holdings).map((total) => (
             <Row key={total.currency} title={total.currency} value={shown(total.amount, total.currency)} valueColor={palette.label} />

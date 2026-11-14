@@ -18,15 +18,15 @@ function NativeTabBar() {
   const palette = useTheme();
   return (
     <NativeTabs tintColor={palette.blue}>
-      <NativeTabs.Trigger name="(insights)">
+      <NativeTabs.Trigger name="insights">
         <NativeLabel>Insights</NativeLabel>
         <NativeIcon sf="chart.bar.fill" drawable="custom_android_drawable" />
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="(accounts)">
+      <NativeTabs.Trigger name="accounts">
         <NativeLabel>Accounts</NativeLabel>
         <NativeIcon sf="building.columns.fill" drawable="custom_android_drawable" />
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="(activity)">
+      <NativeTabs.Trigger name="activity">
         <NativeLabel>Activity</NativeLabel>
         <NativeIcon sf="list.bullet" drawable="custom_android_drawable" />
       </NativeTabs.Trigger>
@@ -50,21 +50,21 @@ function ClassicTabBar() {
       }}
     >
       <Tabs.Screen
-        name="(insights)"
+        name="insights"
         options={{
           title: "Insights",
           tabBarIcon: ({ color, size }) => <Ionicons name="bar-chart" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
-        name="(accounts)"
+        name="accounts"
         options={{
           title: "Accounts",
           tabBarIcon: ({ color, size }) => <Ionicons name="business" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
-        name="(activity)"
+        name="activity"
         options={{
           title: "Activity",
           tabBarIcon: ({ color, size }) => <Ionicons name="receipt" color={color} size={size} />,

@@ -52,7 +52,7 @@ export default function LoginScreen() {
       const response = await authenticate(apiUrl, username.trim(), password, convexUrl, register);
       await session.login(response, apiUrl.replace(/\/$/, ""), convexUrl.replace(/\/$/, ""));
       success();
-      router.replace("/");
+      router.replace("/insights");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not reach the server.");
     } finally {

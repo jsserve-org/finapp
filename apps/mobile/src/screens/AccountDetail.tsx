@@ -135,7 +135,7 @@ export default function AccountDetailScreen() {
                 subtitle={`${bill.isActive ? "" : "Paused · "}next ${formatDate(bill.nextDate)}`}
                 value={shown(-bill.amountMinor, bill.currency)}
                 valueColor={palette.label}
-                onPress={() => router.push({ pathname: "/(tabs)/(activity)/bill/[id]", params: { id: bill.id } } as never)}
+                onPress={() => router.push({ pathname: "/activity/bill/[id]", params: { id: bill.id } } as never)}
               />
             ))}
           </Section>
@@ -160,7 +160,7 @@ export default function AccountDetailScreen() {
                   value={shown(amountMinor, currency)}
                   valueColor={amountMinor >= 0 ? palette.green : palette.label}
                   onPress={() =>
-                    router.push({ pathname: "/(tabs)/(accounts)/transaction/[id]", params: { id: transaction.id } } as never)
+                    router.push({ pathname: "/accounts/transaction/[id]", params: { id: transaction.id } } as never)
                   }
                 />
               );

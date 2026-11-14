@@ -31,12 +31,13 @@ function RootNavigator() {
     if (loading) return;
     const onLogin = segments[0] === "login";
     if (!canUseApp && !onLogin) router.replace("/login");
-    if (canUseApp && onLogin) router.replace("/");
+    if (canUseApp && onLogin) router.replace("/insights");
   }, [canUseApp, loading, router, segments]);
 
   return (
     <Stack screenOptions={{ headerBackButtonDisplayMode: "minimal" }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="login" options={{ headerShown: false }} />
       <Stack.Screen name="add/money" options={sheetOptions("Spend money")} />
       <Stack.Screen name="add/transfer" options={sheetOptions("Transfer")} />

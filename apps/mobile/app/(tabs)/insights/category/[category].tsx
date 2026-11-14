@@ -58,7 +58,7 @@ export default function CategoryScreen() {
                 value={formatMoney(transaction.amount.amountMinor, transaction.amount.currency)}
                 valueColor={palette.red}
                 onPress={() =>
-                  router.push({ pathname: "/(tabs)/(insights)/transaction/[id]", params: { id: transaction.id } } as never)
+                  router.push({ pathname: "/insights/transaction/[id]", params: { id: transaction.id } } as never)
                 }
               />
             ))

@@ -154,7 +154,7 @@ export default function ActivityScreen() {
                 subtitle={`${bill.isActive ? "" : "Paused · "}${frequencyLabel(bill.frequency)} · next ${formatDate(bill.nextDate, "short")}`}
                 value={shown(-bill.amountMinor, bill.currency)}
                 valueColor={palette.label}
-                onPress={() => router.push({ pathname: "/(tabs)/(activity)/bill/[id]", params: { id: bill.id } } as never)}
+                onPress={() => router.push({ pathname: "/activity/bill/[id]", params: { id: bill.id } } as never)}
               />
             ))
           )}
@@ -203,7 +203,7 @@ export default function ActivityScreen() {
                   value={shown(amountMinor, currency)}
                   valueColor={amountMinor >= 0 ? palette.green : palette.label}
                   onPress={() =>
-                    router.push({ pathname: "/(tabs)/(activity)/transaction/[id]", params: { id: transaction.id } } as never)
+                    router.push({ pathname: "/activity/transaction/[id]", params: { id: transaction.id } } as never)
                   }
                 />
               );
