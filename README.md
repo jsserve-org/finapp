@@ -1,16 +1,16 @@
 # Ledgerly
 
-An offline-first finance app with native SwiftUI iOS, React Native Android, a Bun authentication/bank gateway, and a self-hosted Convex sync layer.
+An offline-first finance app with one Expo (React Native) client for iPhone and Android, a Bun authentication/bank gateway, and a self-hosted Convex sync layer. The original native SwiftUI app stays in `apps/ios` as a reference; the Expo app in `apps/mobile` is the shipping client for both platforms.
 
-Both apps can be used without a server account. Users can continue locally, create manual accounts immediately, and enable self-hosted sync later from Settings. Local account data is stored in SwiftData on iOS and SQLite on Android; an outbox uploads locally created accounts after the user opts into sync.
+Both platforms share the same client and can be used without a server account. Users can continue locally, create manual accounts immediately, and enable self-hosted sync later from Settings. Local data lives in SQLite on both platforms; an outbox uploads locally created records after the user opts into sync.
 
 ## Services
 
 ```text
-iOS / Android ─┬─ HTTPS :3000  Bun API (login and bank integrations)
-               └─ WSS   :3210  Convex (realtime sync)
-                                  └─ persistent convex-data volume
-Admin only ────── HTTPS :6791  Convex dashboard
+Expo iOS/Android ─┬─ HTTPS :3000  Bun API (login and bank integrations)
+                  └─ WSS   :3210  Convex (realtime sync)
+                                    └─ persistent convex-data volume
+Admin only ─────── HTTPS :6791  Convex dashboard
 ```
 
 Postgres and Drizzle have been removed. Convex now owns users, opaque sessions, accounts, transactions, sync changes, mutation deduplication, and automation status. Passwords are processed by the Bun gateway with Argon2id; Convex stores only the resulting salted hash. Mobile devices store only an opaque session token in Keychain/SecureStore, together with the server-issued API URL, Convex URL, sync-session ID, and local sync cursor.
