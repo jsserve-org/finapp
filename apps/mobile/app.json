@@ -15,13 +15,15 @@
     },
     "ios": {
       "bundleIdentifier": "com.ledgerly.app",
-      "buildNumber": "42",
+      "buildNumber": "43",
       "supportsTablet": false,
       "infoPlist": {
         "NSLocalNetworkUsageDescription": "Ledgerly connects to your self-hosted server on the local network to sync your financial data.",
         "NSPhotoLibraryUsageDescription": "Ledgerly reads only the payment screenshot you explicitly choose. OCR stays on this iPhone.",
         "NSFaceIDUsageDescription": "Ledgerly uses Face ID to unlock your financial information on this iPhone.",
-        "NSAppTransportSecurity": { "NSAllowsLocalNetworking": true }
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        }
       }
     },
     "android": {
@@ -35,7 +37,12 @@
     "plugins": [
       "expo-router",
       "expo-sqlite",
-      ["expo-secure-store", { "faceIDPermission": "Ledgerly uses Face ID to unlock your financial information on this iPhone." }],
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": "Ledgerly uses Face ID to unlock your financial information on this iPhone."
+        }
+      ],
       "@react-native-community/datetimepicker"
     ]
   }
