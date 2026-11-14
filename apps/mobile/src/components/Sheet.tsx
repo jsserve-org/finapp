@@ -1,4 +1,5 @@
 import { Stack } from "expo-router";
+import { BlurView } from "expo-blur";
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../theme";
@@ -35,14 +36,21 @@ export function SheetScreen({
       />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView
+          contentInsetAdjustmentBehavior="automatic"
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
+          automaticallyAdjustKeyboardInsets
         >
           {children}
         </ScrollView>
         {footer ? (
-          <View style={[styles.footer, { backgroundColor: palette.card, borderColor: palette.separator, paddingBottom: insets.bottom + 14 }]}>
+          <View style={[styles.footer, { borderColor: palette.separator, paddingBottom: insets.bottom + 14 }]}>
+            {Platform.OS === "ios" ? (
+              <BlurView intensity={90} tint="systemChromeMaterial" style={StyleSheet.absoluteFill} />
+            ) : (
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.card }]} />
+            )}
             {footer}
           </View>
         ) : null}
@@ -52,6 +60,6 @@ export function SheetScreen({
 }
 
 const styles = StyleSheet.create({
-  content: { padding: 16, gap: 20, paddingBottom: 28 },
+  content: { padding: 16, paddingTop: 16, gap: 20, paddingBottom: 28 },
   footer: { paddingHorizontal: 16, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
 });

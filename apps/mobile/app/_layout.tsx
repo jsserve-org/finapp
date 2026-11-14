@@ -38,7 +38,7 @@ function RootNavigator() {
     <Stack screenOptions={{ headerBackButtonDisplayMode: "minimal" }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="login" options={{ headerShown: false }} />
+      <Stack.Screen name="login" />
       <Stack.Screen name="add/money" options={sheetOptions("Spend money")} />
       <Stack.Screen name="add/transfer" options={sheetOptions("Transfer")} />
       <Stack.Screen name="add/quick-spend" options={sheetOptions("Quick spend")} />

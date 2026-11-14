@@ -1,21 +1,13 @@
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useMemo, useState } from "react";
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import {
-  cachedAccounts,
-  cachedRecurringPayments,
-  cachedTransactions,
-  getCached,
-} from "../db";
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { cachedAccounts, cachedRecurringPayments, getCached } from "../db";
 import { formatDate, formatMoney } from "../format";
 import { deleteTransaction, updateTransaction } from "../actions";
 import { transactionPresentation } from "../insights";
 import { useCacheVersion } from "../store";
 import { useTheme } from "../theme";
-import { GlassSurface } from "../components/Glass";
-import { DestructiveButton, PrimaryButton, SecondaryButton } from "../components/Buttons";
-import { CategoryPicker } from "../components/Fields";
-import { FormField } from "../components/Fields";
+import { CategoryPicker, FormField } from "../components/Fields";
 import { EmptyState, InfoRow, Row, Section, Screen } from "../components/List";
 import { Icon, paymentIconFor } from "../components/Icon";
 import { success, warning } from "../haptics";
@@ -34,10 +26,7 @@ export default function TransactionDetailScreen() {
   const transaction = useMemo(() => getCached<Transaction>("transaction", id), [id, version]);
   const account = useMemo(() => cachedAccounts().find((item) => item.id === transaction?.accountId), [transaction, version]);
   const bills = useMemo(() => cachedRecurringPayments(), [version]);
-  const linkedBill = useMemo(
-    () => bills.find((bill) => bill.id === transaction?.recurringPaymentId),
-    [bills, transaction],
-  );
+  const linkedBill = useMemo(() => bills.find((bill) => bill.id === transaction?.recurringPaymentId), [bills, transaction]);
   const transferAccount = useMemo(
     () => cachedAccounts().find((item) => item.id === transaction?.transferAccountId),
     [transaction, version],
@@ -47,12 +36,14 @@ export default function TransactionDetailScreen() {
     return (
       <Screen>
         <Stack.Screen options={{ title: "Transaction" }} />
-        <EmptyState icon="activity" title="Transaction not found" message="It may have been deleted on another device." />
+        <EmptyState icon="activity" title="Transaction not found" message={`It may have been deleted on another device. (${String(id)})`} />
       </Screen>
     );
   }
 
   const { amountMinor, currency, awaitingSettlement } = transactionPresentation(transaction);
+  const tone = amountMinor >= 0 ? palette.green : palette.red;
+
   const startEditing = () => {
     setDescription(transaction.description);
     setCategory(transaction.category ?? "Uncategorized");
@@ -66,24 +57,18 @@ export default function TransactionDetailScreen() {
   };
 
   const confirmDelete = () => {
-    Alert.alert(
-      transaction.transferId ? "Delete transfer?" : "Delete transaction?",
-      transaction.transferId
-        ? "Both sides of the transfer are removed and the balances are restored."
-        : "The account balance is restored and the deletion syncs to other devices.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => {
-            deleteTransaction(transaction.id);
-            warning();
-            router.back();
-          },
+    Alert.alert("Delete this transaction?", "The account balance will be adjusted to remove this transaction.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => {
+          deleteTransaction(transaction.id);
+          warning();
+          router.back();
         },
-      ],
-    );
+      },
+    ]);
   };
 
   const sourceLabel = (() => {
@@ -106,21 +91,21 @@ export default function TransactionDetailScreen() {
     }
   })();
 
+  const purposeLabel =
+    transaction.expensePurpose === "school" ? "School" : transaction.expensePurpose === "someoneElse" ? "Someone else" : "Personal";
+
   return (
     <Screen>
       <Stack.Screen
         options={{
           title: "Transaction",
+          headerLargeTitle: false,
           headerRight: () =>
             editing ? (
               <Pressable onPress={save} hitSlop={10}>
                 <Text style={{ color: palette.blue, fontSize: 17, fontWeight: "600" }}>Save</Text>
               </Pressable>
-            ) : (
-              <Pressable onPress={startEditing} hitSlop={10}>
-                <Text style={{ color: palette.blue, fontSize: 17 }}>Edit</Text>
-              </Pressable>
-            ),
+            ) : undefined,
           headerLeft: editing
             ? () => (
                 <Pressable onPress={() => setEditing(false)} hitSlop={10}>
@@ -130,101 +115,89 @@ export default function TransactionDetailScreen() {
             : undefined,
         }}
       />
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <GlassSurface style={styles.hero}>
-          <View style={[styles.heroIcon, { backgroundColor: palette.fill }]}>
-            <Icon
-              name={paymentIconFor(transaction.description, transaction.category, amountMinor)}
-              size={22}
-              color={amountMinor >= 0 ? palette.green : palette.red}
-            />
-          </View>
-          <Text style={[styles.heroValue, { color: amountMinor >= 0 ? palette.green : palette.label }]}>
-            {formatMoney(amountMinor, currency)}
-          </Text>
-          <Text style={[styles.heroTitle, { color: palette.label }]}>{transaction.description}</Text>
-          <Text style={[styles.heroSubtitle, { color: palette.secondaryLabel }]}>
-            {formatDate(transaction.bookedAt)}
-            {account ? ` · ${account.name}` : ""}
-          </Text>
-          {awaitingSettlement ? (
-            <View style={[styles.notice, { backgroundColor: palette.fill }]}>
-              <Icon name="info" size={14} color={palette.secondaryLabel} />
-              <Text style={{ color: palette.secondaryLabel, fontSize: 13 }}>
-                Bank charge pending. Your later import provides the final amount.
-              </Text>
-            </View>
-          ) : null}
-        </GlassSurface>
+      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <View style={styles.hero}>
+          <Icon name={paymentIconFor(transaction.description, transaction.category, amountMinor)} size={38} color={tone} />
+          <Text style={[styles.direction, { color: tone }]}>{amountMinor >= 0 ? "Money in" : "Money out"}</Text>
+          <Text style={[styles.amount, { color: tone }]}>{formatMoney(Math.abs(amountMinor), currency)}</Text>
+        </View>
 
         {editing ? (
           <Section title="Edit">
-            <FormField label="Description" value={description} onChangeText={setDescription} autoCapitalize="sentences" />
+            <FormField label="Description" value={description} onChangeText={setDescription} />
             <CategoryPicker value={category} onChange={setCategory} />
-            <Row
-              title="Recurring bill"
-              value={linkedBill?.name ?? "None"}
-              onPress={() => setBillPickerVisible(true)}
+            <Row title="Recurring bill" value={linkedBill?.name ?? "Not linked"} onPress={() => setBillPickerVisible(true)} />
+          </Section>
+        ) : null}
+
+        <Section title="Payment details">
+          <InfoRow label="Description" value={transaction.description} />
+          {transaction.originalAmount ? (
+            <>
+              <InfoRow
+                label="Original purchase"
+                value={formatMoney(Math.abs(transaction.originalAmount.amountMinor), transaction.originalAmount.currency)}
+              />
+              <InfoRow label="Bank settlement" value={awaitingSettlement ? "Waiting for bank" : formatMoney(Math.abs(transaction.amount.amountMinor), transaction.amount.currency)} />
+            </>
+          ) : null}
+          <InfoRow label="Category" value={transaction.category ?? "Uncategorized"} />
+          <InfoRow label="Purpose" value={purposeLabel} />
+          <InfoRow label="Direction" value={amountMinor < 0 ? "Money out" : "Money in"} />
+          <Row
+            title="Status"
+            icon={transaction.pending ? "clock" : "checkCircle"}
+            iconColor={transaction.pending ? palette.orange : palette.green}
+            value={transaction.pending ? "Pending" : "Completed"}
+            valueColor={transaction.pending ? palette.orange : palette.green}
+          />
+          <InfoRow label="Date" value={formatDate(transaction.bookedAt)} />
+        </Section>
+
+        <Section title="Account">
+          <InfoRow label="Account" value={account?.name ?? "Unknown account"} />
+          {account?.institution ? <InfoRow label="Institution" value={account.institution} /> : null}
+          <InfoRow label="Currency" value={transaction.amount.currency} />
+        </Section>
+
+        {transaction.source === "transfer" ? (
+          <Section title="Transfer">
+            <InfoRow
+              label={transaction.transferDirection === "outgoing" ? "To" : "From"}
+              value={transferAccount?.name ?? "Unknown account"}
             />
           </Section>
         ) : null}
 
-        <Section title="Details">
-          <InfoRow label="Category" value={transaction.category ?? "Uncategorized"} />
-          <InfoRow label="Date" value={formatDate(transaction.bookedAt)} />
-          {account ? <InfoRow label="Account" value={account.name} /> : null}
-          <InfoRow label="Source" value={sourceLabel} />
-          {transaction.originalAmount ? (
-            <InfoRow
-              label="Original"
-              value={formatMoney(transaction.originalAmount.amountMinor, transaction.originalAmount.currency)}
-            />
-          ) : null}
-          {transaction.expensePurpose ? (
-            <InfoRow
-              label="For"
-              value={transaction.expensePurpose === "school" ? "School" : transaction.expensePurpose === "someoneElse" ? "Someone else" : "Personal"}
-            />
-          ) : null}
-          {transaction.reimbursementStatus ? (
-            <InfoRow label="Reimbursement" value={transaction.reimbursementStatus === "pending" ? "Expected" : "Settled"} />
-          ) : null}
-          {transferAccount ? (
-            <InfoRow label={transaction.transferDirection === "outgoing" ? "To" : "From"} value={transferAccount.name} />
-          ) : null}
-          <InfoRow label="Pending" value={transaction.pending ? "Yes" : "No"} />
+        <Section
+          title="Recurring bill"
+          footer="Ledgerly matches the original purchase currency when available. Foreign-currency bills can also be linked manually."
+        >
+          <Row
+            icon="bill"
+            title="Recurring bill"
+            value={linkedBill?.name ?? "Not linked"}
+            valueColor={linkedBill ? palette.label : palette.secondaryLabel}
+            onPress={() => setBillPickerVisible(true)}
+          />
         </Section>
 
-        {linkedBill ? (
-          <Section title="Recurring bill">
-            <Row
-              icon="bill"
-              title={linkedBill.name}
-              subtitle={`next ${formatDate(linkedBill.nextDate)}`}
-              value={formatMoney(-linkedBill.amountMinor, linkedBill.currency)}
-              valueColor={palette.label}
-              onPress={() => router.push({ pathname: "/activity/bill/[id]", params: { id: linkedBill.id } } as never)}
-            />
-            {!editing ? (
-              <Row
-                icon="close"
-                iconColor={palette.red}
-                title="Unlink bill"
-                destructive
-                onPress={() => {
-                  updateTransaction(transaction.id, { recurringPaymentId: null });
-                  success();
-                }}
-              />
-            ) : null}
-          </Section>
-        ) : (
-          <Section>
-            <Row icon="bill" title="Link to a recurring bill" onPress={() => setBillPickerVisible(true)} />
-          </Section>
-        )}
+        <Section title="Record information">
+          <InfoRow label="Source" value={sourceLabel} />
+          <InfoRow label="Last updated" value={formatDate(transaction.updatedAt)} />
+          <View style={styles.idBlock}>
+            <Text style={[styles.idLabel, { color: palette.secondaryLabel }]}>Transaction ID</Text>
+            <Text selectable style={[styles.idValue, { color: palette.label }]}>
+              {transaction.id}
+            </Text>
+          </View>
+        </Section>
 
-        <DestructiveButton title="Delete transaction" onPress={confirmDelete} />
+        <Section>
+          <Row icon="edit" iconColor={palette.blue} title="Edit transaction" onPress={startEditing} showChevron={false} />
+          <Row icon="trash" iconColor={palette.red} title="Delete transaction" destructive onPress={confirmDelete} showChevron={false} />
+        </Section>
+        <View style={{ height: 28 }} />
       </ScrollView>
 
       <Modal visible={billPickerVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setBillPickerVisible(false)}>
@@ -236,33 +209,25 @@ export default function TransactionDetailScreen() {
             </Pressable>
           </View>
           <ScrollView>
-            <Pressable
+            <Row
+              title="Not linked"
+              accessory={!transaction.recurringPaymentId ? <Icon name="checkmark" size={16} color={palette.blue} /> : undefined}
               onPress={() => {
                 updateTransaction(transaction.id, { recurringPaymentId: null });
                 setBillPickerVisible(false);
               }}
-              style={[styles.modalRow, { borderColor: palette.separator }]}
-            >
-              <Text style={{ color: palette.label, fontSize: 17 }}>None</Text>
-              {!transaction.recurringPaymentId ? <Icon name="checkmark" size={16} color={palette.blue} /> : null}
-            </Pressable>
+            />
             {bills.map((bill) => (
-              <Pressable
+              <Row
                 key={bill.id}
+                title={bill.name}
+                subtitle={`${formatMoney(bill.amountMinor, bill.currency)} · next ${formatDate(bill.nextDate)}`}
+                accessory={transaction.recurringPaymentId === bill.id ? <Icon name="checkmark" size={16} color={palette.blue} /> : undefined}
                 onPress={() => {
                   updateTransaction(transaction.id, { recurringPaymentId: bill.id });
                   setBillPickerVisible(false);
                 }}
-                style={[styles.modalRow, { borderColor: palette.separator }]}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: palette.label, fontSize: 17 }}>{bill.name}</Text>
-                  <Text style={{ color: palette.secondaryLabel, fontSize: 13 }}>
-                    {formatMoney(bill.amountMinor, bill.currency)} · next {formatDate(bill.nextDate)}
-                  </Text>
-                </View>
-                {transaction.recurringPaymentId === bill.id ? <Icon name="checkmark" size={16} color={palette.blue} /> : null}
-              </Pressable>
+              />
             ))}
           </ScrollView>
         </Screen>
@@ -272,14 +237,13 @@ export default function TransactionDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { padding: 16, gap: 22, paddingBottom: 120 },
-  hero: { padding: 20, gap: 6, alignItems: "center" },
-  heroIcon: { width: 44, height: 44, borderRadius: 14, alignItems: "center", justifyContent: "center", marginBottom: 6 },
-  heroValue: { fontSize: 36, fontWeight: "700", fontVariant: ["tabular-nums"] },
-  heroTitle: { fontSize: 17, fontWeight: "600", textAlign: "center" },
-  heroSubtitle: { fontSize: 13, textAlign: "center" },
-  notice: { flexDirection: "row", gap: 6, alignItems: "center", paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, marginTop: 10 },
+  content: { padding: 16, paddingTop: 0, gap: 22, paddingBottom: 120 },
+  hero: { alignItems: "center", gap: 6, paddingVertical: 18 },
+  direction: { fontSize: 17, fontWeight: "600" },
+  amount: { fontSize: 34, fontWeight: "700", fontVariant: ["tabular-nums"] },
+  idBlock: { paddingHorizontal: 16, paddingVertical: 10, gap: 4 },
+  idLabel: { fontSize: 12 },
+  idValue: { fontSize: 12, fontFamily: "Menlo" },
   modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 20 },
   modalTitle: { fontSize: 20, fontWeight: "700" },
-  modalRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingVertical: 14, borderTopWidth: StyleSheet.hairlineWidth },
 });

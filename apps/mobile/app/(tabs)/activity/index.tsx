@@ -8,7 +8,6 @@ import { useCacheVersion, useHiddenAmounts } from "../../../src/store";
 import { useSession } from "../../../src/session";
 import { useSync } from "../../../src/sync";
 import { useTheme } from "../../../src/theme";
-import { PrimaryButton, SecondaryButton } from "../../../src/components/Buttons";
 import { DateField } from "../../../src/components/DateField";
 import { EmptyState, Row, Section, Screen } from "../../../src/components/List";
 import { Icon, paymentIconFor } from "../../../src/components/Icon";
@@ -128,16 +127,31 @@ export default function ActivityScreen() {
         }}
       />
       <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl refreshing={isSyncing} onRefresh={() => void refresh()} enabled={token != null} tintColor={palette.secondaryLabel} />
         }
       >
-        <View style={styles.quickActions}>
-          <PrimaryButton title="Spend money" icon="plus" tone="blue" onPress={() => router.push("/add/money?direction=out" as never)} />
-          <SecondaryButton title="Add recurring bill" icon="bill" onPress={() => router.push("/add/bill" as never)} />
-          <Text style={[styles.caption, { color: palette.secondaryLabel }]}>
+        <View style={{ gap: 8 }}>
+          <View style={styles.quickActions}>
+            <Pressable
+              onPress={() => router.push("/add/money?direction=out" as never)}
+              style={({ pressed }) => [styles.primaryButton, { backgroundColor: "#0052AD" }, pressed && { opacity: 0.85 }]}
+            >
+              <Icon name="plus" size={17} color="#FFFFFF" weight="bold" />
+              <Text style={styles.primaryButtonText}>Spend money</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => router.push("/add/bill" as never)}
+              style={({ pressed }) => [styles.secondaryButton, { backgroundColor: palette.card }, pressed && { opacity: 0.7 }]}
+            >
+              <Icon name="bill" size={17} color={palette.label} />
+              <Text style={[styles.secondaryButtonText, { color: palette.label }]}>Add recurring bill</Text>
+            </Pressable>
+          </View>
+          <Text style={[styles.footer, { color: palette.secondaryLabel }]}>
             Expenses are one-time transactions. Recurring bills repeat on a schedule.
           </Text>
         </View>
@@ -159,23 +173,16 @@ export default function ActivityScreen() {
             ))
           )}
           {bills.length > 3 ? (
-            <Pressable onPress={() => setShowAllBills(!showAllBills)} style={styles.moreRow}>
-              <Text style={{ color: palette.blue, fontSize: 17 }}>
-                {showAllBills ? "Show fewer" : `Show all ${bills.length}`}
-              </Text>
-            </Pressable>
+            <Row title={showAllBills ? "Show fewer" : `Show all ${bills.length}`} onPress={() => setShowAllBills(!showAllBills)} />
           ) : null}
         </Section>
 
         <Section
           title="Bills & transactions"
           headerAccessory={
-            <Pressable onPress={pickFilter} style={styles.filterButton}>
-              <Icon name="calendar" size={12} color={palette.blue} />
-              <Text style={{ color: palette.blue, fontSize: 13, fontWeight: "600" }}>
-                {filter === "custom"
-                  ? `${formatDate(customStart, "short")}–${formatDate(customEnd, "short")}`
-                  : filterLabels[filter]}
+            <Pressable onPress={pickFilter} style={styles.filterButton} hitSlop={8}>
+              <Text style={{ color: palette.blue, fontSize: 17 }}>
+                {filter === "custom" ? `${formatDate(customStart, "short")}–${formatDate(customEnd, "short")}` : filterLabels[filter]}
               </Text>
             </Pressable>
           }
@@ -185,7 +192,7 @@ export default function ActivityScreen() {
             <EmptyState icon="activity" title="No activity" message="Transactions you add or sync will appear here." />
           ) : visible.length === 0 ? (
             <EmptyState
-              icon="search"
+              icon={search ? "search" : "calendar"}
               title={search ? "No search results" : "No transactions in this range"}
               message={search ? "Try a different search or date range." : "Choose a wider date range to see older activity."}
             />
@@ -202,19 +209,16 @@ export default function ActivityScreen() {
                   subtitle={`${amountMinor >= 0 ? "Received" : "Spent"} · ${transaction.category ?? "Uncategorized"}${awaitingSettlement ? " · bank charge pending" : ""}${bill ? ` · ${bill.name}` : ""}`}
                   value={shown(amountMinor, currency)}
                   valueColor={amountMinor >= 0 ? palette.green : palette.label}
-                  onPress={() =>
-                    router.push({ pathname: "/activity/transaction/[id]", params: { id: transaction.id } } as never)
-                  }
+                  onPress={() => router.push({ pathname: "/activity/transaction/[id]", params: { id: transaction.id } } as never)}
                 />
               );
             })
           )}
           {visible.length > limit ? (
-            <Pressable onPress={() => setLimit(limit + 50)} style={styles.moreRow}>
-              <Text style={{ color: palette.blue, fontSize: 17 }}>Show 50 more</Text>
-            </Pressable>
+            <Row title="Show 50 more" onPress={() => setLimit(limit + 50)} />
           ) : null}
         </Section>
+        <View style={{ height: 28 }} />
       </ScrollView>
 
       <Modal visible={customVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setCustomVisible(false)}>
@@ -242,10 +246,13 @@ export default function ActivityScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { padding: 16, gap: 22, paddingBottom: 120 },
+  content: { padding: 16, paddingTop: 0, gap: 22, paddingBottom: 120 },
   quickActions: { gap: 10 },
-  caption: { fontSize: 13, lineHeight: 18, paddingHorizontal: 4 },
-  moreRow: { alignItems: "center", paddingVertical: 14 },
+  footer: { fontSize: 13, lineHeight: 18 },
+  primaryButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, height: 50, borderRadius: 12 },
+  primaryButtonText: { color: "#FFFFFF", fontSize: 17, fontWeight: "600" },
+  secondaryButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, height: 50, borderRadius: 12 },
+  secondaryButtonText: { fontSize: 17, fontWeight: "600" },
   filterButton: { flexDirection: "row", alignItems: "center", gap: 5 },
   modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 20 },
   modalTitle: { fontSize: 20, fontWeight: "700" },

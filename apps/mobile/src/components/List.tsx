@@ -1,8 +1,20 @@
-import { Children, Fragment } from "react";
+import { Children, Fragment, isValidElement } from "react";
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
-import { useTheme, type Palette } from "../theme";
+import { useTheme } from "../theme";
 import { Icon, type IconName } from "./Icon";
 import { hairline } from "./Glass";
+
+// iOS 26 grouped list metrics: larger, sentence-case section titles, generous
+// rounded cards, and plain SF Symbols (no icon chips).
+const metrics = {
+  radius: 26,
+  inset: 16,
+  title: 17,
+  subtitle: 15,
+  value: 17,
+  icon: 21,
+  minRow: 50,
+};
 
 export function Screen({ children, style }: { children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
   const palette = useTheme();
@@ -25,17 +37,25 @@ export function Section({
   const palette = useTheme();
   const items = Children.toArray(children).filter(Boolean);
   return (
-    <View style={[{ gap: 7 }, style]}>
+    <View style={[{ gap: 8 }, style]}>
       {(title || headerAccessory) && (
         <View style={styles.headerRow}>
-          {title ? <Text style={[styles.header, { color: palette.secondaryLabel }]}>{title.toUpperCase()}</Text> : <View />}
+          {title ? <Text style={[styles.header, { color: palette.label }]}>{title}</Text> : <View />}
           {headerAccessory}
         </View>
       )}
-      <View style={{ borderRadius: 22, backgroundColor: palette.card, overflow: "hidden" }}>
+      <View style={{ borderRadius: metrics.radius, backgroundColor: palette.card, overflow: "hidden" }}>
         {items.map((child, index) => (
           <Fragment key={index}>
-            {index > 0 && <View style={{ height: hairline, marginLeft: 16, backgroundColor: palette.separator }} />}
+            {index > 0 && (
+              <View
+                style={{
+                  height: hairline,
+                  marginLeft: isValidElement(child) && (child.props as { icon?: unknown }).icon ? metrics.inset + 33 : metrics.inset,
+                  backgroundColor: palette.separator,
+                }}
+              />
+            )}
             {child}
           </Fragment>
         ))}
@@ -56,6 +76,9 @@ export function Row({
   destructive,
   valueColor,
   disabled,
+  trailing,
+  showChevron = true,
+  titleColor,
 }: {
   title: string;
   subtitle?: string;
@@ -67,17 +90,16 @@ export function Row({
   destructive?: boolean;
   valueColor?: string;
   disabled?: boolean;
+  trailing?: React.ReactNode;
+  showChevron?: boolean;
+  titleColor?: string;
 }) {
   const palette = useTheme();
   const content = (
     <View style={[styles.row, disabled && { opacity: 0.45 }]}>
-      {icon ? (
-        <View style={[styles.iconWrap, { backgroundColor: palette.fill }]}>
-          <Icon name={icon} size={17} color={iconColor ?? palette.blue} />
-        </View>
-      ) : null}
+      {icon ? <Icon name={icon} size={metrics.icon} color={iconColor ?? palette.blue} /> : null}
       <View style={styles.grow}>
-        <Text numberOfLines={1} style={[styles.title, { color: destructive ? palette.red : palette.label }]}>
+        <Text numberOfLines={1} style={[styles.title, { color: titleColor ?? (destructive ? palette.red : palette.label) }]}>
           {title}
         </Text>
         {subtitle ? (
@@ -91,8 +113,9 @@ export function Row({
           {value}
         </Text>
       ) : null}
+      {trailing}
       {accessory}
-      {onPress ? <Icon name="chevronRight" size={13} color={palette.tertiaryLabel} /> : null}
+      {onPress && showChevron ? <Icon name="chevronRight" size={13} color={palette.tertiaryLabel} /> : null}
     </View>
   );
 
@@ -104,12 +127,43 @@ export function Row({
   );
 }
 
+/** Label on the left, secondary value on the right (SwiftUI's LabeledContent). */
 export function InfoRow({ label, value, valueColor }: { label: string; value: string; valueColor?: string }) {
   const palette = useTheme();
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, styles.minRow]}>
       <Text style={[styles.title, { color: palette.label, flex: 1 }]}>{label}</Text>
-      <Text style={[styles.value, { color: valueColor ?? palette.secondaryLabel }]}>{value}</Text>
+      <Text style={[styles.value, { color: valueColor ?? palette.secondaryLabel }]} numberOfLines={2}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+export function ValueRow({
+  label,
+  value,
+  emphasis,
+  valueColor,
+}: {
+  label: string;
+  value: string;
+  emphasis?: boolean;
+  valueColor?: string;
+}) {
+  const palette = useTheme();
+  return (
+    <View style={[styles.row, styles.minRow]}>
+      <Text style={[styles.title, { color: emphasis ? palette.secondaryLabel : palette.label, flex: 1 }]}>{label}</Text>
+      <Text
+        style={[
+          styles.value,
+          emphasis && { fontSize: 22, fontWeight: "700" },
+          { color: valueColor ?? (emphasis ? palette.label : palette.secondaryLabel) },
+        ]}
+      >
+        {value}
+      </Text>
     </View>
   );
 }
@@ -118,7 +172,7 @@ export function EmptyState({ icon, title, message, action }: { icon: IconName; t
   const palette = useTheme();
   return (
     <View style={styles.empty}>
-      <Icon name={icon} size={38} color={palette.tertiaryLabel} weight="regular" />
+      <Icon name={icon} size={40} color={palette.tertiaryLabel} weight="regular" />
       <Text style={[styles.emptyTitle, { color: palette.label }]}>{title}</Text>
       <Text style={[styles.emptyMessage, { color: palette.secondaryLabel }]}>{message}</Text>
       {action}
@@ -126,26 +180,38 @@ export function EmptyState({ icon, title, message, action }: { icon: IconName; t
   );
 }
 
-export function Badge({ text, palette }: { text: string; palette: Palette }) {
+export function Badge({ text }: { text: string }) {
+  const palette = useTheme();
   return (
-    <View style={[styles.badge, { backgroundColor: palette.fill }]}>
-      <Text style={{ color: palette.label, fontSize: 15, fontWeight: "600", fontVariant: ["tabular-nums"] }}>{text}</Text>
-    </View>
+    <Text style={{ color: palette.label, fontSize: metrics.value, fontWeight: "600", fontVariant: ["tabular-nums"] }}>
+      {text}
+    </Text>
   );
 }
 
 const styles = StyleSheet.create({
-  headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16 },
-  header: { fontSize: 13, fontWeight: "600", letterSpacing: 0.3 },
-  footer: { fontSize: 13, lineHeight: 18, paddingHorizontal: 16 },
-  row: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 11, minHeight: 48 },
-  iconWrap: { width: 30, height: 30, borderRadius: 8, alignItems: "center", justifyContent: "center" },
-  grow: { flex: 1, gap: 2 },
-  title: { fontSize: 17 },
-  subtitle: { fontSize: 13 },
-  value: { fontSize: 17, fontVariant: ["tabular-nums"] },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: metrics.inset,
+  },
+  header: { fontSize: 20, fontWeight: "700", letterSpacing: -0.2 },
+  footer: { fontSize: 13, lineHeight: 18, paddingHorizontal: metrics.inset },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: metrics.inset,
+    paddingVertical: 11,
+    minHeight: metrics.minRow,
+  },
+  minRow: { minHeight: 44, paddingVertical: 10 },
+  grow: { flex: 1, gap: 3 },
+  title: { fontSize: metrics.title },
+  subtitle: { fontSize: metrics.subtitle },
+  value: { fontSize: metrics.value, fontVariant: ["tabular-nums"] },
   empty: { alignItems: "center", gap: 8, paddingVertical: 44, paddingHorizontal: 24 },
   emptyTitle: { fontSize: 17, fontWeight: "600", marginTop: 4 },
   emptyMessage: { fontSize: 14, lineHeight: 19, textAlign: "center" },
-  badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
 });

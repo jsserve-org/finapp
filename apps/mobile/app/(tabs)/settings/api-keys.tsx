@@ -3,7 +3,6 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text } from "react-native";
 import { createAPIKey, listAPIKeys, revokeAPIKey, type APIKeySummary } from "../../../src/api";
 import { useSession } from "../../../src/session";
 import { useTheme } from "../../../src/theme";
-import { PrimaryButton } from "../../../src/components/Buttons";
 import { FormField } from "../../../src/components/Fields";
 import { Row, Section, Screen } from "../../../src/components/List";
 
@@ -74,11 +73,21 @@ export default function APIKeysScreen() {
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Section title="New key" footer="Create named, revocable keys for agents and automations. The secret is shown once.">
           <FormField label="Name" value={name} onChangeText={setName} placeholder="Automation" autoCapitalize="words" />
         </Section>
-        <PrimaryButton title={busy ? "Creating…" : "Create API key"} icon="key" disabled={busy || name.trim().length === 0} onPress={() => void create()} />
+        <Section>
+          <Row
+            icon="key"
+            title={busy ? "Creating…" : "Create API key"}
+            titleColor={busy || name.trim().length === 0 ? palette.tertiaryLabel : palette.blue}
+            showChevron={false}
+            onPress={() => {
+              if (!busy && name.trim().length > 0) void create();
+            }}
+          />
+        </Section>
 
         {created ? (
           <Section title="Copy this secret now">

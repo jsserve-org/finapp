@@ -42,7 +42,7 @@ export function FormField({
         secureTextEntry={secureTextEntry}
         multiline={multiline}
         autoFocus={autoFocus}
-        style={[styles.input, { color: palette.label }]}
+        style={[styles.input, label ? { textAlign: "right" } : null, { color: palette.label }]}
       />
     </View>
   );
@@ -238,7 +238,7 @@ export function CategoryPicker({
 
 const styles = StyleSheet.create({
   field: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingVertical: 12, minHeight: 50 },
-  fieldLabel: { fontSize: 17, minWidth: 92 },
+  fieldLabel: { fontSize: 17 },
   input: { flex: 1, fontSize: 17, paddingVertical: 2 },
   amountBlock: { alignItems: "center", gap: 10, paddingVertical: 18 },
   amountTitle: { fontSize: 15 },

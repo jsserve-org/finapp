@@ -6,7 +6,6 @@ import { formatDate, formatMoney } from "../format";
 import { deleteRecurringPayment, saveRecurringPayment } from "../actions";
 import { useCacheVersion, useHiddenAmounts } from "../store";
 import { useTheme } from "../theme";
-import { DestructiveButton, PrimaryButton } from "../components/Buttons";
 import { EmptyState, InfoRow, Row, Section, Screen } from "../components/List";
 import { frequencyLabel, type RecurringPayment } from "../types";
 import { warning } from "../haptics";
@@ -54,7 +53,7 @@ export default function BillDetailScreen() {
           ),
         }}
       />
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content}>
         <Section
           title="Subscription"
           footer="Due dates create pending expense records. A matching recorded payment replaces the estimate. Pending records do not change your account balance."
@@ -87,11 +86,13 @@ export default function BillDetailScreen() {
           )}
         </Section>
 
-        <PrimaryButton
-          title={payment.isActive ? "Pause bill" : "Resume bill"}
-          icon={payment.isActive ? "minusCircle" : "checkCircle"}
-          tone={payment.isActive ? "blue" : "green"}
-          onPress={() => {
+        <Section>
+          <Row
+            icon={payment.isActive ? "minusCircle" : "checkCircle"}
+            iconColor={payment.isActive ? palette.blue : palette.green}
+            title={payment.isActive ? "Pause bill" : "Resume bill"}
+            showChevron={false}
+            onPress={() => {
             saveRecurringPayment({
               id: payment.id,
               name: payment.name,
@@ -104,25 +105,29 @@ export default function BillDetailScreen() {
               isActive: !payment.isActive,
             });
           }}
-        />
-
-        <DestructiveButton
-          title="Delete recurring bill"
-          onPress={() =>
-            Alert.alert("Delete recurring bill?", "Linked payments stay in Activity; pending estimates are removed.", [
-              { text: "Cancel", style: "cancel" },
-              {
-                text: "Delete",
-                style: "destructive",
-                onPress: () => {
-                  deleteRecurringPayment(payment.id);
-                  warning();
-                  router.back();
+          />
+          <Row
+            icon="trash"
+            iconColor={palette.red}
+            title="Delete recurring bill"
+            destructive
+            showChevron={false}
+            onPress={() =>
+              Alert.alert("Delete recurring bill?", "Linked payments stay in Activity; pending estimates are removed.", [
+                { text: "Cancel", style: "cancel" },
+                {
+                  text: "Delete",
+                  style: "destructive",
+                  onPress: () => {
+                    deleteRecurringPayment(payment.id);
+                    warning();
+                    router.back();
+                  },
                 },
-              },
-            ])
-          }
-        />
+              ])
+            }
+          />
+        </Section>
       </ScrollView>
     </Screen>
   );

@@ -5,7 +5,6 @@ import { createAccount } from "../../src/actions";
 import { defaultCurrency, parseMinorUnits } from "../../src/format";
 import { accountKinds, type AccountKind } from "../../src/types";
 import { useTheme } from "../../src/theme";
-import { PrimaryButton } from "../../src/components/Buttons";
 import { CurrencyRow, FormField } from "../../src/components/Fields";
 import { Section } from "../../src/components/List";
 import { SheetScreen } from "../../src/components/Sheet";
@@ -44,7 +43,6 @@ export default function NewAccountSheet() {
           <Text style={{ color: canSave ? palette.blue : palette.tertiaryLabel, fontSize: 17, fontWeight: "600" }}>Save</Text>
         </Pressable>
       }
-      footer={<PrimaryButton title="Create account" icon="addCircle" disabled={!canSave} onPress={save} />}
     >
       <Section title="Account">
         <FormField label="Name" value={name} onChangeText={setName} placeholder="Main checking" />
