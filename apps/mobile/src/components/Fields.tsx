@@ -56,7 +56,7 @@ export function AmountHeader({
   onChangeCurrency,
   tone,
   currencyLocked,
-  autoFocus = false,
+  autoFocus = true,
 }: {
   title: string;
   amount: string;
