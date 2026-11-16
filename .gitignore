@@ -7,3 +7,5 @@ coverage/
 DerivedData/
 .expo/
 apps/android/.env
+apps/ios/build/
+*.ipa
