@@ -35,6 +35,7 @@
 		CA97A2EF1F499AC7C00B1EC7 /* AccountDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0106C64BF0BF3AFFB28671 /* AccountDetailView.swift */; };
 		D97B47F1B729F380F03D276D /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C47DE8DA5D1977EEE8DB432 /* KeychainStore.swift */; };
 		F00853AE958F2D78941F1003 /* APIKeysView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8E4CAC7A2A809EAAEBE71FD /* APIKeysView.swift */; };
+		F1C611688ED82210D21A515F /* QuickSpendTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFEDF76F9B18BDD04CDBC046 /* QuickSpendTests.swift */; };
 		F6A9329066866B96C200E684 /* QuickSpendView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05EB4B15F2ECD6A9F3473763 /* QuickSpendView.swift */; };
 		FF22C721D942DED66BB719E3 /* SyncEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0357F0A8C8E8410C8283C386 /* SyncEngineTests.swift */; };
 /* End PBXBuildFile section */
@@ -77,6 +78,7 @@
 		D8E4CAC7A2A809EAAEBE71FD /* APIKeysView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIKeysView.swift; sourceTree = "<group>"; };
 		DA0106C64BF0BF3AFFB28671 /* AccountDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountDetailView.swift; sourceTree = "<group>"; };
 		DFBC8BFF6BBF45BAC50DD36B /* ScreenshotSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotSync.swift; sourceTree = "<group>"; };
+		DFEDF76F9B18BDD04CDBC046 /* QuickSpendTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickSpendTests.swift; sourceTree = "<group>"; };
 		E0C42285F60A69C2A53C0989 /* LedgerlyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LedgerlyApp.swift; sourceTree = "<group>"; };
 		E30C53556FDFA179A07EC296 /* AppIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIcon.swift; sourceTree = "<group>"; };
 		ED7C885C03FE7BC27EC2A787 /* ScreenshotSyncSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotSyncSettingsView.swift; sourceTree = "<group>"; };
@@ -146,6 +148,7 @@
 			isa = PBXGroup;
 			children = (
 				63CDC298A57304DB8424CF6A /* AppPrivacyTests.swift */,
+				DFEDF76F9B18BDD04CDBC046 /* QuickSpendTests.swift */,
 				0357F0A8C8E8410C8283C386 /* SyncEngineTests.swift */,
 			);
 			path = LedgerlyTests;
@@ -236,6 +239,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				3D770461B1907984761894C7 /* AppPrivacyTests.swift in Sources */,
+				F1C611688ED82210D21A515F /* QuickSpendTests.swift in Sources */,
 				FF22C721D942DED66BB719E3 /* SyncEngineTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
