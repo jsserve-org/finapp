@@ -149,15 +149,19 @@ struct DashboardView: View {
                     Label("Portfolio", systemImage: "chart.line.uptrend.xyaxis")
                         .font(.headline)
                     if holdings.isEmpty {
-                        Text("Add your first stock trade")
+                        Text("Holdings appear here once your investment automation syncs")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     } else {
-                        ForEach(portfolioTotals, id: \.0) { currency, amount in
-                            HStack {
-                                Text(currency).foregroundStyle(.secondary)
+                        ForEach(portfolioTotals, id: \.currency) { total in
+                            HStack(alignment: .firstTextBaseline) {
+                                Text(total.currency).foregroundStyle(.secondary)
                                 Spacer()
-                                Text(hidesFinancialAmounts ? "••••" : money(amount, currency)).fontWeight(.semibold)
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    Text(hidesFinancialAmounts ? "••••" : money(total.value, total.currency)).fontWeight(.semibold)
+                                    StockGainText(amount: total.gain, fraction: nil, currency: total.currency, format: StockFormat(hidesAmounts: hidesFinancialAmounts))
+                                        .font(.caption.weight(.medium))
+                                }
                             }
                         }
                     }
@@ -167,10 +171,10 @@ struct DashboardView: View {
         }
     }
 
-    private var portfolioTotals: [(String, Int)] {
+    private var portfolioTotals: [(currency: String, value: Int, gain: Int)] {
         Dictionary(grouping: holdings, by: \.currency)
-            .map { ($0.key, $0.value.reduce(0) { $0 + $1.marketValueMinor }) }
-            .sorted { $0.0 < $1.0 }
+            .map { (currency: $0.key, value: $0.value.reduce(0) { $0 + $1.marketValueMinor }, gain: $0.value.reduce(0) { $0 + $1.gainLossMinor }) }
+            .sorted { $0.currency < $1.currency }
     }
 
     private var categoryTotals: [SpendingCategoryTotal] {

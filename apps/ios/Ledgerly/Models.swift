@@ -461,6 +461,9 @@ enum JSONValue: Codable, Equatable {
     var currency: String
     var linkedAccountId: String?
     var updatedAt: String
+    /// Local only, set by `StockQuoteService`. Nil means `currentPriceMinor` is still the last trade price.
+    var priceAsOf: Date?
+    var dayChangeMinor: Int?
 
     init(id: String = UUID().uuidString.lowercased(), symbol: String, name: String, quantity: Double, averageCostMinor: Int, currentPriceMinor: Int, currency: String, linkedAccountId: String?, updatedAt: String = ISO8601DateFormatter().string(from: Date())) {
         self.id = id; self.symbol = symbol; self.name = name; self.quantity = quantity
@@ -471,6 +474,9 @@ enum JSONValue: Codable, Equatable {
     var marketValueMinor: Int { Int((quantity * Double(currentPriceMinor)).rounded()) }
     var costBasisMinor: Int { Int((quantity * Double(averageCostMinor)).rounded()) }
     var gainLossMinor: Int { marketValueMinor - costBasisMinor }
+    var isOpen: Bool { quantity > 0 }
+    var returnFraction: Double? { costBasisMinor > 0 ? Double(gainLossMinor) / Double(costBasisMinor) : nil }
+    var dayChangeValueMinor: Int? { dayChangeMinor.map { Int((quantity * Double($0)).rounded()) } }
 }
 
 enum NetWorthCalculator {

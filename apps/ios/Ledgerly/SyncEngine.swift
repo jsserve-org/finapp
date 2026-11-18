@@ -234,6 +234,7 @@ struct SyncEngine {
                         item.symbol = dto.symbol; item.name = dto.name; item.quantity = dto.quantity
                         item.averageCostMinor = dto.averageCostMinor; item.currentPriceMinor = dto.currentPriceMinor
                         item.currency = dto.currency; item.linkedAccountId = dto.linkedAccountId; item.updatedAt = dto.updatedAt
+                        item.priceAsOf = nil; item.dayChangeMinor = nil
                     } else {
                         let item = StockHolding(id: dto.id, symbol: dto.symbol, name: dto.name, quantity: dto.quantity, averageCostMinor: dto.averageCostMinor, currentPriceMinor: dto.currentPriceMinor, currency: dto.currency, linkedAccountId: dto.linkedAccountId, updatedAt: dto.updatedAt)
                         context.insert(item)
@@ -350,6 +351,7 @@ struct SyncEngine {
             isOffline = false
             lastError = nil
             lastSyncedAt = Date()
+            await StockQuoteService.refresh(context: context)
         } catch {
             isOffline = true
             lastError = error.localizedDescription

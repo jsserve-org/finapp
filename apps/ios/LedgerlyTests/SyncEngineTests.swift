@@ -16,6 +16,126 @@ final class SyncEngineTests: XCTestCase {
         engine = SyncEngine(api: APIClient.shared)
     }
 
+    func testScreenshotPreservesETFCodeAndRejectsLeveragedPositions() {
+        func word(_ text: String, _ x: Double, _ y: Double) -> StockScreenshotText {
+            StockScreenshotText(text: text, box: CGRect(x: x - 0.02, y: y - 0.01, width: 0.04, height: 0.02))
+        }
+        let headers = [word("商品", 0.1, 0.8), word("交易類別", 0.3, 0.8), word("庫存股數", 0.5, 0.8), word("成交均價", 0.7, 0.8), word("市價", 0.9, 0.8)]
+        for type in ["現股", "融資", "融券"] {
+            let values = [word("00679B", 0.1, 0.6), word(type, 0.3, 0.6), word("1,000", 0.5, 0.6), word("25.5", 0.7, 0.6), word("27", 0.9, 0.6)]
+            let row = StockScreenshotTable.rows(headers + values).first
+            XCTAssertEqual(row?.symbol, "00679B")
+            XCTAssertEqual(row?.positionType, type)
+            XCTAssertEqual(row?.valid, type == "現股")
+        }
+        XCTAssertNil(StockScreenshotDraft.number("1,00"))
+        XCTAssertNil(StockScreenshotDraft.number("1,2,3"))
+        XCTAssertNil(StockScreenshotDraft.number("1e3"))
+        XCTAssertEqual(StockScreenshotDraft.number(" 1,000.25 "), 1000.25)
+    }
+
+    func testQuoteParserRejectsNonfiniteOverflowAndImpossibleDates() throws {
+        let rows = ["nan", "inf", "1e300", "-1", "100000000"].map {
+            ["Date": "1151105", "Code": "2330", "Name": "Stock", "ClosingPrice": $0, "Change": "0"]
+        } + [["Date": "1150230", "Code": "2330", "Name": "Stock", "ClosingPrice": "10", "Change": "0"]]
+        XCTAssertTrue(try StockQuoteParser.twse(JSONSerialization.data(withJSONObject: rows)).isEmpty)
+    }
+
+    func testOlderQuoteDoesNotReplaceNewerLocalQuote() {
+        let holding = StockHolding(symbol: "2330", name: "Stock", quantity: 1, averageCostMinor: 100, currentPriceMinor: 200, currency: "TWD", linkedAccountId: nil)
+        holding.priceAsOf = Date(timeIntervalSince1970: 100)
+        holding.dayChangeMinor = 10
+        let stale = StockQuote(symbol: "2330", name: "Stock", closeMinor: 100, changeMinor: -10, date: Date(timeIntervalSince1970: 0))
+        XCTAssertFalse(StockQuoteService.apply(["2330": stale], to: [holding]))
+        XCTAssertEqual(holding.currentPriceMinor, 200)
+        XCTAssertEqual(holding.dayChangeMinor, 10)
+    }
+
+    func testHistoryRejectsMalformedDateSegmentsAndExtremePrice() throws {
+        let data = Data(#"{"fields":["日期","收盤價"],"data":[["115/nope/10/01","20"],["115//10/01","20"],["115/10/01","1e300"],["115/10/02","20"]]}"#.utf8)
+        XCTAssertEqual(try StockHistoryParser.parse(data).map(\.price), [20])
+    }
+
+    func testStockHistoryParsesBothExchangeTablesAndRejectsInvalidPrices() throws {
+        let listed = Data(#"{"fields":["日期","成交股數","收盤價"],"data":[["115/10/02","2000","1,250.50"],["115/10/01","1000","1,200"],["115/10/03","0","--"],["115/10/04","0","nan"]]}"#.utf8)
+        let points = try StockHistoryParser.parse(listed)
+        XCTAssertEqual(points.map(\.price), [1200, 1250.5])
+        XCTAssertEqual(StockHistoryParser.calendar.component(.year, from: points[0].date), 2026)
+        let otc = Data(#"{"tables":[{"fields":["日 期","成交張數","收盤"],"data":[["115/10/01","380","18.60"],["115/02/30","0","99"],["115/10/02","1","-1"]]}]}"#.utf8)
+        XCTAssertEqual(try StockHistoryParser.parse(otc).map(\.price), [18.6])
+        XCTAssertTrue(try StockHistoryParser.parse(Data(#"{"stat":"No data"}"#.utf8)).isEmpty)
+        XCTAssertThrowsError(try StockHistoryParser.parse(Data("not json".utf8)))
+    }
+
+    func testStockHistoryRangesUseTaiwanCalendarAcrossYearBoundary() throws {
+        let calendar = StockHistoryParser.calendar
+        let now = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 1, day: 5)))
+        let start = StockHistoryRange.week.start(now: now, calendar: calendar)
+        XCTAssertEqual(calendar.component(.year, from: start), 2025)
+        XCTAssertEqual(calendar.component(.month, from: start), 12)
+        XCTAssertEqual(calendar.component(.day, from: start), 29)
+        XCTAssertEqual(calendar.component(.year, from: StockHistoryRange.year.start(now: now, calendar: calendar)), 2025)
+    }
+
+    func testStockNameLookupResolvesOnlyUniqueExactNamesAndAllowsSearch() {
+        let stocks = [StockIdentity(symbol: "1584", name: "精剛"), StockIdentity(symbol: "2330", name: "台積電")]
+        XCTAssertEqual(StockIdentity.exactName(" 精 剛 ", in: stocks)?.symbol, "1584")
+        XCTAssertNil(StockIdentity.exactName("精", in: stocks))
+        XCTAssertNil(StockIdentity.exactName("", in: stocks))
+        XCTAssertNil(StockIdentity.exactName("精剛", in: stocks + [StockIdentity(symbol: "9999", name: "精剛")]))
+        XCTAssertEqual(StockIdentity.search("精", in: stocks).map(\.symbol), ["1584"])
+        XCTAssertEqual(StockIdentity.search("233", in: stocks).map(\.name), ["台積電"])
+        XCTAssertTrue(StockIdentity.search("unknown", in: stocks).isEmpty)
+    }
+
+    func testStockScreenshotTableKeepsColumnsAndRedactedRowsSeparate() {
+        func word(_ text: String, _ x: Double, _ y: Double) -> StockScreenshotText {
+            StockScreenshotText(text: text, box: CGRect(x: x - 0.02, y: y - 0.01, width: 0.04, height: 0.02))
+        }
+        let words = [
+            word("商品", 0.18, 0.8), word("父易類別", 0.24, 0.8),
+            word("庫仔股數", 0.30, 0.8), word("成交均價", 0.36, 0.8),
+            word("投資成本", 0.42, 0.8), word("：市價", 0.48, 0.8), word("獲利點", 0.54, 0.8),
+            word("現股", 0.24, 0.7), word("2,000", 0.30, 0.7), word("117.5", 0.36, 0.7),
+            word("235,167", 0.42, 0.7), word("239.5", 0.48, 0.7), word("118.64", 0.54, 0.7),
+            word("精剛", 0.18, 0.6), word("現股", 0.24, 0.6), word("1,000", 0.30, 0.6),
+            word("25.25", 0.36, 0.6), word("16.5", 0.48, 0.6),
+            word("現股", 0.24, 0.5),
+        ]
+        // Vision's observation order may be column-major rather than row-major.
+        let rows = StockScreenshotTable.rows(Array(words.reversed()))
+        XCTAssertEqual(rows.count, 3)
+        XCTAssertEqual(rows[0].quantity, "2,000")
+        XCTAssertEqual(rows[0].cost, "117.5")
+        XCTAssertEqual(rows[0].price, "239.5")
+        XCTAssertTrue(rows[0].symbol.isEmpty, "A quantity must never become a ticker")
+        XCTAssertEqual(rows[1].name, "精剛")
+        XCTAssertEqual(rows[1].quantity, "1,000")
+        XCTAssertEqual(rows[1].cost, "25.25")
+        XCTAssertEqual(rows[1].price, "16.5")
+        XCTAssertFalse(rows[2].included)
+        XCTAssertTrue(rows[2].quantity.isEmpty)
+        XCTAssertTrue(rows[2].cost.isEmpty)
+        XCTAssertTrue(rows[2].price.isEmpty)
+        XCTAssertFalse(rows[0].valid, "Missing stock identities cannot be saved")
+        XCTAssertTrue(StockScreenshotTable.rows([word("1,000", 0.3, 0.5)]).isEmpty)
+    }
+
+    func testStockScreenshotAcceptsCompleteRowsWithoutPerStockConfirmation() {
+        var row = StockScreenshotRow(symbol: "2330", quantity: "1,000", cost: "850.50", price: "900", included: true)
+        XCTAssertTrue(row.valid)
+        row.symbol = "00400A"
+        XCTAssertTrue(row.valid)
+        for invalid in ["nan", "inf", "-1", "100000000000", ""] {
+            row.quantity = invalid
+            XCTAssertFalse(row.valid)
+        }
+    }
+
+    func testStockScreenshotUsesTCStockHoldingIdentity() {
+        XCTAssertEqual(StockScreenshotDraft.holdingID(symbol: "2330"), "3f4bf51f-3dfb-5d2e-a417-c3282a9270a4")
+    }
+
     // MARK: - JSONValue
 
     func testPartialAccountChangePatchesCachedAccountInsteadOfFailingSync() throws {
@@ -470,6 +590,107 @@ final class SyncEngineTests: XCTestCase {
         XCTAssertEqual(holding.marketValueMinor, 50_000)
         XCTAssertEqual(holding.gainLossMinor, 5_000)
         XCTAssertEqual(try context.fetch(FetchDescriptor<StockTrade>()).first?.symbol, "AAPL")
+    }
+
+    func testRealizedGainReplaysAverageCostAndCountsSellFees() {
+        let trades = [
+            StockTrade(holdingId: "h", symbol: "2330", side: "sell", quantity: 1_000, priceMinor: 120_00, feesMinor: 500_00, currency: "TWD", tradedAt: "2026-03-01T12:00:00.000+08:00", linkedAccountId: nil),
+            StockTrade(holdingId: "h", symbol: "2330", side: "buy", quantity: 1_000, priceMinor: 100_00, feesMinor: 0, currency: "TWD", tradedAt: "2026-01-01T12:00:00.000+08:00", linkedAccountId: nil),
+            StockTrade(holdingId: "h", symbol: "2330", side: "buy", quantity: 1_000, priceMinor: 110_00, feesMinor: 0, currency: "TWD", tradedAt: "2026-02-01T12:00:00.000+08:00", linkedAccountId: nil),
+        ]
+        // Sold 1,000 at 120 against a 105 average, less 500 in fees.
+        XCTAssertEqual(StockTradeMath.realizedGain(trades: trades), 14_500_00)
+    }
+
+    func testRealizedGainFundsSameDaySellsWithSameDayBuys() {
+        let time = "2026-01-01T12:00:00.000+08:00"
+        let trades = [
+            StockTrade(holdingId: "h", symbol: "2330", side: "sell", quantity: 1_000, priceMinor: 11_00, feesMinor: 0, currency: "TWD", tradedAt: time, linkedAccountId: nil),
+            StockTrade(holdingId: "h", symbol: "2330", side: "buy", quantity: 1_000, priceMinor: 10_00, feesMinor: 0, currency: "TWD", tradedAt: time, linkedAccountId: nil),
+        ]
+        XCTAssertEqual(StockTradeMath.realizedGain(trades: trades), 1_000_00)
+    }
+
+    func testPortfolioSummaryIgnoresClosedPositionsAndCountsUnquoted() {
+        let quoted = StockHolding(symbol: "2330", name: "TSMC", quantity: 10, averageCostMinor: 100_00, currentPriceMinor: 110_00, currency: "TWD", linkedAccountId: nil)
+        quoted.priceAsOf = Date(timeIntervalSince1970: 0)
+        quoted.dayChangeMinor = -1_00
+        let unquoted = StockHolding(symbol: "9999", name: "9999", quantity: 10, averageCostMinor: 10_00, currentPriceMinor: 10_00, currency: "TWD", linkedAccountId: nil)
+        let closed = StockHolding(symbol: "1111", name: "1111", quantity: 0, averageCostMinor: 0, currentPriceMinor: 50_00, currency: "TWD", linkedAccountId: nil)
+
+        let summary = StockPortfolioSummary(holdings: [quoted, unquoted, closed], trades: [])
+        XCTAssertEqual(summary.valueMinor, 1_200_00)
+        XCTAssertEqual(summary.costMinor, 1_100_00)
+        XCTAssertEqual(summary.unrealizedMinor, 100_00)
+        XCTAssertEqual(summary.dayChangeMinor, -10_00)
+        XCTAssertEqual(summary.unquotedCount, 1)
+        XCTAssertEqual(summary.priceAsOf, Date(timeIntervalSince1970: 0))
+    }
+
+    func testAllocationFoldsExtraPositionsIntoOtherAndKeepsColorsByTicker() {
+        let holdings = (1...7).map { index in
+            StockHolding(symbol: "S\(index)", name: "S\(index)", quantity: 1, averageCostMinor: 1, currentPriceMinor: index * 100, currency: "TWD", linkedAccountId: nil)
+        }
+        let slices = StockAllocationSlice.slices(for: holdings)
+        XCTAssertEqual(slices.map(\.id), ["S7", "S6", "S5", "S4", "S3", "Other"])
+        XCTAssertEqual(slices.first?.colorIndex, 4)
+        XCTAssertNil(slices.last?.colorIndex)
+        XCTAssertEqual(slices.last?.valueMinor, 300)
+        XCTAssertEqual(slices.reduce(0) { $0 + $1.share }, 1, accuracy: 0.0001)
+    }
+
+    func testQuoteParsersHandleExchangeFormatsAndPlaceholders() throws {
+        let twse = try StockQuoteParser.twse(Data(#"""
+        [{"Date":"1151105","Code":"2330","Name":"台積電","ClosingPrice":"1,025.00","Change":"-5.0000"},
+         {"Date":"1151105","Code":"0000","Name":"No trade","ClosingPrice":"","Change":"0.0000"}]
+        """#.utf8))
+        XCTAssertEqual(twse.map(\.symbol), ["2330"])
+        XCTAssertEqual(twse[0].closeMinor, 102_500)
+        XCTAssertEqual(twse[0].changeMinor, -500)
+        let parts = Calendar(identifier: .gregorian).dateComponents(in: TimeZone(identifier: "Asia/Taipei")!, from: twse[0].date)
+        XCTAssertEqual([parts.year, parts.month, parts.day], [2026, 11, 5])
+
+        let tpex = try StockQuoteParser.tpex(Data(#"""
+        [{"Date":"1151105","SecuritiesCompanyCode":"00679B","CompanyName":"元大美債20年","Close":"26.99","Change":"+0.51"},
+         {"Date":"1151105","SecuritiesCompanyCode":"1111","CompanyName":"Ex-dividend","Close":"10.00","Change":"除息"},
+         {"Date":"1151105","SecuritiesCompanyCode":"2222","CompanyName":"No trade","Close":"----","Change":"---"}]
+        """#.utf8))
+        XCTAssertEqual(tpex.map(\.symbol), ["00679B", "1111"])
+        XCTAssertEqual(tpex[0].changeMinor, 51)
+        XCTAssertNil(tpex[1].changeMinor)
+    }
+
+    @MainActor
+    func testQuoteApplyUpdatesTaiwanHoldingsAndOnlyFillsPlaceholderNames() {
+        let date = Date(timeIntervalSince1970: 0)
+        let quotes = [
+            "2330": StockQuote(symbol: "2330", name: "台積電", closeMinor: 1_000_00, changeMinor: 5_00, date: date),
+            "AAPL": StockQuote(symbol: "AAPL", name: "Wrong", closeMinor: 1, changeMinor: nil, date: date),
+            "0050": StockQuote(symbol: "0050", name: "元大台灣50", closeMinor: 200_00, changeMinor: nil, date: date),
+        ]
+        let placeholder = StockHolding(symbol: "2330", name: "2330", quantity: 1, averageCostMinor: 1, currentPriceMinor: 1, currency: "TWD", linkedAccountId: nil)
+        let renamed = StockHolding(symbol: "0050", name: "My ETF", quantity: 1, averageCostMinor: 1, currentPriceMinor: 1, currency: "TWD", linkedAccountId: nil)
+        let foreign = StockHolding(symbol: "AAPL", name: "Apple", quantity: 1, averageCostMinor: 1, currentPriceMinor: 5, currency: "USD", linkedAccountId: nil)
+
+        XCTAssertTrue(StockQuoteService.apply(quotes, to: [placeholder, renamed, foreign]))
+        XCTAssertEqual(placeholder.name, "台積電")
+        XCTAssertEqual(placeholder.currentPriceMinor, 1_000_00)
+        XCTAssertEqual(placeholder.dayChangeMinor, 5_00)
+        XCTAssertEqual(renamed.name, "My ETF")
+        XCTAssertEqual(foreign.currentPriceMinor, 5)
+        XCTAssertNil(foreign.priceAsOf)
+        XCTAssertFalse(StockQuoteService.apply(quotes, to: [placeholder, renamed, foreign]))
+    }
+
+    func testSyncedHoldingUpdateClearsLocalQuote() throws {
+        let value = #"{"id":"holding-1","symbol":"2330","name":"TSMC","currency":"TWD","quantity":1,"averageCostMinor":100,"currentPriceMinor":100,"linkedAccountId":null,"updatedAt":"2026-01-01T00:00:00.000Z"}"#
+        try engine.apply([change(11, entity: "stockHolding", id: "holding-1", value: value)], context: context)
+        let holding = try XCTUnwrap(context.fetch(FetchDescriptor<StockHolding>()).first)
+        holding.priceAsOf = Date()
+        holding.dayChangeMinor = 5
+        try engine.apply([change(12, entity: "stockHolding", id: "holding-1", value: value)], context: context)
+        XCTAssertNil(holding.priceAsOf)
+        XCTAssertNil(holding.dayChangeMinor)
     }
 
     func testServerCompatibilityDetectsLegacyAndMismatchedServers() {

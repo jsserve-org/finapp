@@ -44,7 +44,7 @@ docker compose --profile tools run --rm convex-deploy
 docker compose up -d api
 ```
 
-Stock holdings and trades sync as first-class records. A trade can link to a same-currency bank account; buys subtract cash, sells return cash, and the matching account transaction remains visible in activity. Current holding value is included in Insights net worth.
+Stock holdings and trades sync as first-class records. A trade can link to a same-currency bank account; buys subtract cash, sells return cash, and the matching account transaction remains visible in activity. Current holding value is included in Insights net worth. The iOS app reprices Taiwan holdings from the public TWSE and TPEx daily closing feeds. It downloads the whole market list, so the exchanges never learn what you hold, and these prices stay on the device instead of syncing.
 
 ## Opening ports
 
