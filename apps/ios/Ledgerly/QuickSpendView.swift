@@ -2,6 +2,7 @@ import SwiftData
 import SwiftUI
 
 /// Three-page spending entry like Spend money: pick the account, enter the amount, then tap a category to save.
+/// Dining taps are named after the likely meal from the clock, so a noon save becomes "Lunch".
 struct QuickSpendView: View {
     private enum Step: Int {
         case account
@@ -48,7 +49,7 @@ struct QuickSpendView: View {
 
     var body: some View {
         if showingDetails {
-            AccountEntryView(account: account, direction: .moneyOut, amount: amount)
+            AccountEntryView(account: account, direction: .moneyOut, amount: amount, prefilledDescription: QuickSpendMeal.guess() ?? "")
         } else {
             NavigationStack {
                 ZStack {
@@ -142,7 +143,12 @@ struct QuickSpendView: View {
                     Button { save(category: category) } label: {
                         HStack(spacing: 12) {
                             Image(systemName: PaymentIcon.symbol(title: "", category: category, amountMinor: -1)).ledgerlyIcon(color: .red)
-                            Text(category).font(.headline).foregroundStyle(.primary)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(category).font(.headline).foregroundStyle(.primary)
+                                if let meal = mealSuggestion(for: category) {
+                                    Text("Looks like \(meal.lowercased())").font(.subheadline).foregroundStyle(.secondary)
+                                }
+                            }
                             Spacer()
                             if category == lastCategory {
                                 Text("Last used").font(.subheadline).foregroundStyle(.secondary)
@@ -201,11 +207,16 @@ struct QuickSpendView: View {
         MoneyInput.minorUnits(amount) ?? 0
     }
 
+    /// Only food gets a meal name; everything else keeps its category as the description.
+    private func mealSuggestion(for category: String) -> String? {
+        category == "Dining" ? QuickSpendMeal.guess() : nil
+    }
+
     private func save(category: String) {
         guard let account, parsedAmount > 0 else { return }
         AccountActionService.record(
             amountMinor: parsedAmount,
-            description: category,
+            description: mealSuggestion(for: category) ?? category,
             category: category,
             date: Date(), direction: .moneyOut, account: account, context: context,
             expensePurpose: "personal",
@@ -213,5 +224,21 @@ struct QuickSpendView: View {
         )
         lastCategory = category
         dismiss()
+    }
+}
+
+/// Meal inferred from the time of day, so a Dining tap at noon is saved as "Lunch".
+/// Mid-afternoon is too ambiguous to call, so it falls back to the plain category.
+enum QuickSpendMeal {
+    static func guess(for date: Date = Date(), calendar: Calendar = .current) -> String? {
+        let hour = calendar.component(.hour, from: date)
+        if calendar.isDateInWeekend(date), (10...13).contains(hour) { return "Brunch" }
+        switch hour {
+        case 5...10: return "Breakfast"
+        case 11...14: return "Lunch"
+        case 15...16: return nil
+        case 17...21: return "Dinner"
+        default: return "Late-night snack"
+        }
     }
 }

@@ -161,12 +161,13 @@ struct AccountEntryView: View {
     @State private var step: Step = .account
     @State private var movesForward = true
 
-    init(account: CachedAccount? = nil, direction: AccountEntryDirection, amount: String = "") {
+    init(account: CachedAccount? = nil, direction: AccountEntryDirection, amount: String = "", prefilledDescription: String = "") {
         self.direction = direction
         preferredAccountID = account?.id
         _selectedAccountID = State(initialValue: account?.id ?? "")
         _currency = State(initialValue: account?.currency ?? SupportedCurrency.defaultCode)
         _amount = State(initialValue: amount)
+        _description = State(initialValue: prefilledDescription)
         _step = State(initialValue: account != nil && !amount.isEmpty ? .details : .account)
     }
 
